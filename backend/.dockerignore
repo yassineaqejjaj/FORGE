@@ -1,0 +1,13 @@
+.venv
+**/__pycache__
+**/*.pyc
+.pytest_cache
+.ruff_cache
+.mypy_cache
+.hypothesis
+.import_linter_cache
+.env
+.data
+.seed-credentials.json
+tests
+*.log

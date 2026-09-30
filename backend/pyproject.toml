@@ -1,0 +1,115 @@
+[project]
+name = "forge-backend"
+version = "1.0.0"
+description = "FORGE — plateforme d'évaluation, de benchmark et d'amélioration continue des agents IA (API, workers, CLI)."
+readme = "README.md"
+requires-python = ">=3.12,<3.13"
+dependencies = [
+    "fastapi>=0.115",
+    "uvicorn[standard]>=0.32",
+    "sqlalchemy[asyncio]>=2.0.36",
+    "asyncpg>=0.30",
+    "alembic>=1.14",
+    "pydantic>=2.9",
+    "pydantic-settings>=2.6",
+    "email-validator>=2.2",
+    "python-multipart>=0.0.18",
+    "argon2-cffi>=23.1",
+    "pyjwt>=2.10",
+    "cryptography>=43",
+    "redis>=5.2",
+    "httpx>=0.28",
+    "orjson>=3.10",
+    "pyyaml>=6.0",
+    "jsonschema>=4.23",
+    "numpy>=1.26",
+    "scipy>=1.14",
+    "opentelemetry-api>=1.28",
+    "opentelemetry-sdk>=1.28",
+    "opentelemetry-exporter-otlp-proto-http>=1.28",
+    "opentelemetry-instrumentation-fastapi>=0.49b0",
+    "opentelemetry-proto>=1.28",
+    "prometheus-client>=0.21",
+]
+
+[project.scripts]
+forge = "forge.cli.main:main"
+
+[dependency-groups]
+dev = [
+    "pytest>=8.3",
+    "pytest-asyncio>=0.24",
+    "hypothesis>=6.115",
+    "respx>=0.21",
+    "ruff>=0.8",
+    "mypy>=1.13",
+    "import-linter>=2.1",
+    "types-pyyaml>=6.0",
+]
+
+[build-system]
+requires = ["hatchling>=1.25"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["forge"]
+
+[tool.ruff]
+line-length = 110
+target-version = "py312"
+extend-exclude = ["alembic/versions"]
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "B", "UP", "ASYNC", "SIM", "RUF"]
+ignore = [
+    "B008",    # FastAPI Depends() in defaults
+    "RUF001",  # French typography (’, «, ») in strings is intentional
+    "RUF002",
+    "RUF003",
+    "RUF012",
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["B011", "E501", "ASYNC109", "ASYNC110", "ASYNC240"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["forge"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "session"
+asyncio_default_test_loop_scope = "session"
+testpaths = ["tests"]
+filterwarnings = ["ignore::DeprecationWarning"]
+
+[tool.mypy]
+python_version = "3.12"
+ignore_missing_imports = true
+warn_unused_ignores = false
+check_untyped_defs = true
+
+# Architecture contracts (docs/ARCHITECTURE.md §2): the domain stays framework-free.
+[tool.importlinter]
+root_package = "forge"
+include_external_packages = true
+
+[[tool.importlinter.contracts]]
+name = "Pure domain: no framework, database or network"
+type = "forbidden"
+source_modules = ["forge.domain"]
+forbidden_modules = [
+    "forge.infra", "forge.adapters", "forge.services", "forge.api", "forge.workers", "forge.cli",
+    "forge.seed", "forge.demo_agents", "forge.config",
+    "sqlalchemy", "fastapi", "starlette", "httpx", "redis", "asyncpg",
+]
+
+[[tool.importlinter.contracts]]
+name = "Layers"
+type = "layers"
+layers = [
+    "forge.api | forge.workers | forge.cli | forge.seed | forge.demo_agents",
+    "forge.services",
+    "forge.adapters",
+    "forge.infra",
+    "forge.domain",
+]

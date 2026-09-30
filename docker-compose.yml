@@ -1,0 +1,126 @@
+# FORGE — complete platform: `docker compose up -d --build` (see Makefile for shortcuts).
+# Host ports: web 3100, api 8100, postgres 5434, valkey 6381, demo agents 8190.
+
+name: forge
+
+x-backend-env: &backend-env
+  FORGE_ENV: ${FORGE_ENV:-development}
+  FORGE_DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-forge}:${POSTGRES_PASSWORD:-forge}@postgres:5432/${POSTGRES_DB:-forge}
+  FORGE_VALKEY_URL: redis://valkey:6379/0
+  FORGE_DEMO_AGENTS_URL: http://demo-agents:8190
+  FORGE_PUBLIC_BASE_URL: ${FORGE_PUBLIC_BASE_URL:-http://localhost:8100}
+
+x-backend: &backend
+  build:
+    context: ./backend
+  image: forge-backend:latest
+  env_file:
+    - path: .env
+      required: false
+  restart: unless-stopped
+
+services:
+  postgres:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-forge}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-forge}
+      POSTGRES_DB: ${POSTGRES_DB:-forge}
+    ports:
+      - "5434:5432"
+    volumes:
+      - forge_pg:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 10s
+
+  valkey:
+    image: valkey/valkey:8-alpine
+    restart: unless-stopped
+    command: ["valkey-server", "--save", "", "--appendonly", "no", "--maxmemory", "256mb", "--maxmemory-policy", "allkeys-lru"]
+    ports:
+      - "6381:6379"
+    healthcheck:
+      test: ["CMD", "valkey-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  api:
+    <<: *backend
+    command: ["api"]
+    environment:
+      <<: *backend-env
+      FORGE_SERVICE_NAME: forge-api
+    ports:
+      - "8100:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      valkey:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=3).status == 200 else 1)"]
+      interval: 10s
+      timeout: 5s
+      retries: 20
+      start_period: 20s
+
+  # Agent calls (slow, rate limited): scale with `docker compose up --scale runner-worker=N`.
+  runner-worker:
+    <<: *backend
+    command: ["worker"]
+    environment:
+      <<: *backend-env
+      FORGE_WORKER_QUEUES: execution
+      FORGE_WORKER_CONCURRENCY: ${FORGE_RUNNER_CONCURRENCY:-8}
+      FORGE_SERVICE_NAME: forge-runner-worker
+    depends_on:
+      api:
+        condition: service_healthy
+
+  # Rules, LLM judges, scoring, aggregation.
+  evaluation-worker:
+    <<: *backend
+    command: ["worker"]
+    environment:
+      <<: *backend-env
+      FORGE_WORKER_QUEUES: evaluation
+      FORGE_WORKER_CONCURRENCY: ${FORGE_EVALUATION_CONCURRENCY:-4}
+      FORGE_SERVICE_NAME: forge-evaluation-worker
+    depends_on:
+      api:
+        condition: service_healthy
+
+  # Demo agents speaking the FORGE Agent Protocol (ProductAgent v1/v2/v3, SupportAgent…).
+  demo-agents:
+    <<: *backend
+    command: ["demo-agents"]
+    environment:
+      <<: *backend-env
+      FORGE_OTLP_INGEST_URL: http://api:8000/v1/traces
+    ports:
+      - "8190:8190"
+    depends_on:
+      api:
+        condition: service_healthy
+
+  web:
+    build:
+      context: ./frontend
+      args:
+        FORGE_API_URL: http://api:8000
+    image: forge-web:latest
+    restart: unless-stopped
+    ports:
+      - "3100:3000"
+    depends_on:
+      api:
+        condition: service_healthy
+
+volumes:
+  forge_pg:
