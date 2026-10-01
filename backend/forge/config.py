@@ -78,6 +78,12 @@ class Settings(BaseSettings):
     feedback_llm_model: str = ""
     feedback_llm_api_key: str = ""
 
+    # --- Analytics (benchmarks, experiments) -----------------------------------------------------
+    #: Bootstrap resamples of the confidence intervals (seeded, docs §9.3).
+    analytics_bootstrap_resamples: int = Field(default=10_000, ge=100, le=100_000)
+    #: Upper bound of runs created by one benchmark launch or one experiment (N × M × K).
+    analytics_max_runs_per_launch: int = Field(default=5_000, ge=1)
+
     # --- Integrations ----------------------------------------------------------------------------
     orbit_base_url: str = ""
     demo_agents_url: str = "http://demo-agents:8190"
