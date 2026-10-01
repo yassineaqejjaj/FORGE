@@ -15,10 +15,11 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from forge import __version__
-from forge.domain.defaults import CRITERIA_BY_KEY
+from forge.domain.defaults import CRITERIA_BY_KEY, RULE_DEFAULTS
 from forge.domain.enums import Dimension, RuleType
 from forge.domain.hashing import content_hash
 from forge.domain.serialization import from_dict, list_from_dicts
+from forge.domain.taxonomy import BUILTIN_ERROR_TYPES
 from forge.domain.types import (
     AgentBudget,
     AgentSpec,
@@ -163,11 +164,18 @@ async def load_agent_spec(session: AsyncSession, version: AgentVersion) -> Agent
 
 
 def parse_rules(items: list[dict[str, Any]] | None) -> list[RuleSpec]:
+    """Rule specs; without explicit ``severity`` a rule inherits the default severity of its error type
+    (a ``no_pii`` failure is a critical ``DATA_LEAK``, not a medium one)."""
     rules: list[RuleSpec] = []
     for index, item in enumerate(items or []):
         data = dict(item)
         data.setdefault("id", f"R{index + 1}")
         data["type"] = RuleType(data["type"])
+        if not data.get("severity"):
+            error_type = data.get("error_type") or RULE_DEFAULTS[data["type"]][1]
+            info = BUILTIN_ERROR_TYPES.get(str(error_type)) if error_type else None
+            if info is not None:
+                data["severity"] = info.default_severity
         rules.append(from_dict(RuleSpec, data))
     return rules
 
