@@ -45,7 +45,9 @@ def test_aggregate_per_agent_and_ranking() -> None:
     summary = aggregate_benchmark(_two_agents(), dimension_weights=WEIGHTS, n_resamples=2000)
     assert summary.schema == "forge.benchmark-summary/v1"
     assert summary.totals.n_runs == 12 and summary.totals.n_scored == 12
-    assert summary.totals.n_scenarios == 3 and summary.totals.n_agents == 2 and summary.totals.repetitions == 2
+    assert (
+        summary.totals.n_scenarios == 3 and summary.totals.n_agents == 2 and summary.totals.repetitions == 2
+    )
     first, second = summary.agents
     assert (first.agent_label, first.rank) == ("A v1.0", 1)
     assert first.composite.mean == pytest.approx(80.5)
@@ -120,7 +122,9 @@ def test_robustness_formula_and_group_composite() -> None:
 
 def test_robustness_weighted_by_family_size_and_capped() -> None:
     runs = [make_run(scenario="a", composite=v, repetition=i) for i, v in enumerate([50.0, 50.0])]
-    runs += [make_run(scenario="b", composite=v, repetition=i) for i, v in enumerate([0.0, 100.0, 0.0, 100.0])]
+    runs += [
+        make_run(scenario="b", composite=v, repetition=i) for i, v in enumerate([0.0, 100.0, 0.0, 100.0])
+    ]
     result = robustness(runs, max_std=0.25)
     by_label = {f.label: f.robustness for f in result.families}
     assert by_label == {"Scénario a": 1.0, "Scénario b": 0.0}
@@ -155,16 +159,21 @@ def test_matrix_cells() -> None:
     assert [s.slug for s in matrix.scenarios] == ["s1", "s2", "s3"]
     assert [a.label for a in matrix.agents] == ["A v1.0", "B v1.0"]
     assert len(matrix.cells) == 6
-    cell = next(c for c in matrix.cells if c.scenario_id == sid("scenario:s1") and c.agent_version_id.endswith(""))
+    cell = next(
+        c for c in matrix.cells if c.scenario_id == sid("scenario:s1") and c.agent_version_id.endswith("")
+    )
     assert cell.n_runs == 2 and cell.composite_mean == pytest.approx(70.5)
     b_s1 = next(
-        c for c in matrix.cells if c.scenario_id == sid("scenario:s1") and c.agent_version_id == sid("agent-version:B:1.0")
+        c
+        for c in matrix.cells
+        if c.scenario_id == sid("scenario:s1") and c.agent_version_id == sid("agent-version:B:1.0")
     )
     assert b_s1.error_types == ["HALLUCINATION"] and b_s1.error_count == 2
 
 
 def test_group_runs_every_dimension() -> None:
-    runs = _two_agents() + [
+    runs = [
+        *_two_agents(),
         make_run(
             scenario="s4",
             agent="A",
@@ -174,7 +183,7 @@ def test_group_runs_every_dimension() -> None:
             difficulty="hard",
             model=None,
             created_at=datetime(2026, 9, 2, tzinfo=UTC),
-        )
+        ),
     ]
     for group_by in GROUP_BY_VALUES:
         rows = group_runs(runs, group_by)

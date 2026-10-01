@@ -97,7 +97,7 @@ class AgentBudget:
     max_tokens: int | None = None
     max_cost: float | None = None
     max_steps: int = 8  # LLM turns in a FORGE-driven tool loop
-    timeout_seconds: float = 120.0
+    timeout_seconds: float | None = None  # None → FORGE_RUNNER_DEFAULT_TIMEOUT_SECONDS
 
 
 @dataclass(slots=True)

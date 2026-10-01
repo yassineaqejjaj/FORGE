@@ -11,10 +11,7 @@ from forge.domain.enums import ExperimentArm, JobKind, Role, RunOrigin
 from forge.infra.db import get_sessionmaker
 from forge.infra.models import AuditEvent, EvaluationRun, ExperimentScenario, Job
 from forge.infra.queue import PRIORITY_EXPERIMENT
-from tests.analytics_fixtures import complete_runs, custom_plans, make_catalog, scenario_index
-
-pytestmark = pytest.mark.usefixtures("custom_plans")
-_FIXTURES = (custom_plans,)
+from tests.analytics_fixtures import complete_runs, make_catalog, scenario_index
 
 
 async def _experiment(client, baseline, candidate, scenario_ids, **extra) -> dict:

@@ -141,7 +141,7 @@ async def _throttle_remote(zkey: str, limit: int, window: float) -> float:
     oldest = await client.zrange(zkey, 0, 0, withscores=True)
     if not oldest:
         return 0.1
-    return max(0.05, oldest[0][1] + window - now)
+    return max(0.05, float(oldest[0][1]) + window - now)
 
 
 def _throttle_local(key: str, limit: int, window: float) -> float:

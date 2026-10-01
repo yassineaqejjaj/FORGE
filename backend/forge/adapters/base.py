@@ -10,6 +10,7 @@ import json
 from datetime import datetime
 from typing import Any
 
+from forge.config import settings
 from forge.domain.enums import BuiltinErrorType, TraceEventSource, TraceEventType
 from forge.domain.traces.protocol import FAP_VERSION, parse_protocol_events, parse_usage, usage_from_events
 from forge.domain.traces.recorder import import_events
@@ -29,6 +30,11 @@ HEADER_ATTEMPT = "X-Forge-Attempt"
 HEADER_TRACEPARENT = "traceparent"
 #: Extra HTTP time on top of the budget timeout: the runner's own timeout must fire first.
 HTTP_TIMEOUT_MARGIN_SECONDS = 5.0
+
+
+def as_dict(value: Any) -> dict[str, Any]:
+    """``value`` when it is a JSON object, else an empty dict (tolerant payload parsing)."""
+    return value if isinstance(value, dict) else {}
 
 
 def _header(request: AgentRequest, name: str) -> str | None:
@@ -55,7 +61,8 @@ def attempt_of(request: AgentRequest) -> int:
 
 def http_timeout(request: AgentRequest) -> float:
     configured = request.agent.adapter_config.get("http_timeout_seconds")
-    base = float(configured) if configured else float(request.agent.budget.timeout_seconds or 120.0)
+    budget = request.agent.budget.timeout_seconds or settings.runner_default_timeout_seconds
+    base = float(configured) if configured else float(budget)
     return base + HTTP_TIMEOUT_MARGIN_SECONDS
 
 
@@ -173,7 +180,7 @@ def result_from_protocol(
 def _result(
     data: dict[str, Any], events: list[TraceEventData], recorder: Any, text: str, output_json: Any
 ) -> AgentResult:
-    usage_data = data.get("usage") if isinstance(data.get("usage"), dict) else {}
+    usage_data = as_dict(data.get("usage"))
     usage = parse_usage(usage_data)
     event_usage, event_calls, event_cost = usage_from_events(events)
     if usage.total_tokens == 0:

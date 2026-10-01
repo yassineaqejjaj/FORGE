@@ -13,7 +13,9 @@ CONTENT = {
     "difficulty": "hard",
     "description": "Rédaction d'un PRD",
     "input": {"prompt": "Rédige un PRD pour l'export CSV des rapports."},
-    "context": {"documents": [{"id": "D1", "title": "Besoin client", "content": "Les clients veulent exporter."}]},
+    "context": {
+        "documents": [{"id": "D1", "title": "Besoin client", "content": "Les clients veulent exporter."}]
+    },
     "constraints": ["Moins de 600 mots", "Citer les sources"],
     "expected_output": "Un PRD avec objectifs, périmètre, exigences et critères d'acceptation.",
     "criteria": [{"key": "quality.completeness", "weight": 2}, "quality.accuracy"],
@@ -62,13 +64,21 @@ async def test_create_and_read_scenario(client_as) -> None:
 async def test_slug_generation_and_conflicts(client_as) -> None:
     editor = await client_as(Role.editor)
     category = f"cat {uuid.uuid4().hex[:4]} research"
-    first = await editor.post("/api/v1/scenarios", json={"name": "A", "category": category, "content": CONTENT})
-    second = await editor.post("/api/v1/scenarios", json={"name": "B", "category": category, "content": CONTENT})
+    first = await editor.post(
+        "/api/v1/scenarios", json={"name": "A", "category": category, "content": CONTENT}
+    )
+    second = await editor.post(
+        "/api/v1/scenarios", json={"name": "B", "category": category, "content": CONTENT}
+    )
     a, b = first.json()["slug"], second.json()["slug"]
     assert a.startswith("scenario_c") and a.endswith("_001") and b.endswith("_002")
-    dup = await editor.post("/api/v1/scenarios", json={"slug": a, "name": "C", "category": "x", "content": CONTENT})
+    dup = await editor.post(
+        "/api/v1/scenarios", json={"slug": a, "name": "C", "category": "x", "content": CONTENT}
+    )
     assert dup.status_code == 409
-    bad = await editor.post("/api/v1/scenarios", json={"slug": "Bad Slug", "name": "C", "category": "x", "content": CONTENT})
+    bad = await editor.post(
+        "/api/v1/scenarios", json={"slug": "Bad Slug", "name": "C", "category": "x", "content": CONTENT}
+    )
     assert bad.status_code == 422
 
 
@@ -79,7 +89,11 @@ async def test_invalid_content_is_rejected_with_details(client_as) -> None:
         json={
             "name": "Invalide",
             "category": "analysis",
-            "content": {"input": {}, "rules": [{"type": "contains", "params": {}}], "criteria": ["style.tone"]},
+            "content": {
+                "input": {},
+                "rules": [{"type": "contains", "params": {}}],
+                "criteria": ["style.tone"],
+            },
         },
     )
     assert response.status_code == 422
@@ -99,7 +113,9 @@ async def test_new_versions_and_conflict(client_as) -> None:
     url = f"/api/v1/scenarios/{scenario['id']}/versions"
     identical = await editor.post(url, json={"content": {"constraints": CONTENT["constraints"]}})
     assert identical.status_code == 409
-    created = await editor.post(url, json={"content": {"constraints": ["Moins de 300 mots"]}, "changelog": "Plus court"})
+    created = await editor.post(
+        url, json={"content": {"constraints": ["Moins de 300 mots"]}, "changelog": "Plus court"}
+    )
     assert created.status_code == 201, created.text
     v2 = created.json()
     assert v2["version"] == 2 and v2["constraints"] == ["Moins de 300 mots"]
@@ -118,14 +134,23 @@ async def test_metadata_patch_and_filters(client_as) -> None:
     tag = f"tag-{uuid.uuid4().hex[:6]}"
     scenario = await _create(editor, tags=[tag])
     patched = await editor.patch(
-        f"/api/v1/scenarios/{scenario['id']}", json={"name": "Renommé", "tags": [tag, "autre"], "visibility": "fresh"}
+        f"/api/v1/scenarios/{scenario['id']}",
+        json={"name": "Renommé", "tags": [tag, "autre"], "visibility": "fresh"},
     )
     assert patched.status_code == 200
-    assert patched.json()["name"] == "Renommé" and patched.json()["visibility"] == "fresh" and patched.json()["fresh_until"]
+    assert (
+        patched.json()["name"] == "Renommé"
+        and patched.json()["visibility"] == "fresh"
+        and patched.json()["fresh_until"]
+    )
     listing = (await editor.get("/api/v1/scenarios", params={"tag": tag})).json()
     assert [s["id"] for s in listing["items"]] == [scenario["id"]]
-    assert (await editor.get("/api/v1/scenarios", params={"tag": tag, "difficulty": "easy"})).json()["total"] == 0
-    assert (await editor.get("/api/v1/scenarios", params={"tag": tag, "visibility": "fresh"})).json()["total"] == 1
+    assert (await editor.get("/api/v1/scenarios", params={"tag": tag, "difficulty": "easy"})).json()[
+        "total"
+    ] == 0
+    assert (await editor.get("/api/v1/scenarios", params={"tag": tag, "visibility": "fresh"})).json()[
+        "total"
+    ] == 1
     assert (await editor.get("/api/v1/scenarios", params={"q": "Renommé", "tag": tag})).json()["total"] == 1
     await editor.patch(f"/api/v1/scenarios/{scenario['id']}", json={"archived": True})
     assert (await editor.get("/api/v1/scenarios", params={"tag": tag})).json()["total"] == 0
@@ -161,9 +186,12 @@ async def test_export_import_round_trip(client_as) -> None:
     maintainer = await client_as(Role.maintainer)
     tag = f"exp-{uuid.uuid4().hex[:6]}"
     parent = await _create(maintainer, tags=[tag])
-    await maintainer.post(f"/api/v1/scenarios/{parent['id']}/versions", json={"content": {"constraints": ["Court"]}})
     await maintainer.post(
-        f"/api/v1/scenarios/{parent['id']}/variants", json={"label": "v2", "overrides": {"constraints": []}, "tags": [tag]}
+        f"/api/v1/scenarios/{parent['id']}/versions", json={"content": {"constraints": ["Court"]}}
+    )
+    await maintainer.post(
+        f"/api/v1/scenarios/{parent['id']}/variants",
+        json={"label": "v2", "overrides": {"constraints": []}, "tags": [tag]},
     )
     exported = await maintainer.get("/api/v1/scenarios/export", params={"tag": tag})
     assert exported.status_code == 200 and exported.headers["content-type"].startswith("application/yaml")
@@ -201,7 +229,9 @@ async def test_export_import_round_trip(client_as) -> None:
     root = next(s for s in imported if not s["parent_scenario_id"])
     assert child["family_id"] == root["id"]
 
-    json_export = await maintainer.get("/api/v1/scenarios/export", params={"q": suffix, "format": "json", "versions": "latest"})
+    json_export = await maintainer.get(
+        "/api/v1/scenarios/export", params={"q": suffix, "format": "json", "versions": "latest"}
+    )
     data = json.loads(json_export.text)
     assert all(len(s["versions"]) == 1 for s in data["scenarios"])
 
@@ -226,7 +256,9 @@ async def test_import_reports_entry_errors_and_multipart(client_as) -> None:
     }  # fmt: skip
     response = await editor.post(
         "/api/v1/scenarios/import",
-        files={"file": ("bundle.yaml", yaml.safe_dump(bundle, allow_unicode=True).encode(), "application/yaml")},
+        files={
+            "file": ("bundle.yaml", yaml.safe_dump(bundle, allow_unicode=True).encode(), "application/yaml")
+        },
     )
     assert response.status_code == 200, response.text
     report = response.json()
@@ -236,5 +268,7 @@ async def test_import_reports_entry_errors_and_multipart(client_as) -> None:
     assert "Scénario invalide" in messages and "mainteneurs" in messages and "parent" in messages
     bad_format = await editor.post("/api/v1/scenarios/import", json={"bundle": {"format": "x"}})
     assert bad_format.status_code == 422
-    unsupported = await editor.post("/api/v1/scenarios/import", content=b"x", headers={"Content-Type": "image/png"})
+    unsupported = await editor.post(
+        "/api/v1/scenarios/import", content=b"x", headers={"Content-Type": "image/png"}
+    )
     assert unsupported.status_code == 415

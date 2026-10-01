@@ -73,11 +73,22 @@ def _float_map(value: Any, label: str, problems: list[str]) -> dict[str, float]:
     return result
 
 
+def _canonical_number(value: Any) -> Any:
+    """``5000.0`` and ``5000`` hash identically (JSONB round trips turn ints into floats)."""
+    if isinstance(value, bool) or not isinstance(value, int | float):
+        return value
+    number = float(value)
+    return int(number) if number.is_integer() else number
+
+
 def normalise_config(data: dict[str, Any]) -> tuple[dict[str, Any], list[str]]:
     """Canonical JSON form of the behaviour fields (+ structural problems)."""
     problems: list[str] = []
     try:
-        normalization = to_dict(from_dict(NormalizationSpec, dict(data.get("normalization") or {})))
+        normalization = {
+            k: _canonical_number(v)
+            for k, v in to_dict(from_dict(NormalizationSpec, dict(data.get("normalization") or {}))).items()
+        }
     except (TypeError, ValueError) as exc:
         problems.append(f"normalisation invalide ({exc})")
         normalization = to_dict(NormalizationSpec())
@@ -305,7 +316,8 @@ async def create_config_version(
     merged.update({k: v for k, v in changes.items() if k in BEHAVIOUR_FIELDS and v is not None})
     data = await _prepare(session, merged)
     new_hash = content_hash(data)
-    if new_hash == latest.content_hash:
+    latest_normalised, _ = normalise_config(config_fields(latest))
+    if new_hash in (latest.content_hash, content_hash(latest_normalised)):
         raise ConfigConflict(
             f"Version identique à la dernière ({latest.key} v{latest.version}) : "
             "aucune modification du calcul"

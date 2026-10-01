@@ -177,7 +177,7 @@ async def _ensure_judge(session: AsyncSession, **fields: object) -> Judge:
         version=1,
         name=str(fields["name"]),
         description=str(fields.get("description", "")),
-        provider=JudgeProvider(data["provider"]),
+        provider=JudgeProvider(str(data["provider"])),
         model=data["model"],
         temperature=0.0,
         max_tokens=1500,

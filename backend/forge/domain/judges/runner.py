@@ -170,12 +170,12 @@ async def run_judge(
     known = list(error_types)
     if JudgeProvider(judge.provider) == JudgeProvider.heuristic:
         started = time.perf_counter()
-        response = heuristic_response(ctx, ordered)
+        heuristic = heuristic_response(ctx, ordered)
         run.attempts = 1
         run.latency_ms = (time.perf_counter() - started) * 1000
-        run.response = {"json": response, "model": judge.model}
+        run.response = {"json": heuristic, "model": judge.model}
         run.parsed = parse_judge_output(
-            response, judge=judge, criteria=ordered, events=ctx.events, known_error_types=known,
+            heuristic, judge=judge, criteria=ordered, events=ctx.events, known_error_types=known,
             prompt_hash=rendered.prompt_hash, model=judge.model,
         )  # fmt: skip
         run.cost = 0.0

@@ -59,7 +59,9 @@ def cmd_whoami(ctx: Context, args: argparse.Namespace) -> int:
     if ctx.as_json:
         ctx.dump(me)
         return EXIT_OK
-    data = me.get("user") if isinstance(me, dict) and isinstance(me.get("user"), dict) else me
+    if not isinstance(me, dict):
+        raise CliError("Réponse inattendue de /auth/me")
+    data: dict[str, Any] = me["user"] if isinstance(me.get("user"), dict) else me
     label = data.get("full_name") or data.get("label") or data.get("name") or data.get("email") or "?"
     ctx.print(f"Connecté en tant que : {label}")
     for key, title in (
@@ -68,7 +70,7 @@ def cmd_whoami(ctx: Context, args: argparse.Namespace) -> int:
         ("role", "Rôle"),
         ("clearance", "Habilitation"),
     ):
-        value = data.get(key, me.get(key) if isinstance(me, dict) else None)
+        value = data.get(key, me.get(key))
         if value is not None:
             ctx.print(f"{title} : {f'C{value}' if key == 'clearance' else value}")
     ctx.print(f"Instance : {ctx.client.base_url}")
@@ -124,7 +126,7 @@ def cmd_benchmarks_list(ctx: Context, args: argparse.Namespace) -> int:
                 b.get("n_scenarios"),
                 b.get("n_agents"),
                 b.get("repetitions"),
-                f"n° {last['number']} ({STATUSES.get(last.get('status'), last.get('status'))})"
+                f"n° {last['number']} ({STATUSES.get(str(last.get('status')), last.get('status'))})"
                 if last
                 else "—",
             ]
@@ -143,14 +145,16 @@ def _wait(ctx: Context, path: str, *, timeout: float, poll: float, what: str) ->
         if progress != last_progress:
             done = (data.get("completed_runs") or 0) + (data.get("failed_runs") or 0)
             ctx.info(
-                f"{what} : {STATUSES.get(status, status)} — {done}/{data.get('total_runs', '?')} runs terminés"
+                f"{what} : {STATUSES.get(status, status)} — "
+                f"{done}/{data.get('total_runs', '?')} runs terminés"
             )
             last_progress = progress
         if status in TERMINAL:
             return data  # type: ignore[no-any-return]
         if monotonic() >= deadline:
             raise CliError(
-                f"Délai d'attente dépassé ({timeout:.0f} s) : {what.lower()} toujours {STATUSES.get(status, status)}"
+                f"Délai d'attente dépassé ({timeout:.0f} s) : "
+                f"{what.lower()} toujours {STATUSES.get(status, status)}"
             )
         sleep(poll)
 
@@ -158,7 +162,8 @@ def _wait(ctx: Context, path: str, *, timeout: float, poll: float, what: str) ->
 def cmd_benchmark_run(ctx: Context, args: argparse.Namespace) -> int:
     execution = ctx.client.post(f"/benchmarks/{args.benchmark}/run", json={"trigger": args.trigger})
     ctx.info(
-        f"Exécution n° {execution['number']} lancée ({execution['total_runs']} runs) — identifiant {execution['id']}"
+        f"Exécution n° {execution['number']} lancée ({execution['total_runs']} runs) — "
+        f"identifiant {execution['id']}"
     )
     if not args.wait:
         if ctx.as_json:
@@ -207,7 +212,8 @@ def cmd_experiment_run(ctx: Context, args: argparse.Namespace) -> int:
             body[key] = value
     experiment = ctx.client.post("/experiments", json=body)
     ctx.info(
-        f"Expérience « {experiment['name']} » lancée ({experiment['total_runs']} runs) — identifiant {experiment['id']}"
+        f"Expérience « {experiment['name']} » lancée ({experiment['total_runs']} runs) — "
+        f"identifiant {experiment['id']}"
     )
     for warning in experiment.get("warnings") or []:
         ctx.info(f"Avertissement : {warning}")
@@ -231,7 +237,8 @@ def cmd_experiment_run(ctx: Context, args: argparse.Namespace) -> int:
         ctx.print(render_comparison(comparison, gate))
     if final["status"] != "completed":
         ctx.info(
-            f"Expérience {STATUSES.get(final['status'], final['status'])} : {final.get('error') or ''}".strip()
+            f"Expérience {STATUSES.get(final['status'], final['status'])} : "
+            f"{final.get('error') or ''}".strip()
         )
         return EXIT_ERROR
     if args.fail_on_regression and not gate.get("passed"):

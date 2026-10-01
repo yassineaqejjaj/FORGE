@@ -18,7 +18,9 @@ async def _completed(db_session, *, spread: float | None, confidence: float, tag
     sv = await create_scenario_version(db_session)
     run = await create_run(db_session, sv, av, tags=[tag])
     await complete_with_scores(db_session, run, composite=75)
-    await db_session.execute(update(Score).where(Score.run_id == run.id).values(spread=spread, confidence=confidence))
+    await db_session.execute(
+        update(Score).where(Score.run_id == run.id).values(spread=spread, confidence=confidence)
+    )
     await db_session.commit()
     return run
 
@@ -31,7 +33,11 @@ async def test_queue_orders_by_disagreement_then_confidence(client_as, db_sessio
     gold = (
         await (await client_as(Role.editor)).post(
             "/api/v1/datasets",
-            json={"name": f"Gold {tag}", "kind": "gold", "items": [{"run_id": str(r.id)} for r in (calm, disputed, unsure)]},
+            json={
+                "name": f"Gold {tag}",
+                "kind": "gold",
+                "items": [{"run_id": str(r.id)} for r in (calm, disputed, unsure)],
+            },
         )
     ).json()
     evaluator = await client_as(Role.evaluator)
@@ -43,7 +49,9 @@ async def test_queue_orders_by_disagreement_then_confidence(client_as, db_sessio
     assert {c["key"] for c in items[0]["criteria"]} >= {"quality.accuracy", "ux.clarity"}
     assert all(c["dimension"] not in ("cost", "latency") for c in items[0]["criteria"])
 
-    blind = (await evaluator.get("/api/v1/reviews/queue", params={"dataset_id": gold["id"], "blind": True})).json()
+    blind = (
+        await evaluator.get("/api/v1/reviews/queue", params={"dataset_id": gold["id"], "blind": True})
+    ).json()
     assert blind["items"][0]["composite_score"] is None and blind["items"][0]["ai_scores"] is None
 
     viewer = await client_as(Role.viewer)
@@ -62,7 +70,10 @@ async def test_submit_replace_and_list_human_evaluations(client_as, make_user, d
         first = await evaluator.post(
             url,
             json={
-                "scores": [{"criterion_key": "quality.accuracy", "score": 4, "comment": "Exact"}, {"criterion_key": "ux.clarity", "score": 3}],
+                "scores": [
+                    {"criterion_key": "quality.accuracy", "score": 4, "comment": "Exact"},
+                    {"criterion_key": "ux.clarity", "score": 3},
+                ],
                 "comment": "Bon ensemble",
             },
         )
@@ -74,24 +85,43 @@ async def test_submit_replace_and_list_human_evaluations(client_as, make_user, d
         }
         assert body["evaluations"][0]["normalized_score"] in (0.8, 0.6)
 
-        second = await evaluator.post(url, json={"scores": [{"criterion_key": "quality.accuracy", "score": 2}]})
+        second = await evaluator.post(
+            url, json={"scores": [{"criterion_key": "quality.accuracy", "score": 2}]}
+        )
         assert second.status_code == 201
         rows = list(
             await db_session.scalars(
-                select(Evaluation).where(Evaluation.run_id == run.id, Evaluation.evaluator_kind == EvaluatorKind.human)
+                select(Evaluation).where(
+                    Evaluation.run_id == run.id, Evaluation.evaluator_kind == EvaluatorKind.human
+                )
             )
         )
         assert len(rows) == 1 and rows[0].raw_score == 2 and rows[0].round is None
-        assert rows[0].evaluator_key == f"human:{user.id}" and rows[0].explanation == "Évaluation humaine sans commentaire"
+        assert (
+            rows[0].evaluator_key == f"human:{user.id}"
+            and rows[0].explanation == "Évaluation humaine sans commentaire"
+        )
 
-        out_of_scale = await evaluator.post(url, json={"scores": [{"criterion_key": "quality.accuracy", "score": 7}]})
+        out_of_scale = await evaluator.post(
+            url, json={"scores": [{"criterion_key": "quality.accuracy", "score": 7}]}
+        )
         assert out_of_scale.status_code == 422
-        unknown = await evaluator.post(url, json={"scores": [{"criterion_key": "quality.unknown_x", "score": 1}]})
+        unknown = await evaluator.post(
+            url, json={"scores": [{"criterion_key": "quality.unknown_x", "score": 1}]}
+        )
         assert unknown.status_code == 422
-        measured = await evaluator.post(url, json={"scores": [{"criterion_key": "latency.total", "score": 1}]})
+        measured = await evaluator.post(
+            url, json={"scores": [{"criterion_key": "latency.total", "score": 1}]}
+        )
         assert measured.status_code == 422
         dup = await evaluator.post(
-            url, json={"scores": [{"criterion_key": "ux.clarity", "score": 1}, {"criterion_key": "ux.clarity", "score": 2}]}
+            url,
+            json={
+                "scores": [
+                    {"criterion_key": "ux.clarity", "score": 1},
+                    {"criterion_key": "ux.clarity", "score": 2},
+                ]
+            },
         )
         assert dup.status_code == 422
 
@@ -109,7 +139,8 @@ async def test_pending_runs_cannot_be_evaluated(client_as, db_session) -> None:
     await db_session.commit()
     evaluator = await client_as(Role.evaluator)
     response = await evaluator.post(
-        f"/api/v1/runs/{run.id}/human-evaluations", json={"scores": [{"criterion_key": "quality.accuracy", "score": 3}]}
+        f"/api/v1/runs/{run.id}/human-evaluations",
+        json={"scores": [{"criterion_key": "quality.accuracy", "score": 3}]},
     )
     assert response.status_code == 422
 
@@ -118,7 +149,9 @@ async def test_human_evaluation_rescores_a_really_evaluated_run(client_as, db_se
     """End-to-end: mock agent + heuristic judge, then a human score is folded in by rescore_run."""
     av = await create_agent_version(
         db_session,
-        adapter_config={"script": {"output": "# PRD\n## Objectifs\nExport CSV des rapports.\n## Périmètre\nTous."}},
+        adapter_config={
+            "script": {"output": "# PRD\n## Objectifs\nExport CSV des rapports.\n## Périmètre\nTous."}
+        },
     )
     sv = await create_scenario_version(db_session)
     run = await create_run(db_session, sv, av, enqueue=True)
@@ -129,9 +162,12 @@ async def test_human_evaluation_rescores_a_really_evaluated_run(client_as, db_se
         pytest.skip(f"pipeline unavailable (run {run.status.value}: {run.error or run.status_detail})")
     evaluator = await client_as(Role.evaluator)
     response = await evaluator.post(
-        f"/api/v1/runs/{run.id}/human-evaluations", json={"scores": [{"criterion_key": "quality.accuracy", "score": 5}]}
+        f"/api/v1/runs/{run.id}/human-evaluations",
+        json={"scores": [{"criterion_key": "quality.accuracy", "score": 5}]},
     )
     assert response.status_code == 201, response.text
     assert response.json()["rescored"] is True
-    scores = list(await db_session.scalars(select(Score).where(Score.run_id == run.id, Score.source == "human")))
+    scores = list(
+        await db_session.scalars(select(Score).where(Score.run_id == run.id, Score.source == "human"))
+    )
     assert any(s.criterion_key == "quality.accuracy" for s in scores)

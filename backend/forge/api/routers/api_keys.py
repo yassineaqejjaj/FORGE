@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import uuid
+from typing import Any
 
 from fastapi import APIRouter, Response, status
 
@@ -18,7 +19,7 @@ from forge.services import api_keys as service
 router = APIRouter(prefix="/api-keys", tags=["api-keys"])
 
 
-def _out(key: ApiKey) -> dict[str, object]:
+def _out(key: ApiKey) -> dict[str, Any]:
     return {
         "id": key.id,
         "name": key.name,

@@ -9,7 +9,9 @@ from forge.domain.enums import CalibrationStatus
 from forge.domain.types import ScorePair
 
 
-def _pairs(values: list[tuple[float, float]], *, judge: str | None = None, criterion: str = "quality.accuracy"):
+def _pairs(
+    values: list[tuple[float, float]], *, judge: str | None = None, criterion: str = "quality.accuracy"
+):
     return [
         ScorePair(run_id=f"r{i}", criterion_key=criterion, ai=a, human=h, judge_key=judge)
         for i, (a, h) in enumerate(values)

@@ -13,7 +13,7 @@ from opentelemetry.proto.collector.trace.v1.trace_service_pb2 import (
     ExportTraceServiceResponse,
 )
 from opentelemetry.proto.common.v1.common_pb2 import AnyValue, KeyValue
-from sqlalchemy import select
+from sqlalchemy import inspect, select
 
 from forge.config import settings
 from forge.domain.enums import Role, TraceEventSource, TraceEventType
@@ -21,12 +21,7 @@ from forge.infra.db import utcnow
 from forge.infra.models import ApiKey, EvaluationRun, TraceEvent
 from forge.infra.security import generate_api_key
 from tests.factories import create_agent_version, create_run, create_scenario_version
-from tests.test_execution import force_custom_plans, otlp_export
-
-
-@pytest.fixture(scope="module", autouse=True)
-async def custom_plans(app) -> None:
-    await force_custom_plans()
+from tests.test_execution import otlp_export
 
 
 async def new_run(session, *, classification: int = 1) -> EvaluationRun:
@@ -55,7 +50,9 @@ async def scoped_key(session, *, clearance: int = 1) -> str:
     return generated.key
 
 
-async def events_of(session, run_id) -> list[TraceEvent]:
+async def events_of(session, run: EvaluationRun) -> list[TraceEvent]:
+    run_id = inspect(run).identity[0]  # safe on expired instances (no sync refresh)
+    await session.commit()
     session.expire_all()
     return list(
         await session.scalars(select(TraceEvent).where(TraceEvent.run_id == run_id).order_by(TraceEvent.seq))
@@ -81,7 +78,7 @@ async def test_otlp_json_attaches_spans_by_trace_id_and_reports_orphans(db_sessi
     assert response.headers["content-type"].startswith("application/json")
     partial = response.json()["partialSuccess"]
     assert partial["rejectedSpans"] == "1" and response.headers["x-forge-attached-spans"] == "2"
-    events = await events_of(db_session, run.id)
+    events = await events_of(db_session, run)
     assert [(e.seq, e.type) for e in events] == [(1, TraceEventType.llm_call), (2, TraceEventType.tool_call)]
     assert events[1].parent_id == events[0].id and events[0].source == TraceEventSource.otlp
     assert events[0].attributes["model"] == "gpt-x"
@@ -111,7 +108,7 @@ async def test_otlp_protobuf_gzip_with_scoped_key_and_run_id_attribute(db_sessio
     assert response.status_code == 200, response.text
     parsed = ExportTraceServiceResponse.FromString(response.content)
     assert not parsed.HasField("partial_success")
-    (event,) = await events_of(db_session, run.id)
+    (event,) = await events_of(db_session, run)
     assert event.span_id == "c" * 16 and event.type == TraceEventType.llm_call
     # A traces:write key is refused on the rest of the API.
     assert (await client.get("/api/v1/runs", headers={"Authorization": f"Bearer {key}"})).status_code == 403
@@ -119,12 +116,13 @@ async def test_otlp_protobuf_gzip_with_scoped_key_and_run_id_attribute(db_sessio
 
 async def test_runs_above_clearance_are_never_revealed(db_session, client) -> None:
     secret_run = await new_run(db_session, classification=3)
+    secret_id = secret_run.id
     key = await scoped_key(db_session, clearance=1)
     export = otlp_export(secret_run.otel_trace_id, [("d1" * 8, None, "x", {}, now_ns(), 1)])
     response = await client.post("/v1/traces", json=export, headers={"X-Forge-Key": key})
     assert response.json()["partialSuccess"]["rejectedSpans"] == "1"
-    assert await events_of(db_session, secret_run.id) == []
-    pushed = await client.post(f"/api/v1/runs/{secret_run.id}/events", headers={"X-Forge-Key": key},
+    assert await events_of(db_session, secret_run) == []
+    pushed = await client.post(f"/api/v1/runs/{secret_id}/events", headers={"X-Forge-Key": key},
                                json={"events": [{"type": "message", "name": "x"}]})  # fmt: skip
     assert pushed.status_code == 404
 
@@ -164,7 +162,7 @@ async def test_json_events_endpoint_appends_with_next_seq(db_session, admin_clie
     second = await admin_client.post(f"/api/v1/runs/{run.id}/events",
                                      json={"events": [{"type": "unknown_kind", "name": "Étape libre"}]})  # fmt: skip
     assert second.json()["first_seq"] == 3
-    events = await events_of(db_session, run.id)
+    events = await events_of(db_session, run)
     assert events[1].parent_id == events[0].id and events[0].offset_ms == pytest.approx(10, abs=1)
     assert events[2].type == TraceEventType.custom and events[2].attributes["original_type"] == "unknown_kind"
     assert events[0].source == TraceEventSource.api
@@ -172,7 +170,7 @@ async def test_json_events_endpoint_appends_with_next_seq(db_session, admin_clie
         f"/api/v1/runs/{uuid.uuid4()}/events", json={"events": [{"type": "message"}]}
     )
     assert missing.status_code == 404
-    empty = await admin_client.post(f"/api/v1/runs/{run.id}/events", json={"events": []})
+    empty = await admin_client.post(f"/api/v1/runs/{inspect(run).identity[0]}/events", json={"events": []})
     assert empty.status_code == 422
 
 
@@ -187,5 +185,5 @@ async def test_otlp_http_client_roundtrip_against_app(app, db_session) -> None:
             json=otlp_export(run.otel_trace_id, [("9" * 16, None, "decision", {"forge.event.type": "decision"}, now_ns(), 1)]),
         )  # fmt: skip
     assert response.status_code == 200
-    (event,) = await events_of(db_session, run.id)
+    (event,) = await events_of(db_session, run)
     assert event.type == TraceEventType.decision

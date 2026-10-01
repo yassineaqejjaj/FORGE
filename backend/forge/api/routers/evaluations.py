@@ -413,17 +413,17 @@ async def get_provenance(
     for score in prov.scores:
         verdicts = []
         for raw_id in score.evaluation_ids or []:
-            row = by_id.get(uuid.UUID(raw_id))
-            if row is None:
+            verdict_row = by_id.get(uuid.UUID(raw_id))
+            if verdict_row is None:
                 continue
             verdicts.append(
                 {
-                    "evaluation_id": str(row.id),
-                    "evaluator_kind": row.evaluator_kind.value,
-                    "evaluator_key": row.evaluator_key,
-                    "raw_score": row.raw_score,
-                    "normalized_score": row.normalized_score,
-                    "confidence": row.confidence,
+                    "evaluation_id": str(verdict_row.id),
+                    "evaluator_kind": verdict_row.evaluator_kind.value,
+                    "evaluator_key": verdict_row.evaluator_key,
+                    "raw_score": verdict_row.raw_score,
+                    "normalized_score": verdict_row.normalized_score,
+                    "confidence": verdict_row.confidence,
                 }
             )
         agg = prov.config.aggregation

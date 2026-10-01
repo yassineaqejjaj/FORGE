@@ -62,7 +62,9 @@ def make_run(
         composite=composite,
         passed=passed,
         gate_failed=gate_failed,
-        dimensions=dimensions if dimensions is not None else ({} if composite is None else {"quality": composite / 100}),
+        dimensions=dimensions
+        if dimensions is not None
+        else ({} if composite is None else {"quality": composite / 100}),
         criteria={},
         cost=cost,
         latency_ms=latency_ms,

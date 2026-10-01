@@ -163,14 +163,15 @@ async def test_judge(
     if found is None:
         raise not_found("Run introuvable")
     run, _scenario = found
+    judge_uuid, run_uuid = judge.id, run.id
     try:
         result = await judge_service.test_judge(session, judge, run, criteria_keys=body.criteria)
     except (LLMError, ValueError) as exc:
         raise ApiError(502, f"Test du juge impossible : {exc}", code="bad_gateway") from exc
     await session.rollback()  # nothing is persisted by a test
     return JudgeTestOut(
-        judge_id=judge.id,
-        run_id=run.id,
+        judge_id=judge_uuid,
+        run_id=run_uuid,
         status=result.status,
         model=result.model,
         verdicts=result.verdicts,

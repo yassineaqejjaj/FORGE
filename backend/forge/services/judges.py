@@ -223,7 +223,7 @@ async def create_judge_version(
     if problems:
         raise JudgeValidationError(problems)
     new_hash = content_hash(data)
-    if new_hash == latest.content_hash:
+    if new_hash in (latest.content_hash, content_hash(_normalise(judge_fields(latest)))):
         raise JudgeConflict(
             f"Version identique à la dernière ({latest.key} v{latest.version}) : "
             "aucune modification du comportement"

@@ -6,7 +6,7 @@ import contextlib
 
 from fastapi import APIRouter, Request, Response, status
 
-from forge.api.deps import CurrentUser, SessionDep, _session_token
+from forge.api.deps import CurrentUser, SessionDep, session_token
 from forge.api.errors import ApiError, bad_request, forbidden, unauthorized
 from forge.api.schemas.auth import LoginIn, LoginOut, PasswordChangeIn
 from forge.api.schemas.users import UserOut
@@ -101,7 +101,7 @@ async def login(body: LoginIn, request: Request, response: Response, session: Se
 
 @router.post("/logout", status_code=status.HTTP_204_NO_CONTENT, summary="Déconnexion")
 async def logout(request: Request, session: SessionDep) -> Response:
-    token = _session_token(request)
+    token = session_token(request)
     if token:
         with contextlib.suppress(TokenError):
             claims = decode_access_token(token)

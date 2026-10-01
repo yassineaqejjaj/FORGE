@@ -64,6 +64,7 @@ class ApiError(HTTPException):
         *,
         code: str | None = None,
         headers: dict[str, str] | None = None,
+        errors: list[dict[str, Any]] | None = None,
     ) -> None:
         super().__init__(
             status_code=status_code,
@@ -71,6 +72,8 @@ class ApiError(HTTPException):
             headers=headers,
         )
         self.code = code or STATUS_CODES.get(status_code, "error")
+        #: Optional detailed problems (``[{"field", "message"}]``) returned as ``errors`` in the body.
+        self.errors = errors
 
 
 def bad_request(detail: str = DEFAULT_MESSAGES[400]) -> ApiError:
@@ -189,7 +192,11 @@ async def _http_exception_handler(request: Request, exc: StarletteHTTPException)
         detail = detail.get("detail", DEFAULT_MESSAGES.get(status_code, "Erreur"))
     if not isinstance(detail, str) or not detail or detail in _STARLETTE_DEFAULTS:
         detail = DEFAULT_MESSAGES.get(status_code, str(detail))
-    return _response(status_code, error_body(detail, code), getattr(exc, "headers", None))
+    extra: dict[str, Any] = {}
+    errors = getattr(exc, "errors", None)
+    if errors:
+        extra["errors"] = errors
+    return _response(status_code, error_body(detail, code, **extra), getattr(exc, "headers", None))
 
 
 _STARLETTE_DEFAULTS = {

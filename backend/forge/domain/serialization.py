@@ -69,7 +69,7 @@ def from_dict[T](cls: type[T], data: dict[str, Any] | None) -> T:
     """Build dataclass ``cls`` from a JSON-like dict."""
     if data is None:
         data = {}
-    hints = _hints(cls)
+    hints = _hints(cls)  # type: ignore[arg-type]
     kwargs: dict[str, Any] = {}
     for f in dataclasses.fields(cls):  # type: ignore[arg-type]
         if f.name not in data or not f.init:

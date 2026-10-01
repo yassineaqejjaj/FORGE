@@ -29,6 +29,7 @@ from forge.domain.enums import (
     RunOrigin,
     RunStatus,
 )
+from forge.domain.types import AgentSpec, ScenarioSpec
 from forge.infra.db import utcnow
 from forge.infra.models import (
     AgentVersion,
@@ -84,27 +85,31 @@ async def create_runs(
 
     catalog = await load_criteria_catalog(session)
     config_spec = await load_score_config(session, evaluation_config)
-    scenario_cache: dict[uuid.UUID, object] = {}
-    agent_cache: dict[uuid.UUID, object] = {}
+    scenario_cache: dict[uuid.UUID, tuple[Scenario, ScenarioVersion, ScenarioSpec]] = {}
+    agent_cache: dict[uuid.UUID, tuple[AgentVersion, AgentSpec]] = {}
     runs: list[EvaluationRun] = []
     now = utcnow()
     for plan in plans:
         if plan.scenario_version_id not in scenario_cache:
-            sv = await session.get(ScenarioVersion, plan.scenario_version_id)
-            if sv is None:
+            found_sv = await session.get(ScenarioVersion, plan.scenario_version_id)
+            if found_sv is None:
                 raise RunCreationError("Version de scénario introuvable")
-            scenario = await session.get(Scenario, sv.scenario_id)
-            assert scenario is not None
-            if scenario.archived:
-                raise RunCreationError(f"Le scénario « {scenario.name} » est archivé")
-            scenario_cache[plan.scenario_version_id] = (scenario, sv, scenario_spec(scenario, sv, catalog))
+            found_scenario = await session.get(Scenario, found_sv.scenario_id)
+            assert found_scenario is not None
+            if found_scenario.archived:
+                raise RunCreationError(f"Le scénario « {found_scenario.name} » est archivé")
+            scenario_cache[plan.scenario_version_id] = (
+                found_scenario,
+                found_sv,
+                scenario_spec(found_scenario, found_sv, catalog),
+            )
         if plan.agent_version_id not in agent_cache:
-            av = await session.get(AgentVersion, plan.agent_version_id)
-            if av is None:
+            found_av = await session.get(AgentVersion, plan.agent_version_id)
+            if found_av is None:
                 raise RunCreationError("Version d'agent introuvable")
-            agent_cache[plan.agent_version_id] = (av, await load_agent_spec(session, av))
-        scenario, sv, s_spec = scenario_cache[plan.scenario_version_id]  # type: ignore[misc]
-        av, a_spec = agent_cache[plan.agent_version_id]  # type: ignore[misc]
+            agent_cache[plan.agent_version_id] = (found_av, await load_agent_spec(session, found_av))
+        scenario, sv, s_spec = scenario_cache[plan.scenario_version_id]
+        av, a_spec = agent_cache[plan.agent_version_id]
         run_id = uuid.uuid4()
         trace_id = new_otel_trace_id()
         manifest, manifest_hash = build_manifest(
@@ -163,7 +168,7 @@ async def mark_evaluating(session: AsyncSession, run: EvaluationRun, *, enqueue:
     """Execution finished (success or captured failure): hand over to the evaluation queue."""
     run.status = RunStatus.evaluating
     run.status_detail = "Évaluation en attente"
-    run.executed_at = utcnow()
+    run.executed_at = run.executed_at or utcnow()
     await session.flush()
     if enqueue:
         await enqueue_job(
@@ -231,7 +236,12 @@ async def on_run_terminal(session: AsyncSession, run: EvaluationRun) -> None:
         await _refresh_progress(session, Experiment, run.experiment_id, "experiment_id")
 
 
-async def _refresh_progress(session: AsyncSession, model: type, parent_id: uuid.UUID, column: str) -> None:
+async def _refresh_progress(
+    session: AsyncSession,
+    model: type[BenchmarkExecution] | type[Experiment],
+    parent_id: uuid.UUID,
+    column: str,
+) -> None:
     col = getattr(EvaluationRun, column)
     counts = dict(
         (
@@ -249,7 +259,7 @@ async def _refresh_progress(session: AsyncSession, model: type, parent_id: uuid.
         update(model).where(model.id == parent_id).values(completed_runs=completed, failed_runs=failed)
     )
     if total and completed + failed >= total:
-        parent = await session.get(model, parent_id)
+        parent: BenchmarkExecution | Experiment | None = await session.get(model, parent_id)
         if parent is not None and parent.status in (ExecutionStatus.queued, ExecutionStatus.running):
             parent.status = ExecutionStatus.aggregating
         kind = JobKind.finalize_execution if model is BenchmarkExecution else JobKind.finalize_experiment

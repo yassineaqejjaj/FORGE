@@ -20,7 +20,7 @@ from collections.abc import Sequence
 from datetime import datetime, timedelta
 from typing import Any
 
-from sqlalchemy import select, update
+from sqlalchemy import select, text, update
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -105,7 +105,8 @@ async def enqueue_job(
         .values(**values)
         .on_conflict_do_nothing(
             index_elements=["dedupe_key"],
-            index_where=Job.dedupe_key.is_not(None) & Job.status.in_([JobStatus.queued, JobStatus.running]),
+            # Literal predicate: must match the partial index exactly (bound parameters would not).
+            index_where=text("dedupe_key IS NOT NULL AND status IN ('queued', 'running')"),
         )
         .returning(Job.id)
     )

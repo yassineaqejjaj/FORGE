@@ -18,7 +18,13 @@ from forge.domain.enums import (
     ScenarioVisibility,
     TraceEventType,
 )
-from forge.domain.rules import MISCONFIGURED_PREFIX, RULE_HANDLERS, evaluate_rule, evaluate_rules, validate_rule
+from forge.domain.rules import (
+    MISCONFIGURED_PREFIX,
+    RULE_HANDLERS,
+    evaluate_rule,
+    evaluate_rules,
+    validate_rule,
+)
 from forge.domain.rules.extraction import extract_json, extract_json_object
 from forge.domain.rules.jsonpath import JsonPathError, get_path, is_present, parse_path
 from forge.domain.types import (
@@ -75,7 +81,8 @@ def make_ctx(
         run_id="run-1",
         scenario=scenario,
         agent=agent,
-        config=config or ScoreConfig(config_id="c1", key="cfg", version=1, name="cfg", dimension_weights={"quality": 1}),
+        config=config
+        or ScoreConfig(config_id="c1", key="cfg", version=1, name="cfg", dimension_weights={"quality": 1}),
         output_text=output,
         output_json=output_json,
         events=events or [],
@@ -142,10 +149,16 @@ def test_required_fields_from_markdown_fence() -> None:
 
 def test_json_valid_and_schema() -> None:
     assert run(make_ctx('{"a": 1}'), rule(RuleType.json_valid)).passed
-    assert run(make_ctx("```json\n[1, 2,]\n```"), rule(RuleType.json_valid)).passed  # trailing comma tolerated
+    assert run(
+        make_ctx("```json\n[1, 2,]\n```"), rule(RuleType.json_valid)
+    ).passed  # trailing comma tolerated
     bad = run(make_ctx("{oops"), rule(RuleType.json_valid))
     assert not bad.passed and bad.errors[0].type == "FORMAT_ERROR"
-    schema = {"type": "object", "required": ["title", "priority"], "properties": {"priority": {"type": "integer"}}}
+    schema = {
+        "type": "object",
+        "required": ["title", "priority"],
+        "properties": {"priority": {"type": "integer"}},
+    }
     good = run(make_ctx('{"title": "t", "priority": 2}'), rule(RuleType.json_schema, schema=schema))
     assert good.passed
     wrong = run(make_ctx('{"title": "t", "priority": "haute"}'), rule(RuleType.json_schema, schema=schema))
@@ -184,7 +197,13 @@ def test_not_contains() -> None:
 def test_sections_present() -> None:
     text = "# Objectifs\n...\n## Périmètre\n...\n**Critères d'acceptation**\n...\nRisques\n------\n"
     ctx = make_ctx(text)
-    ok = run(ctx, rule(RuleType.sections_present, sections=["objectifs", "PERIMETRE", "criteres d'acceptation", "risques"]))
+    ok = run(
+        ctx,
+        rule(
+            RuleType.sections_present,
+            sections=["objectifs", "PERIMETRE", "criteres d'acceptation", "risques"],
+        ),
+    )
     assert ok.passed, ok.explanation
     missing = run(ctx, rule(RuleType.sections_present, sections=["Objectifs", "Planning"]))
     assert not missing.passed and missing.raw_score == 0.5
@@ -340,7 +359,7 @@ def test_json_path_parsing() -> None:
 
 def test_json_extraction() -> None:
     assert extract_json('{"a": 1}').source == "text"
-    assert extract_json("bla ```json\n{\"a\": 1}\n``` bla").source == "fence"
+    assert extract_json('bla ```json\n{"a": 1}\n``` bla').source == "fence"
     embedded = extract_json('Résultat : {"a": {"b": "}"}} fin')
     assert embedded.ok and embedded.value == {"a": {"b": "}"}}
     assert not extract_json("").ok

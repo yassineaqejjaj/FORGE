@@ -12,7 +12,7 @@ from typing import Any
 
 import httpx
 
-from forge.adapters.base import conversation, credential_headers, extract_json, http_timeout
+from forge.adapters.base import as_dict, conversation, credential_headers, extract_json, http_timeout
 from forge.adapters.http import create_client, request_json
 from forge.adapters.tool_loop import ToolNames, parse_arguments, run_tool, steps_exhausted
 from forge.domain.enums import AdapterKind, BuiltinErrorType, TraceEventType
@@ -202,7 +202,7 @@ def _first_message(data: dict[str, Any]) -> dict[str, Any]:
 
 
 def _usage(data: dict[str, Any]) -> TokenUsage:
-    usage = data.get("usage") if isinstance(data.get("usage"), dict) else {}
+    usage = as_dict(data.get("usage"))
     return TokenUsage(
         input_tokens=int(usage.get("prompt_tokens") or usage.get("input_tokens") or 0),
         output_tokens=int(usage.get("completion_tokens") or usage.get("output_tokens") or 0),

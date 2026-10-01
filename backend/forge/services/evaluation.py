@@ -27,7 +27,7 @@ from collections.abc import Sequence
 from dataclasses import dataclass, field
 from typing import Any
 
-from sqlalchemy import delete, select
+from sqlalchemy import ColumnElement, delete, select
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -816,7 +816,7 @@ async def evaluate_run(
         for error in human.errors or []:
             try:
                 facts.append(
-                    ErrorFact(type=str(error.get("type")), severity=ErrorSeverity(error.get("severity")))
+                    ErrorFact(type=str(error.get("type")), severity=ErrorSeverity(str(error.get("severity"))))
                 )
             except (ValueError, TypeError):
                 continue
@@ -1007,7 +1007,9 @@ async def rescore_run(
             for error in row.errors or []:
                 try:
                     facts.append(
-                        ErrorFact(type=str(error.get("type")), severity=ErrorSeverity(error.get("severity")))
+                        ErrorFact(
+                            type=str(error.get("type")), severity=ErrorSeverity(str(error.get("severity")))
+                        )
                     )
                 except (ValueError, TypeError):
                     continue
@@ -1237,7 +1239,7 @@ async def round_scores(
 
 
 async def round_errors(session: AsyncSession, run_id: uuid.UUID, round_no: int | None) -> list[RunError]:
-    condition = RunError.round.is_(None)
+    condition: ColumnElement[bool] = RunError.round.is_(None)
     if round_no is not None:
         condition = condition | (RunError.round == round_no)
     rows = await session.scalars(
@@ -1337,10 +1339,11 @@ async def score_provenance(
                 event_ids.add(parsed)
     events: dict[int, TraceEvent] = {}
     if seqs or event_ids:
-        condition = TraceEvent.seq.in_(list(seqs)) if seqs else None
+        condition: ColumnElement[bool] | None = TraceEvent.seq.in_(list(seqs)) if seqs else None
         if event_ids:
             id_condition = TraceEvent.id.in_(list(event_ids))
             condition = id_condition if condition is None else condition | id_condition
+        assert condition is not None
         for event in await session.scalars(select(TraceEvent).where(TraceEvent.run_id == run.id, condition)):
             events[event.seq] = event
     errors = [e for e in await round_errors(session, run.id, round_no) if e.criterion_key == criterion_key]

@@ -73,7 +73,9 @@ def test_clear_improvement_is_shipped() -> None:
     assert result.composite.verdict == Verdict.better
     assert result.composite.delta == pytest.approx(8.0, abs=1.0)
     assert result.composite.ci_low > 0 and result.composite.p_value < 0.01
-    assert result.composite.delta_pct == pytest.approx(result.composite.delta / result.composite.baseline_mean * 100)
+    assert result.composite.delta_pct == pytest.approx(
+        result.composite.delta / result.composite.baseline_mean * 100
+    )
     quality = next(d for d in result.dimensions if d.key == "quality")
     assert quality.verdict == Verdict.better
     assert result.regressions == []
@@ -222,10 +224,17 @@ def test_comparison_is_deterministic_and_json_ready() -> None:
 
 def test_gate() -> None:
     regressions = [
-        {"name": "Scénario B", "delta": -12.0, "severity": "major", "reasons": ["Score composite −12,0 points"]},
+        {
+            "name": "Scénario B",
+            "delta": -12.0,
+            "severity": "major",
+            "reasons": ["Score composite −12,0 points"],
+        },
         {"name": "Scénario A", "delta": -20.0, "severity": "critical", "reasons": []},
     ]
-    gate = evaluate_gate(status="completed", recommendation="do_not_ship", regressions=regressions, summary="Résumé")
+    gate = evaluate_gate(
+        status="completed", recommendation="do_not_ship", regressions=regressions, summary="Résumé"
+    )
     assert gate.passed is False
     assert gate.reasons[0].startswith("Garde-fou CI bloquant")
     assert gate.reasons[2].startswith("Régression critique sur « Scénario A »")

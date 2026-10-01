@@ -23,7 +23,7 @@ from forge.domain.enums import (
     TraceEventType,
 )
 from forge.domain.traces.protocol import invocation_span_id
-from forge.domain.types import AgentResult, TokenUsage
+from forge.domain.types import AgentResult
 from forge.infra.db import get_sessionmaker, utcnow
 from forge.infra.models import EvaluationRun, ExecutionTrace, Job, ModelConfiguration, TraceEvent
 from forge.services import trace_ingest
@@ -31,28 +31,6 @@ from forge.services.credentials import create_credential
 from forge.services.execution import execute_run_job, invoke_adhoc
 from forge.workers.worker import Worker
 from tests.factories import create_agent_version, create_run, create_scenario_version
-
-@pytest.fixture(scope="module", autouse=True)
-async def custom_plans(app) -> None:
-    """Work around a foundation bug (reported): ``enqueue_job(dedupe_key=…)`` uses ``ON CONFLICT … WHERE``
-    with bound parameters, which Postgres can no longer match to the partial unique index once the
-    prepared statement switches to a generic plan (6th execution on a connection)."""
-    await force_custom_plans()
-
-
-async def force_custom_plans() -> None:
-    import asyncpg
-
-    from forge.infra.db import dispose_engine
-    from tests.conftest import PG_SERVER_URL, TEST_DATABASE
-
-    conn = await asyncpg.connect(f"{PG_SERVER_URL}/{TEST_DATABASE}")
-    try:
-        await conn.execute(f'ALTER DATABASE "{TEST_DATABASE}" SET plan_cache_mode = force_custom_plan')
-    finally:
-        await conn.close()
-    await dispose_engine()
-
 
 DOCS = [
     {
@@ -365,10 +343,8 @@ async def test_invoke_adhoc(db_session) -> None:
     data = result.to_dict()
     assert data["status"] == "succeeded" and data["output_text"] == "Bonjour test"
     assert data["token_usage"]["total_tokens"] == 7 and "result" not in data
-    assert [e["type"] for e in data["events"]][0] == "run_started" and data["events"][-1][
-        "type"
-    ] == "run_completed"
+    assert data["events"][0]["type"] == "run_started"
+    assert data["events"][-1]["type"] == "run_completed"
     failing = await create_agent_version(db_session, adapter_config={"script": {"error": {"message": "non"}}})
     failed = await invoke_adhoc(db_session, failing, input={"prompt": "x"})
     assert failed.status == "failed" and "non" in failed.error and failed.output_text is None
-    assert isinstance(TokenUsage(), TokenUsage)

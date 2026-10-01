@@ -21,7 +21,7 @@ def types(text: str) -> list[PiiType]:
         ("international +44 20 7946 0958", PiiType.PHONE),
         ("IBAN FR76 3000 6000 0112 3456 7890 189", PiiType.IBAN),
         ("carte 4111 1111 1111 1111", PiiType.CARD),
-        ("NIR 1 85 05 78 006 084 36", PiiType.NIR),
+        ("NIR 1 85 05 78 006 084 91", PiiType.NIR),
         ("serveur 192.168.10.42", PiiType.IP),
         ("Rendez-vous avec Mme Dupont demain", PiiType.PERSON),
     ],
@@ -33,7 +33,7 @@ def test_detects_each_type(text: str, expected: PiiType) -> None:
 def test_checksums_reject_invalid_numbers() -> None:
     assert PiiType.IBAN not in types("FR76 3000 6000 0112 3456 7890 188")
     assert PiiType.CARD not in types("4111 1111 1111 1112")
-    assert not pii.nir_is_valid("185057800608400")
+    assert not pii.nir_is_valid("185057800608436")
     assert pii.iban_is_valid("FR7630006000011234567890189")
     assert pii.luhn_is_valid("4111111111111111")
 

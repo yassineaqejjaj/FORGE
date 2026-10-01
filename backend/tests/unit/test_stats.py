@@ -75,7 +75,9 @@ def test_bootstrap_is_deterministic_and_contains_the_mean() -> None:
     assert first.low < first.estimate < first.high
     assert first.n == 60
     # Normal theory: half-width ≈ 1.96 · σ / √n ≈ 2.5
-    assert (first.high - first.low) / 2 == pytest.approx(1.96 * np.std(values, ddof=1) / math.sqrt(60), rel=0.15)
+    assert (first.high - first.low) / 2 == pytest.approx(
+        1.96 * np.std(values, ddof=1) / math.sqrt(60), rel=0.15
+    )
 
 
 def test_bootstrap_seed_changes_interval_slightly() -> None:

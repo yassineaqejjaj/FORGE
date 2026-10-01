@@ -28,9 +28,23 @@ async def _scored_run(db_session, *, composite: float, latency: float = 3200.0, 
         output_text="Voici le PRD demandé.",
         latency_ms=latency,
         events=[
-            {"type": TraceEventType.llm_call, "name": "gpt", "attributes": {"model": "m", "input_tokens": 10}},
-            {"type": TraceEventType.tool_call, "name": "search", "input": {"q": "csv"}, "attributes": {"tool": "search"}},
-            {"type": TraceEventType.tool_result, "name": "search", "output": {"hits": 2}, "attributes": {"tool": "search"}},
+            {
+                "type": TraceEventType.llm_call,
+                "name": "gpt",
+                "attributes": {"model": "m", "input_tokens": 10},
+            },
+            {
+                "type": TraceEventType.tool_call,
+                "name": "search",
+                "input": {"q": "csv"},
+                "attributes": {"tool": "search"},
+            },
+            {
+                "type": TraceEventType.tool_result,
+                "name": "search",
+                "output": {"hits": 2},
+                "attributes": {"tool": "search"},
+            },
         ],
     )
     await complete_with_scores(db_session, run, composite=composite, errors=[("FORMAT_ERROR", "low")])
@@ -65,12 +79,18 @@ async def test_create_adhoc_runs(client_as, db_session) -> None:
 
     url = "/api/v1/runs"
     assert (await editor.post(url, json={"agent_version_id": str(av.id)})).status_code == 422
-    too_many = await editor.post(url, json={"agent_version_id": str(av.id), "scenario_ids": [str(sv1.scenario_id)], "repetitions": 21})
+    too_many = await editor.post(
+        url, json={"agent_version_id": str(av.id), "scenario_ids": [str(sv1.scenario_id)], "repetitions": 21}
+    )
     assert too_many.status_code == 422
-    unknown = await editor.post(url, json={"agent_version_id": str(uuid.uuid4()), "scenario_ids": [str(sv1.scenario_id)]})
+    unknown = await editor.post(
+        url, json={"agent_version_id": str(uuid.uuid4()), "scenario_ids": [str(sv1.scenario_id)]}
+    )
     assert unknown.status_code == 404
     viewer = await client_as(Role.viewer)
-    assert (await viewer.post(url, json={"agent_version_id": str(av.id), "scenario_ids": [str(sv1.scenario_id)]})).status_code == 403
+    assert (
+        await viewer.post(url, json={"agent_version_id": str(av.id), "scenario_ids": [str(sv1.scenario_id)]})
+    ).status_code == 403
 
 
 async def test_list_filters_and_sorting(client_as, db_session) -> None:
@@ -92,7 +112,9 @@ async def test_list_filters_and_sorting(client_as, db_session) -> None:
     assert ranged["total"] == 1
     by_agent = (await viewer.get("/api/v1/runs", params={"agent_version_id": str(av.id)})).json()
     assert [r["id"] for r in by_agent["items"]] == [str(low.id)]
-    by_status = (await viewer.get("/api/v1/runs", params={"tag": tag, "status": ["completed", "failed"]})).json()
+    by_status = (
+        await viewer.get("/api/v1/runs", params={"tag": tag, "status": ["completed", "failed"]})
+    ).json()
     assert by_status["total"] == 2
     by_name = (await viewer.get("/api/v1/runs", params={"tag": tag, "q": av.version and "Agent"})).json()
     assert by_name["total"] == 2
@@ -100,7 +122,7 @@ async def test_list_filters_and_sorting(client_as, db_session) -> None:
 
 
 async def test_run_detail_trace_timeline_manifest(client_as, db_session) -> None:
-    run, av, sv = await _scored_run(db_session, composite=82)
+    run, _av, sv = await _scored_run(db_session, composite=82)
     viewer = await client_as(Role.viewer)
     detail = await viewer.get(f"/api/v1/runs/{run.id}")
     assert detail.status_code == 200, detail.text
@@ -122,7 +144,9 @@ async def test_run_detail_trace_timeline_manifest(client_as, db_session) -> None
     assert trace["messages"][-1]["content"] == "Voici le PRD demandé."
 
     timeline = await viewer.get(f"/api/v1/runs/{run.id}/timeline")
-    assert timeline.status_code == 200 and timeline.json()["items"] and timeline.json()["run_id"] == str(run.id)
+    assert (
+        timeline.status_code == 200 and timeline.json()["items"] and timeline.json()["run_id"] == str(run.id)
+    )
 
     manifest = (await viewer.get(f"/api/v1/runs/{run.id}/manifest")).json()
     assert manifest["redacted"] is True and manifest["manifest"]["scenario"]["canary"] is None
@@ -169,5 +193,8 @@ async def test_runs_above_clearance_are_hidden(client_as, db_session) -> None:
     detail = (await cleared.get(f"/api/v1/runs/{run.id}")).json()
     assert detail["scenario"]["classification_warning"].startswith("Contenu classifié C3")
     editor = await client_as(Role.editor, clearance=1)
-    response = await editor.post("/api/v1/runs", json={"agent_version_id": str(run.agent_version_id), "scenario_ids": [str(sv.scenario_id)]})
+    response = await editor.post(
+        "/api/v1/runs",
+        json={"agent_version_id": str(run.agent_version_id), "scenario_ids": [str(sv.scenario_id)]},
+    )
     assert response.status_code == 404

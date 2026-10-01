@@ -30,6 +30,7 @@ from __future__ import annotations
 from collections import Counter, defaultdict
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass, field
+from typing import Any
 
 from forge.domain.benchmarks.aggregation import is_scored
 from forge.domain.benchmarks.labels import RESOURCE_LABELS, dimension_label, dimension_sort_key
@@ -458,7 +459,8 @@ def _severity_rank(severity: RegressionSeverity) -> int:
 
 def _change_sort_key(change: ScenarioChange) -> tuple[int, float, str]:
     rank = _severity_rank(change.severity) if change.severity else -1
-    return (-rank, change.delta if change.status == "regression" else -(change.delta or 0.0), change.name)
+    delta = float(change.delta or 0.0)
+    return (-rank, delta if change.status == "regression" else -delta, change.name)
 
 
 # =====================================================================================================
@@ -567,7 +569,7 @@ def compare(
     """Compare the baseline and candidate runs of an experiment (docs §9.3)."""
     from forge.domain.experiments.recommendation import recommend
 
-    stats_kwargs = {"confidence": confidence, "n_resamples": n_resamples, "seed": seed}
+    stats_kwargs: dict[str, Any] = {"confidence": confidence, "n_resamples": n_resamples, "seed": seed}
     base_arm = arm_summary(ExperimentArm.baseline, baseline, robustness_max_std=robustness_max_std)
     cand_arm = arm_summary(ExperimentArm.candidate, candidate, robustness_max_std=robustness_max_std)
 

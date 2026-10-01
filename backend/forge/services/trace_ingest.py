@@ -226,7 +226,7 @@ async def append_events(
         origin=origin,
         max_payload_chars=settings.max_event_payload_chars,
         start_seq=int(last_seq) + 1,
-        known_span_ids=frozenset(existing),
+        known_span_ids=frozenset(k for k in existing if k),
     )
     rows = [
         TraceEvent(

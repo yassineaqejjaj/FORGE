@@ -142,7 +142,8 @@ def extract_api_key(request: Request) -> str | None:
     return None
 
 
-def _session_token(request: Request) -> str | None:
+def session_token(request: Request) -> str | None:
+    """Session JWT from the Bearer header (non-API-key) or the ``forge_session`` cookie."""
     token = _bearer_token(request)
     if token and not looks_like_api_key(token):
         return token
@@ -198,7 +199,7 @@ async def get_principal(request: Request, session: SessionDep) -> Principal:
         if api_key.scopes:
             raise forbidden("Cette clé d'API est limitée à l'envoi de traces")
         return Principal.for_api_key(api_key)
-    token = _session_token(request)
+    token = session_token(request)
     if token is None:
         raise unauthorized("Authentification requise")
     return Principal.for_user(await _user_from_token(session, token))
@@ -215,7 +216,7 @@ async def get_trace_writer(request: Request, session: SessionDep) -> Principal:
         if not api_key.scopes:
             principal.require(Role.editor)
         return principal
-    token = _session_token(request)
+    token = session_token(request)
     if token is None:
         raise unauthorized("Authentification requise (clé d'API fgk_… attendue)")
     principal = Principal.for_user(await _user_from_token(session, token))
@@ -225,7 +226,7 @@ async def get_trace_writer(request: Request, session: SessionDep) -> Principal:
 
 async def get_current_user(request: Request, session: SessionDep) -> User:
     """Human user only (session cookie or Bearer JWT)."""
-    token = _session_token(request)
+    token = session_token(request)
     if token is None:
         if extract_api_key(request):
             raise forbidden("Cette opération n'est pas accessible avec une clé d'API")

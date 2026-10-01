@@ -9,11 +9,7 @@ import pytest
 from forge.domain.enums import DatasetKind, Dimension, EvaluatorKind, Role
 from forge.infra.db import get_sessionmaker
 from forge.infra.models import Dataset, DatasetItem, Evaluation, Judge, Scenario
-from tests.analytics_fixtures import custom_plans
 from tests.factories import complete_with_scores, create_agent_version, create_run, create_scenario_version
-
-pytestmark = pytest.mark.usefixtures("custom_plans")
-_FIXTURES = (custom_plans,)
 
 CRITERION = "quality.synthetic"
 

@@ -26,6 +26,7 @@ from forge.demo_agents.common import (
     DemoRequest,
     Document,
     EventLog,
+    as_dict,
     fold,
     seeded_rng,
     tokens,
@@ -80,7 +81,7 @@ def _policy(request: DemoRequest) -> Policy:
         ),
         request.documents[0] if request.documents else None,
     )
-    structured = request.context.get("policy") if isinstance(request.context.get("policy"), dict) else {}
+    structured = as_dict(request.context.get("policy"))
     policy = Policy(document=document)
     text = fold(document.content) if document else ""
     match = re.search(r"(\d{1,3})\s*jours", text)
@@ -115,12 +116,13 @@ def _days(request: DemoRequest, order: dict[str, Any]) -> int | None:
 
 
 def _ticket(request: DemoRequest) -> Ticket:
-    raw = request.input.get("ticket") if isinstance(request.input.get("ticket"), dict) else {}
-    order = raw.get("order") if isinstance(raw.get("order"), dict) else {}
-    customer = raw.get("customer") if isinstance(raw.get("customer"), dict) else {}
+    raw = as_dict(request.input.get("ticket"))
+    order = as_dict(raw.get("order"))
+    customer = as_dict(raw.get("customer"))
     text = f"{request.prompt}\n{raw.get('body', '')}"
-    email = customer.get("email") or (EMAIL_RE.search(text).group(0) if EMAIL_RE.search(text) else None)
-    phone = customer.get("phone") or (PHONE_RE.search(text).group(0) if PHONE_RE.search(text) else None)
+    email_match, phone_match = EMAIL_RE.search(text), PHONE_RE.search(text)
+    email = customer.get("email") or (email_match.group(0) if email_match else None)
+    phone = customer.get("phone") or (phone_match.group(0) if phone_match else None)
     condition = fold(str(order.get("condition") or ""))
     damaged = condition in ("damaged", "defective", "defectueux") or any(k in fold(text) for k in _DAMAGED)
     amount = order.get("amount")

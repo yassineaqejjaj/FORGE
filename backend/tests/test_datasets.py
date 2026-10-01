@@ -33,9 +33,13 @@ async def test_context_dataset_lifecycle(client_as) -> None:
         json={"items": [{"key": "faq", "title": "FAQ", "content": "Questions", "metadata": {"lang": "fr"}}]},
     )
     assert added.status_code == 201 and added.json()[0]["key"] == "faq"
-    duplicate = await editor.post(f"/api/v1/datasets/{dataset['id']}/items", json={"items": [{"key": "faq", "content": "x"}]})
+    duplicate = await editor.post(
+        f"/api/v1/datasets/{dataset['id']}/items", json={"items": [{"key": "faq", "content": "x"}]}
+    )
     assert duplicate.status_code == 409
-    empty = await editor.post(f"/api/v1/datasets/{dataset['id']}/items", json={"items": [{"title": "Sans contenu"}]})
+    empty = await editor.post(
+        f"/api/v1/datasets/{dataset['id']}/items", json={"items": [{"title": "Sans contenu"}]}
+    )
     assert empty.status_code == 422
 
     detail = (await editor.get(f"/api/v1/datasets/{dataset['id']}")).json()
@@ -44,12 +48,16 @@ async def test_context_dataset_lifecycle(client_as) -> None:
     assert removed.status_code == 204
     assert (await editor.delete(f"/api/v1/datasets/{dataset['id']}/items/{uuid.uuid4()}")).status_code == 404
 
-    patched = await editor.patch(f"/api/v1/datasets/{dataset['id']}", json={"description": "Docs", "tags": ["prd"]})
+    patched = await editor.patch(
+        f"/api/v1/datasets/{dataset['id']}", json={"description": "Docs", "tags": ["prd"]}
+    )
     assert patched.json()["description"] == "Docs" and patched.json()["version"] == 3
 
     listing = (await editor.get("/api/v1/datasets", params={"kind": "context", "q": slug})).json()
     assert listing["total"] == 1 and listing["items"][0]["items_count"] == 1
-    assert (await editor.post("/api/v1/datasets", json={"name": "x", "slug": slug, "kind": "gold"})).status_code == 409
+    assert (
+        await editor.post("/api/v1/datasets", json={"name": "x", "slug": slug, "kind": "gold"})
+    ).status_code == 409
 
     viewer = await client_as(Role.viewer)
     assert (await viewer.get(f"/api/v1/datasets/{dataset['id']}")).status_code == 200
@@ -64,13 +72,21 @@ async def test_gold_dataset_references_runs(client_as, db_session) -> None:
     editor = await client_as(Role.editor)
     created = await editor.post(
         "/api/v1/datasets",
-        json={"name": f"Gold {uuid.uuid4().hex[:6]}", "kind": "gold", "items": [{"run_id": str(run.id), "notes": "cas limite"}]},
+        json={
+            "name": f"Gold {uuid.uuid4().hex[:6]}",
+            "kind": "gold",
+            "items": [{"run_id": str(run.id), "notes": "cas limite"}],
+        },
     )
     assert created.status_code == 201, created.text
     item = created.json()["items"][0]
     assert item["run_id"] == str(run.id) and item["content"] == {"notes": "cas limite"}
     assert item["run"]["status"] == "pending" and item["run"]["agent_label"].endswith("v1.0")
-    missing = await editor.post(f"/api/v1/datasets/{created.json()['id']}/items", json={"items": [{"run_id": str(uuid.uuid4())}]})
+    missing = await editor.post(
+        f"/api/v1/datasets/{created.json()['id']}/items", json={"items": [{"run_id": str(uuid.uuid4())}]}
+    )
     assert missing.status_code == 422
-    no_run = await editor.post(f"/api/v1/datasets/{created.json()['id']}/items", json={"items": [{"notes": "x"}]})
+    no_run = await editor.post(
+        f"/api/v1/datasets/{created.json()['id']}/items", json={"items": [{"notes": "x"}]}
+    )
     assert no_run.status_code == 422

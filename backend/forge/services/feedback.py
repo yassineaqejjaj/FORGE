@@ -226,19 +226,19 @@ async def create_aggregate_feedback(
     scores: dict[uuid.UUID, list[Score]] = defaultdict(list)
     errors: dict[uuid.UUID, list[RunError]] = defaultdict(list)
     if run_ids:
-        for row in await session.scalars(select(CompositeScore).where(CompositeScore.run_id.in_(run_ids))):
-            if row.round == rounds[row.run_id]:
-                current = composites.get(row.run_id)
-                if current is None or row.created_at > current.created_at:
-                    composites[row.run_id] = row
-        for row in await session.scalars(
+        for comp in await session.scalars(select(CompositeScore).where(CompositeScore.run_id.in_(run_ids))):
+            if comp.round == rounds[comp.run_id]:
+                current = composites.get(comp.run_id)
+                if current is None or comp.created_at > current.created_at:
+                    composites[comp.run_id] = comp
+        for score_row in await session.scalars(
             select(Score).where(Score.run_id.in_(run_ids), Score.used_in_composite.is_(True))
         ):
-            if row.round == rounds[row.run_id]:
-                scores[row.run_id].append(row)
-        for row in await session.scalars(select(RunError).where(RunError.run_id.in_(run_ids))):
-            if row.round is None or row.round == rounds[row.run_id]:
-                errors[row.run_id].append(row)
+            if score_row.round == rounds[score_row.run_id]:
+                scores[score_row.run_id].append(score_row)
+        for error_row in await session.scalars(select(RunError).where(RunError.run_id.in_(run_ids))):
+            if error_row.round is None or error_row.round == rounds[error_row.run_id]:
+                errors[error_row.run_id].append(error_row)
     catalog = await load_criteria_catalog(session)
     labels = await _labels(session)
     inputs: list[FeedbackInput] = []

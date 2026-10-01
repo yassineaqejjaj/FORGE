@@ -992,6 +992,7 @@ async def benchmark_results(
     """Results of one execution (default: latest completed, else latest) grouped by ``group_by``."""
     if group_by not in GROUP_BY_VALUES:
         raise AnalyticsInvalid(f"Regroupement inconnu : {group_by} (attendu : {', '.join(GROUP_BY_VALUES)})")
+    execution: BenchmarkExecution | None
     if execution_id is not None:
         execution = await get_execution(session, execution_id)
         if execution.benchmark_id != benchmark.id:

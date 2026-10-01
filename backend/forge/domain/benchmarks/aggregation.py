@@ -21,6 +21,7 @@ from __future__ import annotations
 from collections import Counter, defaultdict
 from collections.abc import Callable, Iterable, Mapping, Sequence
 from dataclasses import dataclass, field
+from typing import Any
 
 from forge.domain.benchmarks.labels import (
     DIFFICULTY_ORDER,
@@ -762,7 +763,7 @@ def aggregate_benchmark(
     seed: int = DEFAULT_SEED,
 ) -> BenchmarkSummary:
     """Full benchmark summary (docs §9.1) of the runs of one execution (or any run set)."""
-    stats_kwargs = {"confidence": confidence, "n_resamples": n_resamples, "seed": seed}
+    stats_kwargs: dict[str, Any] = {"confidence": confidence, "n_resamples": n_resamples, "seed": seed}
     per_agent: dict[str, list[RunSummary]] = defaultdict(list)
     for run in runs:
         per_agent[run.agent_version_id].append(run)

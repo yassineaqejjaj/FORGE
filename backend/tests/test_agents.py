@@ -14,7 +14,11 @@ def _slug() -> str:
 
 MODEL = {"provider": "openai", "model": "gpt-5-mini", "temperature": 0.2, "input_cost_per_mtok": 0.25}
 TOOLS = [
-    {"name": "search_docs", "description": "Recherche dans la documentation", "parameters": {"type": "object"}},
+    {
+        "name": "search_docs",
+        "description": "Recherche dans la documentation",
+        "parameters": {"type": "object"},
+    },
     {"name": "create_ticket", "description": "Crée un ticket"},
 ]
 
@@ -31,13 +35,17 @@ async def _agent(c) -> dict:
 async def test_agent_crud(client_as) -> None:
     editor = await client_as(Role.editor)
     agent = await _agent(editor)
-    assert agent["tags"] == ["pm", "demo"] and agent["versions_count"] == 0 and agent["latest_version"] is None
+    assert (
+        agent["tags"] == ["pm", "demo"] and agent["versions_count"] == 0 and agent["latest_version"] is None
+    )
     duplicate = await editor.post("/api/v1/agents", json={"name": "x", "slug": agent["slug"]})
     assert duplicate.status_code == 409
     auto = await editor.post("/api/v1/agents", json={"name": f"Agent Étoilé {uuid.uuid4().hex[:4]}"})
     assert auto.json()["slug"].startswith("agent-etoile-")
 
-    patched = await editor.patch(f"/api/v1/agents/{agent['id']}", json={"description": "PM", "metadata": {"team": "x"}})
+    patched = await editor.patch(
+        f"/api/v1/agents/{agent['id']}", json={"description": "PM", "metadata": {"team": "x"}}
+    )
     assert patched.json()["description"] == "PM" and patched.json()["metadata"] == {"team": "x"}
 
     listing = await editor.get("/api/v1/agents", params={"q": agent["slug"]})
@@ -45,7 +53,9 @@ async def test_agent_crud(client_as) -> None:
     archived = await editor.patch(f"/api/v1/agents/{agent['id']}", json={"archived": True})
     assert archived.json()["archived"] is True
     assert (await editor.get("/api/v1/agents", params={"q": agent["slug"]})).json()["total"] == 0
-    assert (await editor.get("/api/v1/agents", params={"q": agent["slug"], "archived": True})).json()["total"] == 1
+    assert (await editor.get("/api/v1/agents", params={"q": agent["slug"], "archived": True})).json()[
+        "total"
+    ] == 1
     assert (await editor.get(f"/api/v1/agents/{uuid.uuid4()}")).status_code == 404
 
     viewer = await client_as(Role.viewer)
@@ -74,7 +84,7 @@ async def test_versions_inline_configs_and_conflict(client_as) -> None:
     assert v1["prompt"]["name"] == prompt_name and v1["prompt"]["version"] == 1
     assert [t["name"] for t in v1["tools"]] == ["search_docs", "create_ticket"]
     assert v1["tool_configuration"]["name"] == f"{agent['slug']}-tools"
-    assert v1["budget"]["max_tokens"] == 4000 and v1["budget"]["timeout_seconds"] == 120.0
+    assert v1["budget"]["max_tokens"] == 4000 and v1["budget"]["timeout_seconds"] is None
     assert v1["content_hash"].startswith("sha256:") and v1["contamination"] == []
 
     identical = await editor.post(f"/api/v1/agents/{agent['id']}/versions", json=body)
@@ -120,7 +130,9 @@ async def test_version_validation(client_as) -> None:
     url = f"/api/v1/agents/{agent['id']}/versions"
     assert (await editor.post(url, json={})).status_code == 422  # adapter kind required
     assert (await editor.post(url, json={"adapter_kind": "openai"})).status_code == 422  # model required
-    assert (await editor.post(url, json={"adapter_kind": "custom_api"})).status_code == 422  # endpoint required
+    assert (
+        await editor.post(url, json={"adapter_kind": "custom_api"})
+    ).status_code == 422  # endpoint required
     both = await editor.post(
         url, json={"adapter_kind": "mock", "model": MODEL, "model_configuration_id": str(uuid.uuid4())}
     )
@@ -199,7 +211,9 @@ async def test_prompts_and_configurations_endpoints(client_as) -> None:
     name = f"support_{uuid.uuid4().hex[:6]}"
     first = await editor.post("/api/v1/prompts", json={"name": name, "content": "Bonjour {{client}}"})
     assert first.status_code == 201 and first.json()["version"] == 1
-    assert (await editor.post("/api/v1/prompts", json={"name": name, "content": "Bonjour {{client}}"})).status_code == 409
+    assert (
+        await editor.post("/api/v1/prompts", json={"name": name, "content": "Bonjour {{client}}"})
+    ).status_code == 409
     second = await editor.post("/api/v1/prompts", json={"name": name, "content": "Salut {{client}}"})
     assert second.json()["version"] == 2
     listing = (await editor.get("/api/v1/prompts", params={"q": name})).json()
@@ -215,22 +229,32 @@ async def test_prompts_and_configurations_endpoints(client_as) -> None:
         }
     ]
     assert (await editor.get("/api/v1/prompts/inconnu_xyz/versions")).status_code == 404
-    assert (await editor.post("/api/v1/prompts", json={"name": "Bad Name", "content": "x"})).status_code == 422
+    assert (
+        await editor.post("/api/v1/prompts", json={"name": "Bad Name", "content": "x"})
+    ).status_code == 422
 
-    model = await editor.post("/api/v1/model-configurations", json={**MODEL, "model": f"m-{uuid.uuid4().hex[:6]}"})
+    model = await editor.post(
+        "/api/v1/model-configurations", json={**MODEL, "model": f"m-{uuid.uuid4().hex[:6]}"}
+    )
     again = await editor.post("/api/v1/model-configurations", json={**model.json(), "id": None})
     assert model.status_code == 201 and again.json()["id"] == model.json()["id"]
 
     tools_name = f"tools_{uuid.uuid4().hex[:6]}"
     tc = await editor.post("/api/v1/tool-configurations", json={"name": tools_name, "tools": TOOLS})
     assert tc.status_code == 201 and tc.json()["version"] == 1
-    assert (await editor.post("/api/v1/tool-configurations", json={"name": tools_name, "tools": TOOLS})).status_code == 409
+    assert (
+        await editor.post("/api/v1/tool-configurations", json={"name": tools_name, "tools": TOOLS})
+    ).status_code == 409
     listed = (await editor.get("/api/v1/tool-configurations", params={"name": tools_name})).json()
     assert listed["total"] == 1
     agent = await _agent(editor)
     version = await editor.post(
         f"/api/v1/agents/{agent['id']}/versions",
-        json={"adapter_kind": "mock", "tool_configuration_id": tc.json()["id"], "prompt_version_id": second.json()["id"]},
+        json={
+            "adapter_kind": "mock",
+            "tool_configuration_id": tc.json()["id"],
+            "prompt_version_id": second.json()["id"],
+        },
     )
     assert version.status_code == 201
     assert version.json()["system_prompt"] == "Salut {{client}}" and len(version.json()["tools"]) == 2

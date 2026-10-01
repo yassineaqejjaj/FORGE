@@ -2,17 +2,11 @@
 
 from __future__ import annotations
 
-import pytest
-
 from forge.domain.enums import Role, ScenarioVisibility
 from forge.infra.db import get_sessionmaker
 from forge.infra.models import Scenario
 from forge.services.runs import mark_failed
-from tests.analytics_fixtures import custom_plans
 from tests.factories import complete_with_scores, create_agent_version, create_run, create_scenario_version
-
-pytestmark = pytest.mark.usefixtures("custom_plans")
-_FIXTURES = (custom_plans,)
 
 
 async def _seed() -> dict:
@@ -54,7 +48,13 @@ async def test_dashboard(client_as) -> None:
     assert 0 <= kpis["pass_rate"] <= 1 and 0 < kpis["error_rate"] <= 1 and kpis["failure_rate"] > 0
     assert kpis["average_composite"] is not None and kpis["average_latency_ms"] is not None
     types = {e["error_type"] for e in data["top_error_types"]}
-    assert {"FORMAT_ERROR", "HALLUCINATION"} <= types and "DATA_LEAK" not in types  # C3 hidden
+    assert {"FORMAT_ERROR", "HALLUCINATION"} <= types
+    # The C3 run (and its scenario) is only counted for a cleared caller.
+    cleared = (
+        await (await client_as(Role.viewer, clearance=3)).get("/api/v1/dashboard", params={"days": 7})
+    ).json()
+    assert cleared["counts"]["runs"] >= data["counts"]["runs"] + 1
+    assert cleared["counts"]["scenarios"] >= data["counts"]["scenarios"] + 1
     assert set(data["queue_depth"]) == {"execution", "evaluation"}
     assert data["trends"][-1]["runs"] >= 3
     assert (await viewer.get("/api/v1/dashboard", params={"days": 0})).status_code == 422

@@ -25,7 +25,7 @@ from collections import defaultdict
 from collections.abc import Sequence
 from typing import Any
 
-from sqlalchemy import ColumnElement, Select, and_, or_, select
+from sqlalchemy import ColumnElement, and_, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from forge.domain.enums import ExperimentArm, RunStatus, ScenarioVisibility
@@ -72,7 +72,7 @@ def run_filters(
     return filters
 
 
-def _scoped(stmt: Select[Any], filters: Sequence[ColumnElement[bool]], viewer: Viewer | None) -> Select[Any]:
+def _scoped(stmt: Any, filters: Sequence[ColumnElement[bool]], viewer: Viewer | None) -> Any:
     if viewer is not None:
         stmt = stmt.join(Scenario, Scenario.id == EvaluationRun.scenario_id).where(
             access.classification_condition(viewer)

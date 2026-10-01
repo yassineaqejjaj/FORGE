@@ -212,7 +212,7 @@ class _Validator:
             for name, bound in (("scale_min", smin), ("scale_max", smax)):
                 if bound is not None and not _num(bound):
                     self.add(f"{path}.{name}", "nombre attendu")
-            if _num(smin) and _num(smax) and smin >= smax:
+            if _num(smin) and _num(smax) and float(smin) >= float(smax):  # type: ignore[arg-type]
                 self.add(path, "scale_min doit être inférieur à scale_max")
             for name in ("name", "question", "rubric"):
                 if item.get(name) is not None and not isinstance(item.get(name), str):
@@ -256,7 +256,7 @@ class _Validator:
             rule["id"] = rule_id
             raw_type = rule.get("type")
             try:
-                rule_type = RuleType(raw_type)
+                rule_type = RuleType(str(raw_type))
             except ValueError:
                 self.add(f"{path}.type", f"type de règle inconnu « {raw_type} »")
                 result.append(rule)

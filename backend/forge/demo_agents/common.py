@@ -75,9 +75,9 @@ class DemoRequest:
 
 
 def parse_request(body: dict[str, Any], headers: dict[str, str]) -> DemoRequest:
-    data_input = body.get("input") if isinstance(body.get("input"), dict) else {}
-    context = body.get("context") if isinstance(body.get("context"), dict) else {}
-    agent = body.get("agent") if isinstance(body.get("agent"), dict) else {}
+    data_input = as_dict(body.get("input"))
+    context = as_dict(body.get("context"))
+    agent = as_dict(body.get("agent"))
     documents = [
         Document(
             id=str(d.get("id") or f"doc-{i + 1}"),
@@ -105,6 +105,11 @@ def parse_request(body: dict[str, Any], headers: dict[str, str]) -> DemoRequest:
         parameters=dict(agent.get("parameters") or {}),
         traceparent=lowered.get("traceparent"),
     )
+
+
+def as_dict(value: Any) -> dict[str, Any]:
+    """``value`` when it is a JSON object, else an empty dict (tolerant payload parsing)."""
+    return value if isinstance(value, dict) else {}
 
 
 def _int(value: Any, default: int) -> int:

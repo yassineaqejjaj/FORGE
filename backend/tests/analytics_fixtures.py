@@ -11,8 +11,7 @@ import uuid
 from collections.abc import Callable
 from typing import Any
 
-import pytest_asyncio
-from sqlalchemy import select, text, update
+from sqlalchemy import select, update
 
 from forge.domain.enums import JobKind, JobStatus, RunStatus, ScenarioVisibility
 from forge.infra.db import get_sessionmaker
@@ -20,23 +19,6 @@ from forge.infra.models import EvaluationRun, Job, Scenario
 from forge.services.runs import mark_failed, on_run_terminal
 from tests.conftest import run_jobs
 from tests.factories import complete_with_scores, create_agent_version, create_scenario_version
-
-
-@pytest_asyncio.fixture(scope="session")
-async def custom_plans(app: object) -> None:
-    """WORKAROUND for a foundation bug (reported): ``infra.queue.enqueue_job`` binds the partial
-    index predicate of ``ON CONFLICT (dedupe_key) WHERE status IN (…)`` as parameters, so once
-    Postgres switches the prepared statement to a generic plan (6th execution on a connection)
-    the index can no longer be inferred and the insert fails. Forcing custom plans on the test
-    database keeps the analytics tests independent of that fix. Remove once the fix lands.
-    """
-    from forge.infra.db import dispose_engine, get_engine
-
-    async with get_engine().begin() as conn:
-        name = (await conn.execute(text("SELECT current_database()"))).scalar_one()
-        await conn.execute(text(f'ALTER DATABASE "{name}" SET plan_cache_mode = force_custom_plan'))
-    await dispose_engine()  # new pooled connections pick the setting up
-
 
 #: run → (composite, extra kwargs of complete_with_scores) or None to fail the run.
 Scorer = Callable[[EvaluationRun], tuple[float, dict[str, Any]] | None]

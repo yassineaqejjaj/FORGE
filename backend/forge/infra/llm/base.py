@@ -165,9 +165,8 @@ async def post_json(
                         body=body,
                         retryable=retryable,
                     )
-                delay = _retry_after(response)
-                if delay is None:
-                    delay = backoff(attempt, base_delay)
+                retry_after = _retry_after(response)
+                delay = retry_after if retry_after is not None else backoff(attempt, base_delay)
                 logger.warning(
                     "%s HTTP %d from %s (attempt %d), retrying in %.1fs",
                     provider,

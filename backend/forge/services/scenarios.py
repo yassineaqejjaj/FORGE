@@ -664,7 +664,7 @@ async def _import_entry(
     versions = [version.version]
     for bundle_version in others:
         try:
-            added = await create_version(
+            new_version = await create_version(
                 session,
                 viewer,
                 actor,
@@ -675,7 +675,7 @@ async def _import_entry(
             )
         except ConflictError:
             continue  # consecutive identical versions
-        versions.append(added.version)
+        versions.append(new_version.version)
     if entry.archived:
         scenario.archived = True
         await session.flush()
@@ -815,7 +815,7 @@ async def export_bundle(
             )
         if not entry_versions:
             continue
-        parent = by_id.get(scenario.parent_scenario_id) if scenario.parent_scenario_id else None
+        parent_row = by_id.get(scenario.parent_scenario_id) if scenario.parent_scenario_id else None
         result.bundle.scenarios.append(
             BundleScenario(
                 slug=scenario.slug,
@@ -827,7 +827,7 @@ async def export_bundle(
                 tags=list(scenario.tags or []),
                 fresh_until=scenario.fresh_until.isoformat() if scenario.fresh_until else None,
                 archived=scenario.archived,
-                parent_slug=parent.slug if parent else None,
+                parent_slug=parent_row.slug if parent_row else None,
                 variant_label=scenario.variant_label,
             )
         )

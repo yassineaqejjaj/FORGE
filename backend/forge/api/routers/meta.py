@@ -75,7 +75,7 @@ def platform_errors() -> Iterator[None]:
     try:
         yield
     except PlatformError as exc:
-        raise ApiError(exc.status_code, exc.message, code=exc.code) from exc
+        raise ApiError(exc.status_code, exc.message, code=exc.code, errors=exc.errors or None) from exc
 
 
 def page_params(

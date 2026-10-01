@@ -5,7 +5,6 @@ from __future__ import annotations
 import time
 import uuid
 
-import pytest
 from sqlalchemy import func, select
 
 from forge.domain.enums import (
@@ -19,10 +18,7 @@ from forge.infra.db import get_sessionmaker
 from forge.infra.models import AuditEvent, EvaluationRun, Job
 from forge.infra.queue import PRIORITY_BENCHMARK
 from forge.services.run_summaries import load_run_summaries
-from tests.analytics_fixtures import complete_runs, custom_plans, make_catalog, scenario_index
-
-pytestmark = pytest.mark.usefixtures("custom_plans")
-_FIXTURES = (custom_plans,)
+from tests.analytics_fixtures import complete_runs, make_catalog, scenario_index
 
 
 async def _create(client, scenario_ids, version_ids, **extra) -> dict:
