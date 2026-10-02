@@ -24,6 +24,7 @@ import { PageHeader } from "@/components/ui/page-header";
 import { Pagination } from "@/components/ui/pagination";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { ResultsAreaTabs } from "@/components/layout/area-tabs";
 import { useErrorsExplorer, useErrorTypes, type ErrorAggregations, type ErrorItem, type ErrorsParams } from "@/lib/api/errors";
 import { useAgentOptions, useAgentVersionOptions, useScenarioOptions } from "@/lib/api/runs";
 import { DEFAULT_PAGE_SIZE } from "@/lib/api/types";
@@ -283,11 +284,13 @@ export function ErrorsExplorerView() {
   return (
     <>
       <PageHeader
-        eyebrow="Évaluer"
-        title="Erreurs"
+        eyebrow="Analyser · Résultats"
+        title="Erreurs détectées"
         icon={<Bug />}
         description="Toutes les erreurs détectées (règles, juges, exécution) : où, à quelle fréquence, avec quelle gravité et sur quelles versions d'agent."
-      />
+      >
+        <ResultsAreaTabs />
+      </PageHeader>
 
       <FilterBar activeCount={activeCount} onReset={() => search.clear()} className="mb-4">
         <MultiFilter id="errors-type" label="Type d'erreur" values={selectedTypes} onChange={(type) => search.set({ type })} options={typeOptions} className="col-span-2" />

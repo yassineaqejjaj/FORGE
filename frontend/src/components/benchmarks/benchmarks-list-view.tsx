@@ -40,14 +40,14 @@ export function BenchmarksListView() {
   return (
     <>
       <PageHeader
-        eyebrow="Comparer"
-        title="Benchmarks"
+        eyebrow="Analyser"
+        title="Comparaisons"
         icon={<Layers />}
-        description="Matrices scénarios × versions d'agents × répétitions : classements avec IC 95 %, robustesse, coûts, latences et écart de généralisation."
+        description="Comparez plusieurs versions d'agents sur les mêmes scénarios (benchmarks) : classements avec IC 95 %, robustesse, coûts, latences et écart de généralisation."
         actions={
           <RequireRole min="editor">
             <Button leftIcon={<Plus aria-hidden />} onClick={() => setCreateOpen(true)}>
-              Nouveau benchmark
+              Nouvelle comparaison
             </Button>
           </RequireRole>
         }

@@ -535,7 +535,7 @@ Endpoints (propriétaire entre crochets) :
 | benchmarks [analytics] | `POST/GET /benchmarks`, `GET/PATCH /benchmarks/{id}`, `POST /benchmarks/{id}/run`, `GET /benchmarks/{id}/executions`, `GET /benchmark-executions/{id}`, `GET /benchmarks/{id}/results`, `POST /benchmark-executions/{id}/cancel` |
 | experiments [analytics] | `POST/GET /experiments`, `GET /experiments/{id}`, `GET /experiments/{id}/comparison`, `GET /experiments/{id}/gate`, `POST /experiments/{id}/cancel` |
 | calibration [analytics] | `GET /calibration?judge_id=&criterion_key=&dataset_id=` |
-| analytics [analytics] | `GET /dashboard?days=30`, `GET /errors` (explorateur : filtres + agrégations) |
+| analytics [analytics] | `GET /dashboard?days=30`, `GET /results/overview?days=&agent_id=` (synthèse par version), `GET /errors` (explorateur : filtres + agrégations) |
 | audit [platform] | `GET /audit` (admin / maintainer) |
 
 ---
@@ -543,15 +543,31 @@ Endpoints (propriétaire entre crochets) :
 ## 13. Frontend
 
 Next.js 15 App Router, TypeScript strict, Tailwind v4, Radix, TanStack Query, Recharts,
-lucide-react ; même design system qu'ORBIT, identité FORGE (orange/ambre, « forge »).
-Pages : Tableau de bord, Agents (+ versions, diff), Scénarios (+ versions, variantes, éditeur),
-Runs, **Run Detail** (3 colonnes : scénario | trace, messages, outils, sortie | composite et
-dimensions ; puis juges, règles, erreurs, feedback — chaque score cliquable jusqu'à sa
-provenance), Benchmarks, Expériences, Juges, Configurations d'évaluation, Revue humaine,
-Calibration, Erreurs, Paramètres (utilisateurs, clés, identifiants, audit). Aucune logique
-métier dans les composants : l'UI affiche ce que l'API calcule.
+lucide-react ; identité FORGE (orange/ambre). Aucune logique métier dans les composants : l'UI
+affiche ce que l'API calcule.
 
----
+**Navigation** (`frontend/src/components/layout/nav.ts`, déclarative) : elle suit le modèle mental
+de l'utilisateur, pas la structure interne.
+
+| Groupe | Entrées (route) |
+|---|---|
+| — | Vue d'ensemble (`/dashboard`) |
+| Concevoir | Agents (`/agents`), Scénarios (`/scenarios`), Datasets (`/datasets`) |
+| Tester | Exécutions (`/runs` ; vues Toutes · En cours · Réussies · En erreur) |
+| Analyser | Résultats (`/results` ; onglet Erreurs détectées `/errors`), Comparaisons (`/benchmarks`) |
+| Améliorer | Expériences (`/experiments`), Revue humaine (`/reviews`) |
+| Configuration | Juges (`/judges` ; onglets Configurations de score `/evaluation-configs`, Calibration `/calibration`), Paramètres (`/settings`) |
+
+* Les routes ne sont pas renommées : seuls les libellés sont traduits.
+* Les fonctions propres à un espace ou à un objet passent par des **onglets locaux** (`LocalTabs`),
+  jamais par la sidebar.
+* **Badges** (`useNavBadges`) affichés seulement s'ils portent une information : exécutions en échec
+  depuis 24 h, file de revue prioritaire (`GET /reviews/queue?priority=true` : désaccord des juges
+  ≥ 0,4, confiance < 0,3, ou exécution d'un jeu gold).
+* **Sélecteur de contexte** : système évalué (agents enregistrés) et environnement (`/meta`) ;
+  point d'entrée futur des projets, environnements et équipes.
+* **Mobile** (< 1024 px) : tiroir à catégories dépliables (une ouverte à la fois, celle de la page
+  active à l'ouverture), zones tactiles ≥ 44 px, fermeture après navigation.
 
 ## 14. Tests
 

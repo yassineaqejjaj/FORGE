@@ -2,10 +2,12 @@
 
 import * as React from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { ArrowDown, ArrowUp, ArrowUpDown, Inbox, Play, Plus, ShieldX } from "lucide-react";
+import { usePathname, useRouter } from "next/navigation";
+import { ArrowDown, ArrowUp, ArrowUpDown, Bug, Inbox, Play, Plus, ShieldX } from "lucide-react";
 
 import { RequireRole } from "@/components/auth/require-role";
+import { LocalTabs } from "@/components/layout/local-tabs";
+import { ALL_NAV_ITEMS, isViewActive } from "@/components/layout/nav";
 import { ClassificationBadge } from "@/components/domain/classification-badge";
 import { CostDisplay, DurationDisplay, TokenCount } from "@/components/domain/metric-display";
 import { RelativeTime } from "@/components/domain/relative-time";
@@ -54,6 +56,9 @@ const FILTER_KEYS = [
   "from",
   "to",
 ] as const;
+
+/** Status views of the list (same links as the mobile menu shortcuts). */
+const RUNS_VIEWS = ALL_NAV_ITEMS.find((item) => item.href === "/runs")?.children ?? [];
 
 const SORTS: ReadonlyArray<RunSort> = ["-created_at", "created_at", "-composite", "composite", "-latency", "latency"];
 
@@ -219,7 +224,7 @@ function boolParam(v: string | undefined): boolean | undefined {
   return v === "true" ? true : v === "false" ? false : undefined;
 }
 
-/** `/runs`: filterable, sortable, paginated runs list (URL-synced) + "Nouveau run". */
+/** `/runs` (« Exécutions »): status views, filterable, sortable, paginated list (URL-synced). */
 export function RunsListView() {
   const search = useSearchState();
   const [dialogOpen, setDialogOpen] = React.useState(false);
@@ -256,12 +261,18 @@ export function RunsListView() {
   const liveCount = items.filter((r) => isRunActive(r.status)).length;
 
   const resultValue = search.get("gate_failed") === "true" ? "gate" : search.get("passed");
+  const pathname = usePathname();
+  const views = RUNS_VIEWS.map((view) => ({
+    href: view.href,
+    label: view.label,
+    active: isViewActive(pathname, search.params, view.href) && !search.get("gate_failed"),
+  }));
 
   return (
     <>
       <PageHeader
-        eyebrow="Laboratoire"
-        title="Runs"
+        eyebrow="Tester"
+        title="Exécutions"
         icon={<Play />}
         description="Chaque exécution d'un agent sur un scénario : trace, sortie, scores expliqués, erreurs et feedback."
         meta={
@@ -272,13 +283,36 @@ export function RunsListView() {
           ) : null
         }
         actions={
-          <RequireRole min="editor">
-            <Button leftIcon={<Plus aria-hidden />} onClick={() => setDialogOpen(true)}>
-              Nouveau run
+          <>
+            <Button asChild variant="secondary">
+              <Link href="/errors">
+                <Bug aria-hidden />
+                Erreurs détectées
+              </Link>
             </Button>
-          </RequireRole>
+            <RequireRole min="editor">
+              <Button leftIcon={<Plus aria-hidden />} onClick={() => setDialogOpen(true)}>
+                Nouvelle exécution
+              </Button>
+            </RequireRole>
+          </>
         }
-      />
+      >
+        <LocalTabs
+          label="Vues des exécutions"
+          tabs={views}
+          onSelect={(tab, event) => {
+            // Keep the other filters (agent, scenario, dates…): only the view keys change.
+            event.preventDefault();
+            const target = new URLSearchParams(tab.href.split("?")[1] ?? "");
+            search.set({
+              status: target.getAll("status"),
+              passed: target.get("passed"),
+              gate_failed: undefined,
+            });
+          }}
+        />
+      </PageHeader>
 
       <FilterBar activeCount={activeCount} onReset={() => search.clear(["sort"])} className="mb-4">
         <SearchFilter
@@ -375,7 +409,7 @@ export function RunsListView() {
       ) : !runs.isPending && items.length === 0 ? (
         <EmptyState
           icon={<Inbox />}
-          title={activeCount ? "Aucun run ne correspond à ces filtres" : "Aucun run pour l'instant"}
+          title={activeCount ? "Aucune exécution ne correspond à ces filtres" : "Aucune exécution pour l'instant"}
           description={
             activeCount
               ? "Élargissez la recherche ou réinitialisez les filtres."
@@ -389,7 +423,7 @@ export function RunsListView() {
             ) : (
               <RequireRole min="editor">
                 <Button size="sm" leftIcon={<Plus aria-hidden />} onClick={() => setDialogOpen(true)}>
-                  Nouveau run
+                  Nouvelle exécution
                 </Button>
               </RequireRole>
             )

@@ -24,6 +24,7 @@ import { SimpleSelect } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { Table, TableBody, TableCell, TableEmptyRow, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { SimpleTooltip } from "@/components/ui/tooltip";
+import { JudgesAreaTabs } from "@/components/layout/area-tabs";
 import { useHasRole } from "@/hooks/use-current-user";
 import { errorMessage } from "@/lib/api/client";
 import { useForgeMeta } from "@/lib/api/evaluation-configs";
@@ -61,7 +62,7 @@ export function JudgesListView() {
   return (
     <>
       <PageHeader
-        eyebrow="Évaluer"
+        eyebrow="Configuration"
         title="Juges"
         icon={<Gavel />}
         description="Juges LLM et heuristiques versionnés : fournisseur, modèle, prompt système et grille. Chaque version est immuable et peut être testée sur un run existant."
@@ -74,7 +75,9 @@ export function JudgesListView() {
             </Button>
           </RequireRole>
         }
-      />
+      >
+        <JudgesAreaTabs />
+      </PageHeader>
       {meta.data && !meta.data.capabilities.llm_judges_configured ? (
         <Alert tone="sky" className="mb-4" title="Aucun juge LLM configuré au démarrage">
           Seul le juge heuristique hors ligne est disponible par défaut. Créez un identifiant fournisseur (Paramètres →

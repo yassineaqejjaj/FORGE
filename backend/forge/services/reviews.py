@@ -16,14 +16,21 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import Any
 
-from sqlalchemy import and_, delete, exists, func, select
+from sqlalchemy import and_, delete, exists, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from forge.domain.defaults import DEFAULT_JUDGED_CRITERIA
-from forge.domain.enums import Dimension, EvaluatorKind, RunStatus, ScenarioVisibility, ScoreSource
+from forge.domain.enums import (
+    DatasetKind,
+    Dimension,
+    EvaluatorKind,
+    RunStatus,
+    ScenarioVisibility,
+    ScoreSource,
+)
 from forge.domain.redaction import redact_evaluation
 from forge.domain.types import CriterionSpec
-from forge.infra.models import Evaluation, EvaluationRun, Scenario, Score, User
+from forge.infra.models import Dataset, DatasetItem, Evaluation, EvaluationRun, Scenario, Score, User
 from forge.services import access, audit
 from forge.services.access import Viewer
 from forge.services.audit import ActorLike
@@ -124,15 +131,26 @@ class QueueItem:
     criteria: list[dict[str, Any]]
 
 
+#: « Needs a human » thresholds of the priority queue (normalised 0–1 scores): judges disagree by
+#: two points or more on a 0–5 scale, or a verdict is barely trusted by its own judge (< 0.3 —
+#: the offline heuristic judge caps its confidence at 0.6, so a higher floor would flag every run).
+PRIORITY_MIN_SPREAD = 0.4
+PRIORITY_MAX_CONFIDENCE = 0.3
+
+
 async def review_queue(
     session: AsyncSession,
     viewer: Viewer,
     user_id: uuid.UUID,
     *,
     dataset_id: uuid.UUID | None = None,
+    priority_only: bool = False,
     offset: int = 0,
     limit: int = 25,
 ) -> tuple[list[QueueItem], int]:
+    """Completed runs the user has not reviewed yet, most useful first (judge disagreement, then low
+    confidence). ``priority_only`` keeps the runs that really need a human: strong disagreement
+    between judges, low judge confidence, or runs selected in a gold dataset."""
     already = exists().where(
         Evaluation.run_id == EvaluationRun.id,
         Evaluation.evaluator_kind == EvaluatorKind.human,
@@ -164,6 +182,19 @@ async def review_queue(
         .group_by(Score.run_id)
         .subquery()
     )
+    if priority_only:
+        in_gold = exists().where(
+            DatasetItem.run_id == EvaluationRun.id,
+            DatasetItem.dataset_id == Dataset.id,
+            Dataset.kind == DatasetKind.gold,
+        )
+        conditions.append(
+            or_(
+                in_gold,
+                stats.c.max_spread >= PRIORITY_MIN_SPREAD,
+                stats.c.min_confidence < PRIORITY_MAX_CONFIDENCE,
+            )
+        )
     base = (
         select(EvaluationRun, Scenario, stats.c.max_spread, stats.c.min_confidence)
         .join(Scenario, Scenario.id == EvaluationRun.scenario_id)
@@ -173,6 +204,7 @@ async def review_queue(
     total = await session.scalar(
         select(func.count(EvaluationRun.id))
         .join(Scenario, Scenario.id == EvaluationRun.scenario_id)
+        .outerjoin(stats, stats.c.run_id == EvaluationRun.id)
         .where(*conditions)
     )
     rows = (

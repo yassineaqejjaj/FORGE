@@ -393,6 +393,7 @@ async def get_meta(principal: RequireViewer, session: SessionDep) -> MetaOut:
     non_judged = {Dimension.cost, Dimension.latency, Dimension.robustness}
     return MetaOut(
         version=settings.app_version,
+        environment=settings.env,
         enums={key: enum_options(cls) for key, cls in ENUM_KEYS.items()},
         classifications=[
             EnumOption(value=str(level), label=f"C{level} — {label}")

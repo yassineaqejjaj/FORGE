@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { Command } from "cmdk";
 import { ArrowRight, Hash, LogOut, Moon, PanelLeft, Search, Sun } from "lucide-react";
 
-import { NAV_SECTIONS, SETTINGS_NAV, type NavItem } from "@/components/layout/nav";
+import { NAV_SECTIONS, SETTINGS_NAV, type NavItem, type NavSubPage } from "@/components/layout/nav";
 import { useShell } from "@/components/layout/shell-context";
 import { useTheme } from "@/components/providers/theme-provider";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
@@ -20,9 +20,9 @@ const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
 
 /** Entities that can be opened directly from a pasted identifier. */
 const OPEN_BY_ID: Array<{ label: string; href: (id: string) => string }> = [
-  { label: "Ouvrir le run", href: (id) => `/runs/${id}` },
+  { label: "Ouvrir l'exécution", href: (id) => `/runs/${id}` },
   { label: "Ouvrir l'expérience", href: (id) => `/experiments/${id}` },
-  { label: "Ouvrir le benchmark", href: (id) => `/benchmarks/${id}` },
+  { label: "Ouvrir la comparaison", href: (id) => `/benchmarks/${id}` },
   { label: "Ouvrir le scénario", href: (id) => `/scenarios/${id}` },
   { label: "Ouvrir l'agent", href: (id) => `/agents/${id}` },
 ];
@@ -33,9 +33,17 @@ function matches(query: string, ...fields: Array<string | undefined>): boolean {
   return fields.some((f) => f && normalizeText(f).includes(q));
 }
 
-function itemMatches(query: string, item: NavItem): boolean {
+function itemMatches(query: string, item: NavItem | NavSubPage): boolean {
   return matches(query, item.label, item.description, ...(item.keywords ?? []));
 }
+
+/** Pages reached through local tabs or shortcuts (Juges › Calibration, Exécutions › En erreur…). */
+const RELATED_PAGES: Array<{ parent: NavItem; page: NavSubPage }> = NAV_SECTIONS.flatMap((section) =>
+  section.items.flatMap((parent) => [
+    ...(parent.subPages ?? []).map((page) => ({ parent, page })),
+    ...(parent.children ?? []).filter((page) => page.href !== parent.href).map((page) => ({ parent, page })),
+  ]),
+);
 
 const itemClass = cn(
   "group flex cursor-default select-none items-center gap-3 rounded-md px-2.5 py-2 text-[13px] text-foreground outline-none",
@@ -81,6 +89,9 @@ export function CommandPalette() {
     items: s.items.filter((i) => allowed(i) && itemMatches(query, i)),
   })).filter((s) => s.items.length > 0);
   const settingsItems = SETTINGS_NAV.filter((i) => allowed(i) && itemMatches(query, i));
+  const relatedPages = RELATED_PAGES.filter(
+    ({ parent, page }) => allowed(parent) && (!page.minRole || hasRole(page.minRole)) && (itemMatches(query, page) || itemMatches(query, parent)),
+  );
 
   const trimmed = query.trim();
   const idCandidate = UUID_RE.test(trimmed) ? trimmed.toLowerCase() : null;
@@ -103,7 +114,8 @@ export function CommandPalette() {
     { id: "logout", label: "Se déconnecter", icon: LogOut, keywords: "déconnexion logout", run: () => logout.mutate() },
   ].filter((a) => matches(query, a.label, a.keywords));
 
-  const nothing = sections.length === 0 && settingsItems.length === 0 && actions.length === 0 && !idCandidate;
+  const nothing =
+    sections.length === 0 && relatedPages.length === 0 && settingsItems.length === 0 && actions.length === 0 && !idCandidate;
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
@@ -166,6 +178,26 @@ export function CommandPalette() {
               </Command.Group>
             ))}
 
+            {relatedPages.length > 0 ? (
+              <Command.Group heading="Pages liées" className={groupClass}>
+                {relatedPages.map(({ parent, page }) => (
+                  <Command.Item
+                    key={page.href}
+                    value={`page-${page.href}`}
+                    onSelect={() => run(() => router.push(page.href))}
+                    className={itemClass}
+                  >
+                    <parent.icon className="text-muted-foreground" aria-hidden />
+                    <span className="font-medium">
+                      {parent.label} <span className="text-muted-foreground">›</span> {page.label}
+                    </span>
+                    <span className="hidden truncate text-xs text-muted-foreground sm:inline">{page.description}</span>
+                    <ArrowRight className="ml-auto opacity-0 group-data-[selected=true]:opacity-60" aria-hidden />
+                  </Command.Item>
+                ))}
+              </Command.Group>
+            ) : null}
+
             {settingsItems.length > 0 ? (
               <Command.Group heading="Paramètres" className={groupClass}>
                 {settingsItems.map((item) => (
@@ -210,7 +242,7 @@ export function CommandPalette() {
                 <Kbd>↵</Kbd> ouvrir
               </span>
             </div>
-            <span className="hidden sm:inline">Collez un identifiant (UUID) pour ouvrir un run, une expérience…</span>
+            <span className="hidden sm:inline">Collez un identifiant (UUID) pour ouvrir une exécution, une expérience…</span>
           </div>
         </Command>
       </DialogContent>

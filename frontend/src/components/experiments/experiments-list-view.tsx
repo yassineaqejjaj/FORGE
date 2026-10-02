@@ -54,7 +54,7 @@ export function ExperimentsListView() {
   return (
     <>
       <PageHeader
-        eyebrow="Comparer"
+        eyebrow="Améliorer"
         title="Expériences"
         icon={<FlaskConical />}
         description="Baseline vs candidate sur les mêmes scénarios : la candidate est-elle réellement meilleure ? Deltas appariés avec IC 95 %, régressions, coûts et recommandation."

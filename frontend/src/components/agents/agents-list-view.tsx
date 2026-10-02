@@ -48,7 +48,7 @@ export function AgentsListView() {
   return (
     <>
       <PageHeader
-        eyebrow="Laboratoire"
+        eyebrow="Concevoir"
         title="Agents"
         icon={<Bot />}
         description="Agents évalués et leurs versions immuables : prompt, modèle, outils, contexte et budget. Chaque modification de comportement crée une nouvelle version."

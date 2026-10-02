@@ -59,7 +59,7 @@ export function ScenariosListView() {
   return (
     <>
       <PageHeader
-        eyebrow="Laboratoire"
+        eyebrow="Concevoir"
         title="Scénarios"
         icon={<ScrollText />}
         description="Bibliothèque de scénarios versionnés : publics, privés (contenu caché, test de généralisation) et fresh, avec familles de variantes."

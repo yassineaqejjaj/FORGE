@@ -1273,6 +1273,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/results/overview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Résultats : runs évalués de la période agrégés par version d'agent */
+        get: operations["get_results_overview_api_v1_results_overview_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/errors": {
         parameters: {
             query?: never;
@@ -4750,6 +4767,11 @@ export interface components {
         MetaOut: {
             /** Version */
             version: string;
+            /**
+             * Environment
+             * @default development
+             */
+            environment: string;
             /** Enums */
             enums: {
                 [key: string]: components["schemas"]["EnumOption"][];
@@ -5710,6 +5732,66 @@ export interface components {
              */
             assessment: string;
         };
+        /** ResultsAgentRowOut */
+        ResultsAgentRowOut: {
+            /** Agent Version Id */
+            agent_version_id: string;
+            /** Agent Id */
+            agent_id: string;
+            /** Agent Label */
+            agent_label: string;
+            /** Model */
+            model?: string | null;
+            /** N Runs */
+            n_runs: number;
+            /** N Scored */
+            n_scored: number;
+            /** N Failed */
+            n_failed: number;
+            /** Composite Mean */
+            composite_mean?: number | null;
+            /** Composite Ci Low */
+            composite_ci_low?: number | null;
+            /** Composite Ci High */
+            composite_ci_high?: number | null;
+            /** Pass Rate */
+            pass_rate?: number | null;
+            /** Gate Failure Rate */
+            gate_failure_rate?: number | null;
+            /** Error Rate */
+            error_rate?: number | null;
+            /** Dimensions */
+            dimensions?: {
+                [key: string]: number;
+            };
+            /** Cost Mean */
+            cost_mean?: number | null;
+            /** Latency Mean */
+            latency_mean?: number | null;
+            /** Latency P95 */
+            latency_p95?: number | null;
+            /** Tokens Mean */
+            tokens_mean?: number | null;
+            /** Errors By Type */
+            errors_by_type?: {
+                [key: string]: number;
+            };
+        };
+        /** ResultsErrorRowOut */
+        ResultsErrorRowOut: {
+            /** Error Type */
+            error_type: string;
+            /** Count */
+            count: number;
+            /** Runs Affected */
+            runs_affected: number;
+            /** Max Severity */
+            max_severity: string;
+            /** By Severity */
+            by_severity?: {
+                [key: string]: number;
+            };
+        };
         /** ResultsOut */
         ResultsOut: {
             /**
@@ -5746,6 +5828,24 @@ export interface components {
             rows: components["schemas"]["GroupRowOut"][];
             /** Errors */
             errors: components["schemas"]["ErrorTypeRowOut"][];
+        };
+        /** ResultsOverviewOut */
+        ResultsOverviewOut: {
+            /** Days */
+            days: number;
+            /**
+             * Since
+             * Format: date-time
+             */
+            since: string;
+            /** N Runs */
+            n_runs: number;
+            /** Truncated */
+            truncated: boolean;
+            /** Agents */
+            agents: components["schemas"]["ResultsAgentRowOut"][];
+            /** Errors */
+            errors: components["schemas"]["ResultsErrorRowOut"][];
         };
         /** ReviewCriterion */
         ReviewCriterion: {
@@ -10301,6 +10401,39 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["DashboardOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_results_overview_api_v1_results_overview_get: {
+        parameters: {
+            query?: {
+                /** @description Fenêtre en jours */
+                days?: number;
+                agent_id?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ResultsOverviewOut"];
                 };
             };
             /** @description Validation Error */

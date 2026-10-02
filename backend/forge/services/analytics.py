@@ -432,3 +432,91 @@ async def explore_errors(
 
 
 __all__ = ["ErrorFilters", "dashboard", "explore_errors"]
+
+
+# --- Results overview (« Analyser › Résultats ») ------------------------------------------------------
+
+RESULTS_MAX_RUNS = 5000
+RESULTS_RESAMPLES = 2000
+
+
+async def results_overview(
+    session: AsyncSession,
+    viewer: Viewer,
+    *,
+    days: int = 30,
+    agent_id: uuid.UUID | None = None,
+) -> dict[str, Any]:
+    """Evaluated runs of the window aggregated per agent version (any origin: ad hoc, benchmark,
+    experiment), with the error breakdown. Same statistics as a benchmark execution, so the numbers
+    of the Résultats page and of the Comparaisons pages are computed identically."""
+    from forge.domain.benchmarks.aggregation import aggregate_agent, error_breakdown
+    from forge.domain.defaults import DEFAULT_DIMENSION_WEIGHTS
+    from forge.domain.types import to_dict
+    from forge.infra.models import EvaluationConfig
+    from forge.services.run_summaries import load_run_summaries
+
+    since = utcnow() - timedelta(days=days)
+    conditions: list[ColumnElement[bool]] = [
+        EvaluationRun.created_at >= since,
+        EvaluationRun.status.in_(list(EVALUATED)),
+    ]
+    if agent_id is not None:
+        conditions.append(EvaluationRun.agent_id == agent_id)
+    recent_ids = list(
+        await session.scalars(
+            select(EvaluationRun.id)
+            .where(*conditions)
+            .order_by(EvaluationRun.created_at.desc())
+            .limit(RESULTS_MAX_RUNS)
+        )
+    )
+    summaries = await load_run_summaries(session, run_ids=recent_ids, viewer=viewer) if recent_ids else []
+    default_config = await session.scalar(
+        select(EvaluationConfig).where(
+            EvaluationConfig.is_default.is_(True), EvaluationConfig.is_latest.is_(True)
+        )
+    )
+    weights = dict(default_config.dimension_weights) if default_config else dict(DEFAULT_DIMENSION_WEIGHTS)
+
+    per_version: dict[str, list[Any]] = {}
+    for summary in summaries:
+        per_version.setdefault(summary.agent_version_id, []).append(summary)
+    agents = [
+        aggregate_agent(runs, dimension_weights=weights, n_resamples=RESULTS_RESAMPLES)
+        for runs in per_version.values()
+    ]
+    agents.sort(key=lambda a: (a.composite.mean is None, -(a.composite.mean or 0.0), a.agent_label))
+    rows = []
+    for agent in agents:
+        rows.append(
+            {
+                "agent_version_id": agent.agent_version_id,
+                "agent_id": agent.agent_id,
+                "agent_label": agent.agent_label,
+                "model": agent.model,
+                "n_runs": agent.n_runs,
+                "n_scored": agent.n_scored,
+                "n_failed": agent.n_failed,
+                "composite_mean": agent.composite.mean,
+                "composite_ci_low": agent.composite.ci_low,
+                "composite_ci_high": agent.composite.ci_high,
+                "pass_rate": agent.pass_rate,
+                "gate_failure_rate": agent.gate_failure_rate,
+                "error_rate": agent.error_rate,
+                "dimensions": dict(agent.dimensions),
+                "cost_mean": agent.cost.mean,
+                "latency_mean": agent.latency.mean,
+                "latency_p95": agent.latency.p95,
+                "tokens_mean": agent.tokens.mean,
+                "errors_by_type": dict(agent.errors_by_type),
+            }
+        )
+    return {
+        "days": days,
+        "since": since,
+        "n_runs": len(summaries),
+        "truncated": len(recent_ids) >= RESULTS_MAX_RUNS,
+        "agents": rows,
+        "errors": [to_dict(row) for row in error_breakdown(summaries)][:12],
+    }

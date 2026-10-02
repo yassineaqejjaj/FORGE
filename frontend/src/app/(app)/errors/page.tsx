@@ -3,7 +3,7 @@ import { Suspense } from "react";
 
 import { ErrorsExplorerView } from "@/components/errors/errors-explorer-view";
 
-export const metadata: Metadata = { title: "Erreurs" };
+export const metadata: Metadata = { title: "Erreurs détectées" };
 
 export default function ErrorsPage() {
   return (
