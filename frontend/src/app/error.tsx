@@ -30,7 +30,7 @@ export default function RootError({ error, reset }: { error: Error & { digest?: 
             Réessayer
           </Button>
           <Button asChild variant="secondary">
-            <Link href="/">Retour au tableau de bord</Link>
+            <Link href="/dashboard">Retour au tableau de bord</Link>
           </Button>
         </div>
       </div>

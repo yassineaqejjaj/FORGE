@@ -31,10 +31,12 @@ export function initials(name: string | null | undefined, fallback = "?"): strin
 }
 
 /** Only allow same-origin relative redirects (prevents open redirects via ?next=). */
-export function safeNextPath(next: string | null | undefined, fallback = "/"): string {
+export function safeNextPath(next: string | null | undefined, fallback = "/dashboard"): string {
   if (!next) return fallback;
   if (!next.startsWith("/") || next.startsWith("//") || next.startsWith("/\\")) return fallback;
   if (next.startsWith("/login")) return fallback;
+  // "/" is the public landing page: after signing in, land in the application.
+  if (next === "/") return fallback;
   return next;
 }
 

@@ -45,7 +45,7 @@ export const NAV_SECTIONS: NavSection[] = [
     label: "Pilotage",
     items: [
       {
-        href: "/",
+        href: "/dashboard",
         label: "Tableau de bord",
         icon: LayoutDashboard,
         description: "Scores, tendances, régressions et activité récente",

@@ -22,7 +22,7 @@ export default function NotFound() {
         </p>
         <div className="flex flex-wrap justify-center gap-2">
           <Button asChild>
-            <Link href="/">
+            <Link href="/dashboard">
               <LayoutDashboard aria-hidden />
               Tableau de bord
             </Link>

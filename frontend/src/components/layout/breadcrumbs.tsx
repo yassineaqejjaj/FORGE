@@ -56,7 +56,7 @@ export function Breadcrumbs({ className }: { className?: string }) {
       crumbs.push({ label, href });
     });
   } else {
-    crumbs.push({ label: "FORGE", href: "/" });
+    crumbs.push({ label: "FORGE", href: "/dashboard" });
   }
 
   return (

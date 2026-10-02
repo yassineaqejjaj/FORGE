@@ -30,7 +30,7 @@ export default function AppError({ error, reset }: { error: Error & { digest?: s
             Réessayer
           </Button>
           <Button asChild variant="secondary">
-            <Link href="/">Retour au tableau de bord</Link>
+            <Link href="/dashboard">Retour au tableau de bord</Link>
           </Button>
         </>
       }

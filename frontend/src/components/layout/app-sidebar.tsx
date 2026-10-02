@@ -131,7 +131,7 @@ export function SidebarContent({ collapsed = false, onNavigate, showCollapseTogg
     <div className="flex h-full flex-col">
       <div className={cn("flex h-14 shrink-0 items-center", collapsed ? "justify-center px-2" : "px-4")}>
         <Link
-          href="/"
+          href="/dashboard"
           onClick={onNavigate}
           className="rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
           aria-label="FORGE — tableau de bord"

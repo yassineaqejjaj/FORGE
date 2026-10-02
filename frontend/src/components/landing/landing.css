@@ -1,0 +1,419 @@
+/* Public landing page (Devoteam | Forge). Every selector is scoped under .forge-landing and every
+   keyframe is prefixed fl- so nothing leaks into the application's design system. */
+
+:root:has(.forge-landing) {
+  scroll-behavior: smooth;
+}
+
+.forge-landing {
+  --fl-ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --fl-ease-io: cubic-bezier(0.65, 0, 0.35, 1);
+  background: #ffffff;
+}
+
+.forge-landing a {
+  color: #d62e45;
+}
+.forge-landing a:hover {
+  color: #b8253a;
+}
+
+/* buttons */
+.forge-landing .btn {
+  transition:
+    transform 250ms var(--fl-ease-out),
+    filter 250ms var(--fl-ease-out),
+    box-shadow 250ms var(--fl-ease-out);
+}
+.forge-landing .btn:hover {
+  filter: brightness(0.94);
+  transform: translateY(-2px);
+}
+.forge-landing .btn:active {
+  transform: scale(0.98);
+}
+.forge-landing .btn .arr {
+  transition: transform 300ms var(--fl-ease-out);
+}
+.forge-landing .btn:hover .arr {
+  transform: translateX(4px);
+}
+.forge-landing a.btn,
+.forge-landing a.btn:hover {
+  color: #ffffff;
+}
+.forge-landing .glow {
+  animation: fl-glow 3.2s ease-in-out infinite;
+}
+@keyframes fl-glow {
+  0%,
+  100% {
+    box-shadow: 0 10px 30px rgba(248, 72, 94, 0.3);
+  }
+  50% {
+    box-shadow:
+      0 0 18px rgba(248, 72, 94, 0.55),
+      0 0 44px rgba(248, 72, 94, 0.25);
+  }
+}
+
+.forge-landing .navlink {
+  color: #efeeee;
+  text-decoration: none;
+  position: relative;
+  padding: 6px 0;
+}
+.forge-landing .navlink::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 1px;
+  background: #f8485e;
+  transform: scaleX(0);
+  transform-origin: right;
+  transition: transform 350ms var(--fl-ease-out);
+}
+.forge-landing .navlink:hover {
+  color: #ffffff;
+}
+.forge-landing .navlink:hover::after {
+  transform: scaleX(1);
+  transform-origin: left;
+}
+.forge-landing .navlink:focus-visible,
+.forge-landing .btn:focus-visible {
+  outline: 2px solid #fca2ae;
+  outline-offset: 4px;
+}
+
+/* hero load-in choreography */
+.forge-landing .in {
+  animation: fl-in 1000ms var(--fl-ease-out) both;
+}
+@keyframes fl-in {
+  from {
+    opacity: 0;
+    transform: translateY(24px);
+    filter: blur(10px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+    filter: blur(0);
+  }
+}
+.forge-landing .w {
+  display: inline-block;
+  animation: fl-word 1100ms var(--fl-ease-out) both;
+}
+@keyframes fl-word {
+  from {
+    opacity: 0;
+    transform: translateY(0.6em) rotate(2deg);
+    filter: blur(12px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+    filter: blur(0);
+  }
+}
+
+/* neon light trail: draws in, then a light pulse travels along it */
+.forge-landing .trail {
+  transform-origin: left center;
+  animation: fl-draw 1800ms var(--fl-ease-io) 300ms both;
+}
+@keyframes fl-draw {
+  from {
+    clip-path: inset(0 100% 0 0);
+  }
+  to {
+    clip-path: inset(0 0 0 0);
+  }
+}
+.forge-landing .sweep {
+  background: linear-gradient(
+    90deg,
+    rgba(255, 77, 107, 0) 0%,
+    rgba(255, 77, 107, 0) 35%,
+    #ffffff 50%,
+    rgba(255, 77, 107, 0) 65%,
+    rgba(255, 77, 107, 0) 100%
+  );
+  background-size: 220% 100%;
+  animation: fl-sweep 5.5s linear 2s infinite;
+}
+@keyframes fl-sweep {
+  from {
+    background-position: 120% 0;
+  }
+  to {
+    background-position: -120% 0;
+  }
+}
+.forge-landing .breathe {
+  animation: fl-breathe 4s ease-in-out infinite;
+}
+@keyframes fl-breathe {
+  0%,
+  100% {
+    opacity: 0.55;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+/* glass card float + bars */
+.forge-landing .float {
+  animation: fl-float 7s ease-in-out infinite;
+}
+@keyframes fl-float {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-10px);
+  }
+}
+.forge-landing .bar {
+  transform-origin: left center;
+  animation: fl-grow 1600ms var(--fl-ease-out) both;
+}
+@keyframes fl-grow {
+  from {
+    transform: scaleX(0);
+  }
+  to {
+    transform: scaleX(1);
+  }
+}
+.forge-landing .dot {
+  animation: fl-ping 2.4s var(--fl-ease-out) infinite;
+}
+@keyframes fl-ping {
+  0% {
+    box-shadow: 0 0 0 0 rgba(90, 184, 145, 0.6);
+  }
+  80%,
+  100% {
+    box-shadow: 0 0 0 8px rgba(90, 184, 145, 0);
+  }
+}
+.forge-landing .tilt {
+  transition: transform 600ms var(--fl-ease-out);
+  transform-style: preserve-3d;
+  will-change: transform;
+}
+.forge-landing .spot {
+  transition: transform 900ms var(--fl-ease-out);
+  will-change: transform;
+}
+
+/* kinetic marquee */
+.forge-landing .marquee {
+  display: flex;
+  width: max-content;
+  animation: fl-marq 38s linear infinite;
+}
+.forge-landing .mwrap:hover .marquee {
+  animation-play-state: paused;
+}
+@keyframes fl-marq {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(-50%);
+  }
+}
+
+/* cards */
+.forge-landing .lift {
+  transition:
+    transform 400ms var(--fl-ease-out),
+    box-shadow 400ms var(--fl-ease-out),
+    background-color 400ms var(--fl-ease-out);
+}
+.forge-landing .lift:hover {
+  transform: translateY(-6px);
+  box-shadow:
+    0 18px 40px rgba(60, 60, 58, 0.12),
+    0 4px 10px rgba(60, 60, 58, 0.06);
+}
+.forge-landing .lcard .big {
+  display: inline-block;
+  transition:
+    transform 500ms var(--fl-ease-out),
+    text-shadow 500ms var(--fl-ease-out);
+}
+.forge-landing .lcard:hover .big {
+  transform: translateY(-4px) scale(1.06);
+  text-shadow: 0 0 24px rgba(248, 72, 94, 0.45);
+}
+.forge-landing .trace {
+  stroke-dasharray: 6 10;
+  animation: fl-dash 2.8s linear infinite;
+}
+@keyframes fl-dash {
+  to {
+    stroke-dashoffset: -64;
+  }
+}
+.forge-landing .scan {
+  animation: fl-scan 3.6s var(--fl-ease-io) infinite;
+}
+@keyframes fl-scan {
+  0% {
+    transform: translateY(0);
+    opacity: 0;
+  }
+  15% {
+    opacity: 1;
+  }
+  85% {
+    opacity: 1;
+  }
+  100% {
+    transform: translateY(150px);
+    opacity: 0;
+  }
+}
+
+/* scroll-driven motion (progressive enhancement: content is fully visible without it) */
+@supports (animation-timeline: view()) {
+  .forge-landing .rv {
+    animation: fl-rv linear both;
+    animation-timeline: view();
+    animation-range: entry 0% cover 28%;
+  }
+  .forge-landing .rv2 {
+    animation: fl-rv linear both;
+    animation-timeline: view();
+    animation-range: entry 10% cover 34%;
+  }
+  .forge-landing .rv3 {
+    animation: fl-rv linear both;
+    animation-timeline: view();
+    animation-range: entry 20% cover 40%;
+  }
+  @keyframes fl-rv {
+    from {
+      opacity: 0;
+      transform: translateY(48px);
+      filter: blur(8px);
+    }
+    to {
+      opacity: 1;
+      transform: none;
+      filter: blur(0);
+    }
+  }
+  .forge-landing .zoomin {
+    animation: fl-zoomin linear both;
+    animation-timeline: view();
+    animation-range: entry 0% cover 40%;
+  }
+  @keyframes fl-zoomin {
+    from {
+      opacity: 0;
+      transform: scale(0.92);
+    }
+    to {
+      opacity: 1;
+      transform: scale(1);
+    }
+  }
+  .forge-landing .line-fill {
+    transform-origin: left center;
+    animation: fl-fill linear both;
+    animation-timeline: view();
+    animation-range: cover 15% cover 55%;
+  }
+  @keyframes fl-fill {
+    from {
+      transform: scaleX(0);
+    }
+    to {
+      transform: scaleX(1);
+    }
+  }
+  .forge-landing .parallax {
+    animation: fl-para linear both;
+    animation-timeline: view();
+    animation-range: cover 0% cover 100%;
+  }
+  @keyframes fl-para {
+    from {
+      transform: translateY(60px);
+    }
+    to {
+      transform: translateY(-60px);
+    }
+  }
+}
+@supports (animation-timeline: scroll()) {
+  .forge-landing .navbar {
+    animation: fl-navglass linear both;
+    animation-timeline: scroll(root);
+    animation-range: 0 160px;
+  }
+  @keyframes fl-navglass {
+    from {
+      background-color: rgba(11, 5, 31, 1);
+      border-bottom-color: rgba(255, 255, 255, 0);
+      padding-top: 20px;
+      padding-bottom: 20px;
+    }
+    to {
+      background-color: rgba(11, 5, 31, 0.72);
+      border-bottom-color: rgba(255, 255, 255, 0.15);
+      padding-top: 12px;
+      padding-bottom: 12px;
+    }
+  }
+  .forge-landing .progress {
+    transform-origin: left center;
+    animation: fl-fill linear both;
+    animation-timeline: scroll(root);
+  }
+}
+
+/* small screens: the design is 1440 px wide; keep the hero and marquee readable on phones */
+@media (max-width: 640px) {
+  .forge-landing .nav-anchor {
+    display: none;
+  }
+  .forge-landing .nav-links {
+    gap: 16px !important;
+  }
+  .forge-landing .hero-title {
+    font-size: 40px !important;
+  }
+  .forge-landing .section-title {
+    font-size: 32px !important;
+  }
+  .forge-landing .marquee-item {
+    font-size: 40px !important;
+  }
+  .forge-landing .cta-card {
+    padding: 56px 28px !important;
+  }
+  .forge-landing .hero-grid {
+    grid-template-columns: minmax(0, 1fr) !important;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .forge-landing *,
+  .forge-landing *::before,
+  .forge-landing *::after {
+    animation: none !important;
+    transition: none !important;
+    scroll-behavior: auto !important;
+  }
+}
