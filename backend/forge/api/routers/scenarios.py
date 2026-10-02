@@ -15,7 +15,7 @@ from starlette.datastructures import UploadFile
 
 from forge.api.deps import RequireEditor, RequireViewer, SessionDep
 from forge.api.errors import ApiError, bad_request
-from forge.api.routers.meta import PageQuery, platform_errors
+from forge.api.routers.meta import PageQuery, parse_archived, platform_errors
 from forge.api.schemas.common import Page
 from forge.api.schemas.scenarios import (
     FamilyMember,
@@ -101,7 +101,11 @@ async def list_scenarios(
     difficulty: Difficulty | None = None,
     tag: str | None = Query(default=None, max_length=100),
     family: uuid.UUID | None = Query(default=None, description="Famille de variantes (family_id)"),
-    archived: bool | None = Query(default=False, description="false (défaut), true, ou vide pour tous"),
+    archived: str | None = Query(
+        default="false",
+        pattern="^(true|false|all|)$",
+        description="false (défaut), true, all ou vide = tous",
+    ),
 ) -> Page[ScenarioOut]:
     rows, total = await service.list_scenarios(
         session,
@@ -112,7 +116,7 @@ async def list_scenarios(
         difficulty=difficulty,
         tag=tag,
         family_id=family,
-        archived=archived,
+        archived=parse_archived(archived),
         offset=paging.offset,
         limit=paging.page_size,
     )

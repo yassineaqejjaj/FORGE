@@ -78,6 +78,13 @@ def platform_errors() -> Iterator[None]:
         raise ApiError(exc.status_code, exc.message, code=exc.code, errors=exc.errors or None) from exc
 
 
+def parse_archived(value: str | None) -> bool | None:
+    """``?archived=`` filter: ``true`` / ``false`` (default) / ``all`` or empty for every row."""
+    if value in (None, "", "all"):
+        return None
+    return value == "true"
+
+
 def page_params(
     page: int = Query(default=1, ge=1, description="Numéro de page (à partir de 1)"),
     page_size: int = Query(

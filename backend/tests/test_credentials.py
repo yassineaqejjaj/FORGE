@@ -70,6 +70,12 @@ async def test_delete_refused_when_referenced_by_agent_version(admin_client) -> 
     assert listed["agent_versions_count"] == 1
 
 
-async def test_credentials_are_admin_only(client_as) -> None:
+async def test_credentials_writes_are_admin_only(client_as) -> None:
+    editor = await client_as(Role.editor)
+    assert (await editor.get("/api/v1/credentials")).status_code == 403
     maintainer = await client_as(Role.maintainer)
-    assert (await maintainer.get("/api/v1/credentials")).status_code == 403
+    listed = await maintainer.get("/api/v1/credentials")  # needed to pin credentials on judges
+    assert listed.status_code == 200
+    assert all("secret" not in c or c["secret"] is None for c in listed.json())
+    created = await maintainer.post("/api/v1/credentials", json={"name": "x", "kind": "openai", "secret": "sk-x"})
+    assert created.status_code == 403

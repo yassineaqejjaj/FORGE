@@ -520,7 +520,7 @@ Endpoints (propriétaire entre crochets) :
 | auth [platform] | `POST /auth/login`, `POST /auth/logout`, `GET /auth/me`, `POST /auth/password` |
 | users [platform] | `GET/POST /users`, `PATCH /users/{id}` (admin) |
 | api-keys [platform] | `GET/POST /api-keys`, `DELETE /api-keys/{id}` (admin) |
-| credentials [platform] | `GET/POST /credentials`, `PATCH /credentials/{id}` (rotation), `DELETE` (admin) |
+| credentials [platform] | `GET /credentials` (maintainer, indices seulement), `POST`, `PATCH /credentials/{id}` (rotation), `DELETE` (admin) |
 | meta [platform] | `GET /meta` (énumérations, libellés FR, types de règles + schéma des params, adapters, fournisseurs de juges, catégories, capacités, URL OTLP) |
 | agents [platform] | `POST/GET /agents`, `GET/PATCH /agents/{id}`, `POST/GET /agents/{id}/versions`, `GET /agent-versions/{id}`, `GET /agent-versions/{id}/diff?against=`, `POST /agent-versions/{id}/test`, `GET/POST /prompts`, `GET /prompts/{name}/versions`, `GET/POST /model-configurations`, `GET/POST /tool-configurations` |
 | scenarios [platform] | `POST/GET /scenarios`, `GET/PATCH /scenarios/{id}`, `POST/GET /scenarios/{id}/versions`, `GET /scenario-versions/{id}`, `POST /scenarios/{id}/variants`, `POST /scenarios/import`, `GET /scenarios/export` |

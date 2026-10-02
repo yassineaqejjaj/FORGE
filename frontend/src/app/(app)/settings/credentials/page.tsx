@@ -1,40 +1,17 @@
 import type { Metadata } from "next";
-import { Anvil } from "lucide-react";
+import { Suspense } from "react";
 
 import { RoleGate } from "@/components/auth/require-role";
-import { EmptyState } from "@/components/ui/empty-state";
+import { CredentialsAdmin } from "@/components/settings/credentials-admin";
 
-export const metadata: Metadata = { title: "Identifiants fournisseurs · Paramètres" };
+export const metadata: Metadata = { title: "Identifiants · Paramètres" };
 
 export default function Page() {
   return (
     <RoleGate min="admin">
-      <section aria-labelledby="settings-section-title" className="grid gap-4">
-        <div className="grid gap-1">
-          <h2 id="settings-section-title" className="text-base font-semibold tracking-tight">
-            Identifiants fournisseurs
-          </h2>
-          <p className="text-sm text-muted-foreground">Clés LLM, jetons NOVA / ORBIT et en-têtes HTTP, chiffrés et jamais réaffichés.</p>
-        </div>
-        <EmptyState
-          icon={<Anvil />}
-          title="Module en cours d'intégration"
-          description="Cette section est en cours de forge et sera disponible prochainement."
-        >
-          <ul className="mt-2 grid max-w-md gap-1.5 text-left text-[13px] text-muted-foreground">
-            {[
-            "Ajout d'un identifiant (indice ••••abcd uniquement)",
-            "Rotation",
-            "Suppression",
-            ].map((item) => (
-              <li key={item} className="flex items-start gap-2">
-                <span className="mt-1.5 size-1.5 shrink-0 rounded-full bg-brand" aria-hidden />
-                {item}
-              </li>
-            ))}
-          </ul>
-        </EmptyState>
-      </section>
+      <Suspense>
+        <CredentialsAdmin />
+      </Suspense>
     </RoleGate>
   );
 }

@@ -7,7 +7,7 @@ import uuid
 from fastapi import APIRouter, Response, status
 from sqlalchemy import select
 
-from forge.api.deps import RequireAdmin, SessionDep
+from forge.api.deps import RequireAdmin, RequireMaintainer, SessionDep
 from forge.api.errors import conflict, not_found
 from forge.api.schemas.credentials import CredentialCreateIn, CredentialOut, CredentialUpdateIn
 from forge.infra.models import ProviderCredential
@@ -45,7 +45,8 @@ async def _get(session: SessionDep, credential_id: uuid.UUID) -> ProviderCredent
 
 
 @router.get("", response_model=list[CredentialOut], summary="Lister les identifiants fournisseurs")
-async def list_credentials(admin: RequireAdmin, session: SessionDep) -> list[CredentialOut]:
+async def list_credentials(principal: RequireMaintainer, session: SessionDep) -> list[CredentialOut]:
+    """Maintainers need the list to pin credentials on judges; secrets are never returned (hint only)."""
     rows = list(await session.scalars(select(ProviderCredential).order_by(ProviderCredential.name)))
     usage = await agent_service.credential_reference_counts(session, [c.id for c in rows])
     return [_out(c, usage.get(c.id, (0, 0))) for c in rows]

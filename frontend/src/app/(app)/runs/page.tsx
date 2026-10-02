@@ -1,23 +1,14 @@
 import type { Metadata } from "next";
-import { Play } from "lucide-react";
+import { Suspense } from "react";
 
-import { ModulePlaceholder } from "@/components/layout/module-placeholder";
+import { RunsListView } from "@/components/runs/runs-list-view";
 
 export const metadata: Metadata = { title: "Runs" };
 
-export default function Page() {
+export default function RunsPage() {
   return (
-    <ModulePlaceholder
-      eyebrow="Laboratoire"
-      title="Runs"
-      icon={<Play />}
-      description="Chaque exécution d'un agent sur un scénario : trace, sortie, scores, erreurs et feedback."
-      upcoming={[
-        "Liste filtrable des runs (statut, agent, scénario, origine)",
-        "Détail en 3 colonnes : scénario | trace | composite et dimensions",
-        "Provenance de chaque score jusqu'aux preuves",
-        "Ré-évaluation, annulation, nouvel essai",
-      ]}
-    />
+    <Suspense fallback={null}>
+      <RunsListView />
+    </Suspense>
   );
 }

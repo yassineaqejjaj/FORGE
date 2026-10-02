@@ -242,6 +242,11 @@ async def _refresh_progress(
     parent_id: uuid.UUID,
     column: str,
 ) -> None:
+    # Serialise concurrent terminal transitions of sibling runs: without this lock, two runs finishing
+    # at the same time each count the other as still active and nobody enqueues the finalisation.
+    # Under READ COMMITTED the count below runs after the lock is granted, so it sees the sibling's
+    # committed status.
+    await session.execute(select(model.id).where(model.id == parent_id).with_for_update())
     col = getattr(EvaluationRun, column)
     counts = dict(
         (
@@ -271,3 +276,28 @@ async def _refresh_progress(
             dedupe_key=f"{kind.value}:{parent_id}",
         )
     await session.flush()
+
+
+async def sweep_stalled_parents(session: AsyncSession) -> int:
+    """Safety net (worker loop): finalise executions / experiments whose runs are all terminal but whose
+    finalisation was never enqueued (crash between a run's completion and its parent refresh). Commits."""
+    active_parent = (ExecutionStatus.queued, ExecutionStatus.running, ExecutionStatus.aggregating)
+    swept = 0
+    for model, column in ((BenchmarkExecution, "benchmark_execution_id"), (Experiment, "experiment_id")):
+        col = getattr(EvaluationRun, column)
+        pending_runs = (
+            select(EvaluationRun.id)
+            .where(col == model.id, EvaluationRun.status.not_in(list(TERMINAL_RUN_STATUSES)))
+            .exists()
+        )
+        any_run = select(EvaluationRun.id).where(col == model.id).exists()
+        ids = list(
+            await session.scalars(
+                select(model.id).where(model.status.in_(active_parent), any_run, ~pending_runs)
+            )
+        )
+        for parent_id in ids:
+            await _refresh_progress(session, model, parent_id, column)
+            swept += 1
+        await session.commit()
+    return swept

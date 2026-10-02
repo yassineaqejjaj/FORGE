@@ -125,6 +125,7 @@ class ErrorItemOut(ApiModel):
     evaluator_kind: str | None = None
     evaluator_key: str
     trace_event_id: uuid.UUID | None = None
+    trace_event_seq: int | None = None
     round: int | None = None
     created_at: datetime
     run_status: str

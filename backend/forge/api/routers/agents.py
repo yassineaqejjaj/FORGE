@@ -11,7 +11,7 @@ from sqlalchemy import select
 
 from forge.api.deps import RequireEditor, RequireViewer, SessionDep
 from forge.api.errors import ApiError
-from forge.api.routers.meta import PageQuery, platform_errors
+from forge.api.routers.meta import PageQuery, parse_archived, platform_errors
 from forge.api.schemas.agents import (
     AgentCreateIn,
     AgentOut,
@@ -145,14 +145,18 @@ async def list_agents(
     q: str | None = Query(default=None, max_length=200),
     tag: str | None = Query(default=None, max_length=100),
     provider: str | None = Query(default=None, max_length=200),
-    archived: bool | None = Query(default=False, description="false (défaut), true, ou vide pour tous"),
+    archived: str | None = Query(
+        default="false",
+        pattern="^(true|false|all|)$",
+        description="false (défaut), true, all ou vide = tous",
+    ),
 ) -> Page[AgentOut]:
     rows, total = await service.list_agents(
         session,
         q=q,
         tag=tag,
         provider=provider,
-        archived=archived,
+        archived=parse_archived(archived),
         offset=paging.offset,
         limit=paging.page_size,
     )

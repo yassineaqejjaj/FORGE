@@ -1,22 +1,14 @@
 import type { Metadata } from "next";
-import { Bug } from "lucide-react";
+import { Suspense } from "react";
 
-import { ModulePlaceholder } from "@/components/layout/module-placeholder";
+import { ErrorsExplorerView } from "@/components/errors/errors-explorer-view";
 
 export const metadata: Metadata = { title: "Erreurs" };
 
-export default function Page() {
+export default function ErrorsPage() {
   return (
-    <ModulePlaceholder
-      eyebrow="Évaluer"
-      title="Erreurs"
-      icon={<Bug />}
-      description="Explorateur des erreurs détectées par type, gravité, agent et scénario."
-      upcoming={[
-        "Filtres par type, gravité, agent, scénario, période",
-        "Agrégations et tendances",
-        "Accès direct aux preuves dans la trace",
-      ]}
-    />
+    <Suspense fallback={null}>
+      <ErrorsExplorerView />
+    </Suspense>
   );
 }

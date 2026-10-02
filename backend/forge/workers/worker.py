@@ -243,6 +243,14 @@ class Worker:
                     count = await requeue_stale_jobs(session, settings.worker_stale_lock_seconds)
                 if count:
                     logger.warning("Re-queued %d stale job(s)", count)
+                async with get_sessionmaker()() as session:
+                    from forge.services.runs import sweep_stalled_parents
+
+                    swept = await sweep_stalled_parents(session)
+                if swept:
+                    logger.info(
+                        "Finalisation re-checked for %d benchmark execution(s) / experiment(s)", swept
+                    )
             except Exception as exc:
                 logger.warning("Stale job check failed: %s", exc)
             await self._sleep(STALE_CHECK_INTERVAL_SECONDS)

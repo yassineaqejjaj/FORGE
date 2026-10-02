@@ -1,23 +1,14 @@
+import { Suspense } from "react";
 import type { Metadata } from "next";
-import { Bot } from "lucide-react";
 
-import { ModulePlaceholder } from "@/components/layout/module-placeholder";
+import { AgentsListView } from "@/components/agents/agents-list-view";
 
 export const metadata: Metadata = { title: "Agents" };
 
-export default function Page() {
+export default function AgentsPage() {
   return (
-    <ModulePlaceholder
-      eyebrow="Laboratoire"
-      title="Agents"
-      icon={<Bot />}
-      description="Agents évalués et leurs versions immuables : prompt, modèle, outils, contexte, budget."
-      upcoming={[
-        "Liste des agents et de leurs versions (hash de contenu)",
-        "Diff entre deux versions",
-        "Test rapide d'une version",
-        "Prompts, configurations de modèles et d'outils",
-      ]}
-    />
+    <Suspense>
+      <AgentsListView />
+    </Suspense>
   );
 }

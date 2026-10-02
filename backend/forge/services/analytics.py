@@ -35,6 +35,7 @@ from forge.infra.models import (
     ExecutionTrace,
     RunError,
     Scenario,
+    TraceEvent,
 )
 from forge.infra.queue import queue_depth
 from forge.services import access
@@ -331,6 +332,7 @@ async def explore_errors(
             "evaluator_kind": error.evaluator_kind.value if error.evaluator_kind else None,
             "evaluator_key": error.evaluator_key,
             "trace_event_id": error.trace_event_id,
+            "trace_event_seq": None,
             "round": error.round,
             "created_at": error.created_at,
             "run_status": run.status.value,
@@ -356,6 +358,17 @@ async def explore_errors(
         if access.must_redact(viewer, scenario.visibility):
             item = redact_error(item)
         items.append(item)
+    event_ids = [i["trace_event_id"] for i in items if i.get("trace_event_id")]
+    if event_ids:
+        seqs = dict(
+            (
+                await session.execute(
+                    select(TraceEvent.id, TraceEvent.seq).where(TraceEvent.id.in_(event_ids))
+                )
+            ).all()
+        )
+        for item in items:
+            item["trace_event_seq"] = seqs.get(item.get("trace_event_id"))
 
     async def grouped(*columns: Any, order_limit: int | None = None) -> list[Any]:
         stmt = (
