@@ -34,3 +34,5 @@ pnpm-debug.log*
 .vscode/
 *.swp
 *.log
+.vercel
+.env*.local

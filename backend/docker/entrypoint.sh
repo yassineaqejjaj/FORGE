@@ -50,7 +50,7 @@ command="${1:-${FORGE_ROLE:-api}}"
 bind_host="${FORGE_BIND_HOST:-0.0.0.0}"
 case "$command" in
   api)
-    shift || true
+    if [ "$#" -gt 0 ]; then shift; fi
     wait_for_postgres
     run_migrations
     exec uvicorn forge.api.main:app \
@@ -62,12 +62,12 @@ case "$command" in
       "$@"
     ;;
   worker)
-    shift || true
+    if [ "$#" -gt 0 ]; then shift; fi
     wait_for_postgres
     exec python -m forge.workers "$@"
     ;;
   demo-agents)
-    shift || true
+    if [ "$#" -gt 0 ]; then shift; fi
     exec uvicorn forge.demo_agents.app:app --host "$bind_host" --port "${FORGE_DEMO_AGENTS_PORT:-${PORT:-8190}}" "$@"
     ;;
   migrate)
