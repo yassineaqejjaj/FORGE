@@ -36,3 +36,6 @@ pnpm-debug.log*
 *.log
 .vercel
 .env*.local
+
+# Deployment credentials (never commit)
+.deploy-credentials*

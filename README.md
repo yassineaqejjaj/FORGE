@@ -50,6 +50,12 @@ d'exécution + évaluations + scores, figés dans un manifeste reproductible.
     écart moyen), file de revue priorisée par le désaccord des juges.
 12. **Auditabilité** : journal immuable, manifestes, hashes de contenu, provenance des scores.
 
+## En ligne
+
+* Interface : <https://forge-pied-rho.vercel.app> (Vercel)
+* API : <https://api-production-b165a.up.railway.app/api/v1/docs> (Railway)
+* Déploiement : [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md)
+
 ## Démarrage rapide
 
 Prérequis : Docker (Compose v2). Optionnel : clés OpenAI / Anthropic pour des juges LLM.
