@@ -65,7 +65,7 @@ def make_run(
         dimensions=dimensions
         if dimensions is not None
         else ({} if composite is None else {"quality": composite / 100}),
-        criteria={},
+        criteria=dict(extra.pop("criteria", {}) or {}),
         cost=cost,
         latency_ms=latency_ms,
         tokens=tokens,

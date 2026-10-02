@@ -24,7 +24,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { isActiveExecution } from "@/lib/api/benchmarks";
 import { useCancelExperiment, useComparison, useExperiment, type ExperimentDetail } from "@/lib/api/experiments";
 import { formatDateTime, plural } from "@/lib/format";
-import { ArmsCard, DimensionComparisonCard, ErrorChangesCard, RecommendationHero, ResourcesCard, StatisticsNote } from "./comparison-sections";
+import { ArmsCard, CriterionComparisonCard, DimensionComparisonCard, ErrorChangesCard, RecommendationHero, ResourcesCard, StatisticsNote } from "./comparison-sections";
 import { FeedbackReportById } from "./feedback-report";
 import { GateCard } from "./gate-card";
 import { ScenarioChangesSection } from "./scenario-changes";
@@ -268,6 +268,7 @@ export function ExperimentDetailView({ id }: { id: string }) {
             {c ? (
               <>
                 <DimensionComparisonCard comparison={c} />
+                <CriterionComparisonCard comparison={c} />
                 <ResourcesCard comparison={c} />
                 <ArmsCard comparison={c} />
                 <StatisticsNote comparison={c} />

@@ -77,5 +77,7 @@ async def test_credentials_writes_are_admin_only(client_as) -> None:
     listed = await maintainer.get("/api/v1/credentials")  # needed to pin credentials on judges
     assert listed.status_code == 200
     assert all("secret" not in c or c["secret"] is None for c in listed.json())
-    created = await maintainer.post("/api/v1/credentials", json={"name": "x", "kind": "openai", "secret": "sk-x"})
+    created = await maintainer.post(
+        "/api/v1/credentials", json={"name": "x", "kind": "openai", "secret": "sk-x"}
+    )
     assert created.status_code == 403

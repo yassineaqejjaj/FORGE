@@ -229,6 +229,8 @@ class ComparisonOut(ApiModel):
     n_unpaired: int
     composite: MetricComparisonOut
     dimensions: list[MetricComparisonOut]
+    #: Per-criterion comparison (absent from comparisons computed before this field existed).
+    criteria: list[MetricComparisonOut] = Field(default_factory=list)
     resources: list[ResourceComparisonOut]
     scenarios: list[ScenarioChangeOut]
     regressions: list[ScenarioChangeOut]

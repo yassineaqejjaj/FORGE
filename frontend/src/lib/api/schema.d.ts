@@ -149,7 +149,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Lister les identifiants fournisseurs */
+        /**
+         * Lister les identifiants fournisseurs
+         * @description Maintainers need the list to pin credentials on judges; secrets are never returned (hint only).
+         */
         get: operations["list_credentials_api_v1_credentials_get"];
         put?: never;
         /** Créer un identifiant */
@@ -2341,6 +2344,8 @@ export interface components {
             composite: components["schemas"]["MetricComparisonOut"];
             /** Dimensions */
             dimensions: components["schemas"]["MetricComparisonOut"][];
+            /** Criteria */
+            criteria?: components["schemas"]["MetricComparisonOut"][];
             /** Resources */
             resources: components["schemas"]["ResourceComparisonOut"][];
             /** Scenarios */
@@ -3339,6 +3344,8 @@ export interface components {
             evaluator_key: string;
             /** Trace Event Id */
             trace_event_id?: string | null;
+            /** Trace Event Seq */
+            trace_event_seq?: number | null;
             /** Round */
             round?: number | null;
             /**
@@ -7490,8 +7497,8 @@ export interface operations {
                 q?: string | null;
                 tag?: string | null;
                 provider?: string | null;
-                /** @description false (défaut), true, ou vide pour tous */
-                archived?: boolean | null;
+                /** @description false (défaut), true, all ou vide = tous */
+                archived?: string | null;
                 /** @description Numéro de page (à partir de 1) */
                 page?: number;
                 /** @description Éléments par page */
@@ -8029,8 +8036,8 @@ export interface operations {
                 tag?: string | null;
                 /** @description Famille de variantes (family_id) */
                 family?: string | null;
-                /** @description false (défaut), true, ou vide pour tous */
-                archived?: boolean | null;
+                /** @description false (défaut), true, all ou vide = tous */
+                archived?: string | null;
                 /** @description Numéro de page (à partir de 1) */
                 page?: number;
                 /** @description Éléments par page */

@@ -244,3 +244,23 @@ def test_gate() -> None:
     running = evaluate_gate(status="running", recommendation=None)
     assert running.passed is False and "en cours" in running.reasons[0]
     assert evaluate_gate(status="completed", recommendation=None).passed is False
+
+
+def test_per_criterion_comparison_shows_gains_and_losses() -> None:
+    """Criteria are compared like dimensions, so a candidate can gain on sourcing and lose on format."""
+    baseline, candidate = [], []
+    for i in range(8):
+        baseline.append(
+            make_run(scenario=f"s{i}", version="1.2", arm=ExperimentArm.baseline, composite=70.0,
+                     criteria={"quality.sourcing": 0.50 + i * 0.001, "quality.format": 0.95})
+        )  # fmt: skip
+        candidate.append(
+            make_run(scenario=f"s{i}", version="1.3", arm=ExperimentArm.candidate, composite=72.0,
+                     criteria={"quality.sourcing": 0.85 + i * 0.002, "quality.format": 0.60 - i * 0.001})
+        )  # fmt: skip
+    result = compare(baseline, candidate, n_resamples=2000)
+    by_key = {c.key: c for c in result.criteria}
+    assert set(by_key) == {"quality.sourcing", "quality.format"}
+    assert by_key["quality.sourcing"].verdict == Verdict.better
+    assert by_key["quality.format"].verdict == Verdict.worse
+    assert by_key["quality.sourcing"].label == "Sources et citations"

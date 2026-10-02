@@ -35,6 +35,7 @@ from typing import Any
 from forge.domain.benchmarks.aggregation import is_scored
 from forge.domain.benchmarks.labels import RESOURCE_LABELS, dimension_label, dimension_sort_key
 from forge.domain.benchmarks.robustness import DEFAULT_ROBUSTNESS_MAX_STD, robustness
+from forge.domain.defaults import CRITERIA_BY_KEY
 from forge.domain.enums import (
     GROUP_DIMENSIONS,
     SEVERITY_RANK,
@@ -229,6 +230,9 @@ class ExperimentComparison:
     recommendation: RecommendationResult
     warnings: list[str]
     statistics: ComparisonStatistics
+    #: Per-criterion comparison (0–100 scale), same statistics as dimensions (spec: gains and
+    #: regressions *per criterion*).
+    criteria: list[MetricComparison] = field(default_factory=list)
 
 
 # =====================================================================================================
@@ -311,6 +315,14 @@ def _dimension_points(key: str) -> Callable[[RunSummary], float | None]:
     def getter(run: RunSummary) -> float | None:
         value = run.dimensions.get(key)
         return float(value) * 100.0 if value is not None else None
+
+    return getter
+
+
+def _criterion_points(key: str) -> Callable[[RunSummary], float | None]:
+    def getter(run: RunSummary) -> float | None:
+        value = run.criteria.get(key)
+        return None if value is None or not is_scored(run) else float(value) * 100.0
 
     return getter
 
@@ -596,6 +608,22 @@ def compare(
         for key in dim_keys
         if key not in {d.value for d in GROUP_DIMENSIONS}
     ]
+    crit_keys = sorted(
+        {k for r in baseline if is_scored(r) for k in r.criteria}
+        & {k for r in candidate if is_scored(r) for k in r.criteria},
+        key=lambda k: (dimension_sort_key(k.split(".", 1)[0]), k),
+    )
+    criteria = [
+        compare_metric(
+            key,
+            CRITERIA_BY_KEY[key].name if key in CRITERIA_BY_KEY else key,
+            _per_scenario(baseline, _criterion_points(key)),
+            _per_scenario(candidate, _criterion_points(key)),
+            **stats_kwargs,
+        )
+        for key in crit_keys
+        if key.split(".", 1)[0] not in {d.value for d in GROUP_DIMENSIONS}
+    ]
     resources = [
         _resource("cost", "€", baseline, candidate, lambda r: r.cost),
         _resource("latency", "ms", baseline, candidate, lambda r: r.latency_ms),
@@ -686,4 +714,5 @@ def compare(
         recommendation=recommendation,
         warnings=all_warnings,
         statistics=ComparisonStatistics(confidence=confidence, n_resamples=n_resamples, seed=seed),
+        criteria=criteria,
     )

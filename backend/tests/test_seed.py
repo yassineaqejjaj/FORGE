@@ -16,7 +16,7 @@ from sqlalchemy import func, select
 
 from forge.adapters.http import use_transport
 from forge.demo_agents.app import app as demo_agents_app
-from forge.domain.enums import EvaluatorKind, ExecutionStatus, RunStatus, ScenarioVisibility
+from forge.domain.enums import EvaluatorKind, ExecutionStatus, FeedbackScope, RunStatus, ScenarioVisibility
 from forge.infra.db import get_sessionmaker
 from forge.infra.models import (
     Agent,
@@ -30,6 +30,7 @@ from forge.infra.models import (
     Evaluation,
     EvaluationRun,
     Experiment,
+    FeedbackReport,
     PromptVersion,
     Scenario,
     User,
@@ -149,6 +150,13 @@ async def test_small_seed_runs_the_pipeline_and_is_idempotent(
             assert experiment.recommendation
         assert experiments[seed_runner.EXP_PRODUCT_13].source_feedback_report_id is not None
         assert experiments[seed_runner.EXP_PRODUCT_14].source_feedback_report_id is not None
+        for name in (seed_runner.EXP_PRODUCT_13, seed_runner.EXP_PRODUCT_14):
+            source = await session.get(FeedbackReport, experiments[name].source_feedback_report_id)
+            assert source is not None, f"{name}: source feedback report deleted"
+        source_13 = await session.get(
+            FeedbackReport, experiments[seed_runner.EXP_PRODUCT_13].source_feedback_report_id
+        )
+        assert source_13 is not None and source_13.scope == FeedbackScope.run
         # human evaluations + gold dataset (calibration)
         gold = await session.scalar(select(Dataset).where(Dataset.slug == seed_runner.GOLD_DATASET_SLUG))
         assert gold is not None

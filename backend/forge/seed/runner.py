@@ -31,7 +31,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
-from sqlalchemy import select
+from sqlalchemy import and_, not_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from forge.config import settings
@@ -860,9 +860,14 @@ class Seeder:
         self.log(f"  {name} : {experiment.total_runs} runs lancés")
 
     async def _v12_feedback_report(self, session: AsyncSession) -> uuid.UUID | None:
-        """Feedback report of the worst v1.2 run of the product benchmark (preferably the FEC PRD)."""
+        """Feedback report of the worst v1.2 run of the product benchmark (preferably the FEC PRD).
+
+        Runs that the evaluator persona reviews later are excluded: a human evaluation re-scores the run,
+        which replaces its feedback report (the experiment would point to a deleted report).
+        """
         execution_id = self.report.execution_ids.get(PRODUCT_BENCHMARK_SLUG)
         version_id = self.versions["product-agent"]["1.2"]
+        reviewed = REVIEW_SCENARIOS["full" if self.options.full else "small"]
         base = (
             select(FeedbackReport.id)
             .join(EvaluationRun, EvaluationRun.id == FeedbackReport.run_id)
@@ -873,6 +878,8 @@ class Seeder:
                 EvaluationRun.agent_version_id == version_id,
                 EvaluationRun.status == RunStatus.completed,
                 Scenario.visibility == ScenarioVisibility.public,
+                # runs reviewed by the evaluator are re-scored, which replaces their feedback report
+                not_(and_(Scenario.slug.in_(list(reviewed)), EvaluationRun.repetition == 0)),
             )
             .order_by(
                 EvaluationRun.gate_failed.desc(),

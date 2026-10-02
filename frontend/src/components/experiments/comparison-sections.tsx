@@ -15,7 +15,7 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableEmptyRow, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { SimpleTooltip } from "@/components/ui/tooltip";
-import type { ArmSummary, Comparison, ResourceComparison } from "@/lib/api/experiments";
+import type { ArmSummary, Comparison, MetricComparison, ResourceComparison } from "@/lib/api/experiments";
 import { DIMENSIONS, isEnumValue, type Dimension } from "@/lib/enums";
 import {
   formatInterval,
@@ -114,12 +114,43 @@ export function RecommendationHero({ comparison }: { comparison: Comparison }) {
 
 /** Composite + dimension comparison table with forest plot. */
 export function DimensionComparisonCard({ comparison }: { comparison: Comparison }) {
-  const rows = [comparison.composite, ...comparison.dimensions];
+  return (
+    <MetricComparisonCard
+      comparison={comparison}
+      title="Comparaison par dimension"
+      firstColumn="Dimension"
+      rows={[comparison.composite, ...comparison.dimensions]}
+    />
+  );
+}
+
+/** Same statistics per criterion: a version can gain on sourcing and regress on format. */
+export function CriterionComparisonCard({ comparison }: { comparison: Comparison }) {
+  const rows = comparison.criteria ?? [];
+  if (!rows.length) return null;
+  return (
+    <MetricComparisonCard comparison={comparison} title="Comparaison par critère" firstColumn="Critère" rows={rows} plot={false} />
+  );
+}
+
+function MetricComparisonCard({
+  comparison,
+  title,
+  firstColumn,
+  rows,
+  plot = true,
+}: {
+  comparison: Comparison;
+  title: string;
+  firstColumn: string;
+  rows: MetricComparison[];
+  plot?: boolean;
+}) {
   const stats = comparison.statistics;
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Comparaison par dimension</CardTitle>
+        <CardTitle>{title}</CardTitle>
         <CardDescription>
           Moyennes en points (0–100), delta apparié par version de scénario, IC {formatPercent(stats.confidence)} par bootstrap apparié (
           {formatNumber(stats.n_resamples, 0)} rééchantillonnages), test de Wilcoxon signé. « Équivalente » : |Δ| &lt;{" "}
@@ -129,7 +160,7 @@ export function DimensionComparisonCard({ comparison }: { comparison: Comparison
       <Table dense>
         <TableHeader>
           <TableRow>
-            <TableHead>Dimension</TableHead>
+            <TableHead>{firstColumn}</TableHead>
             <TableHead className="text-right">Baseline</TableHead>
             <TableHead className="text-right">Candidate</TableHead>
             <TableHead className="text-right">Δ points</TableHead>
@@ -144,7 +175,14 @@ export function DimensionComparisonCard({ comparison }: { comparison: Comparison
           {rows.map((r) => (
             <TableRow key={r.key} className={cn(r.key === "composite" && "bg-muted/40 font-medium")}>
               <TableCell>
-                {isEnumValue(DIMENSIONS, r.key) ? <DimensionBadge dimension={r.key} /> : <span className="font-semibold">{r.label}</span>}
+                {isEnumValue(DIMENSIONS, r.key) ? (
+                  <DimensionBadge dimension={r.key} />
+                ) : (
+                  <span className={cn(r.key === "composite" ? "font-semibold" : "text-sm")}>
+                    {r.label}
+                    {r.key !== "composite" ? <span className="ml-1.5 font-mono text-[11px] text-muted-foreground">{r.key}</span> : null}
+                  </span>
+                )}
               </TableCell>
               <TableCell className="text-right tabular-nums">{formatScore100(r.baseline_mean)}</TableCell>
               <TableCell className="text-right tabular-nums">{formatScore100(r.candidate_mean)}</TableCell>
@@ -164,9 +202,11 @@ export function DimensionComparisonCard({ comparison }: { comparison: Comparison
           ))}
         </TableBody>
       </Table>
-      <CardContent className="pt-4">
-        <ForestPlot rows={rows} equivalenceMargin={stats.equivalence_margin} />
-      </CardContent>
+      {plot ? (
+        <CardContent className="pt-4">
+          <ForestPlot rows={rows} equivalenceMargin={stats.equivalence_margin} />
+        </CardContent>
+      ) : null}
     </Card>
   );
 }
