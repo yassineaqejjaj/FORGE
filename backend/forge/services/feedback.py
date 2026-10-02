@@ -19,7 +19,7 @@ from collections import defaultdict
 from collections.abc import Sequence
 from typing import Any
 
-from sqlalchemy import delete, select
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from forge.config import settings
@@ -170,17 +170,30 @@ async def create_run_feedback(
     agent = run.manifest.get("agent") or {}
     data.label = data.label or f"{agent.get('agent_name', 'Agent')} v{agent.get('version', '?')}"
     report = await _llm_enrich(build_feedback(data))
+    row = _row(
+        report, scope=FeedbackScope.run, run_id=run.id, agent_version_id=run.agent_version_id, round=round_no
+    )
     if replace:
-        await session.execute(
-            delete(FeedbackReport).where(
+        # Update the round's report in place: its id may be referenced by an experiment
+        # (improvement loop, ``experiments.source_feedback_report_id``) and must stay valid.
+        existing = await session.scalar(
+            select(FeedbackReport)
+            .where(
                 FeedbackReport.run_id == run.id,
                 FeedbackReport.scope == FeedbackScope.run,
                 FeedbackReport.round == round_no,
             )
+            .order_by(FeedbackReport.created_at.desc())
+            .limit(1)
         )
-    row = _row(
-        report, scope=FeedbackScope.run, run_id=run.id, agent_version_id=run.agent_version_id, round=round_no
-    )
+        if existing is not None:
+            for column in (
+                "score", "summary", "strengths", "weaknesses", "errors", "recommendations",
+                "priority_actions", "generator",
+            ):  # fmt: skip
+                setattr(existing, column, getattr(row, column))
+            await session.flush()
+            return existing
     session.add(row)
     await session.flush()
     return row

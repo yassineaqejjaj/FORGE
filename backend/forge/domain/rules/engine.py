@@ -67,11 +67,13 @@ _MAX_EVIDENCE = 5
 _MAX_PATTERN_LENGTH = 2000
 _FLAG_MAP = {"i": re.IGNORECASE, "m": re.MULTILINE, "s": re.DOTALL, "x": re.VERBOSE}
 
-#: Default citation patterns: ``[1]``, ``[1, 2]``, ``[source: …]``, ``[doc-42]`` / ``[KB-12]``.
+#: Default citation patterns: ``[1]``, ``[1, 2]``, ``[source: …]``, ``[doc-42]`` / ``[KB-12]`` /
+#: ``[entretiens-notes-de-frais]`` (document ids with a hyphen). Markdown links ``[text](url)`` are not
+#: citations (negative look-ahead on ``(``).
 DEFAULT_CITATION_PATTERNS: tuple[str, ...] = (
-    r"\[\d{1,3}(?:\s*[,;–-]\s*\d{1,3})*\]",
-    r"\[(?:source|sources|src|réf|ref|réf\.|doc|document)\s*:\s*[^\]\n]{1,200}\]",
-    r"\[[A-Za-z][A-Za-z0-9_.:]*-[A-Za-z0-9_.:-]*\d[A-Za-z0-9_.:-]*\]",
+    r"\[\d{1,3}(?:\s*[,;–-]\s*\d{1,3})*\](?!\()",
+    r"\[(?:source|sources|src|réf|ref|réf\.|doc|document)\s*:\s*[^\]\n]{1,200}\](?!\()",
+    r"\[[A-Za-z][A-Za-z0-9_.:]*-[A-Za-z0-9_.:-]*[A-Za-z0-9]\](?!\()",
 )
 
 

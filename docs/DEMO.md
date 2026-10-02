@@ -178,8 +178,10 @@ echo $?   # 1 : « Garde-fou CI : ÉCHEC » — la CI bloque (recommandation « 
   stories export FEC, PRD circuit de validation × 1.2 / 1.3 / 1.4). Sarah est plus sévère que le juge
   sur le respect des contraintes quand la limite de mots est dépassée.
 * **Calibration** (jeu « Nordalis — jeu gold de calibration ») : accord juge / humain par critère —
-  n = 72 paires, taux d'accord ≈ 0,89, kappa pondéré ≈ 0,74 → **Calibré** au global, plus faible sur
-  certains critères (`coherence.constraints`, `ux.clarity`).
+  n = 72 paires sur 12 runs, taux d'accord ≈ 0,88, kappa pondéré ≈ 0,71 → **Calibré** au global ;
+  **faible** sur `coherence.constraints` et `quality.completeness` (l'humaine pénalise davantage les
+  limites de mots dépassées), **non calibré** sur `ux.clarity` ; données insuffisantes (n < 10) sur
+  les critères notés sur un seul type de livrable. De quoi justifier d'ajouter un juge LLM.
 
 ## 8. Boucle d'amélioration : feedback → v1.4 → expérience (1 min 30)
 

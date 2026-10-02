@@ -99,7 +99,7 @@ type = "forbidden"
 source_modules = ["forge.domain"]
 forbidden_modules = [
     "forge.infra", "forge.adapters", "forge.services", "forge.api", "forge.workers", "forge.cli",
-    "forge.seed", "forge.demo_agents", "forge.config",
+    "forge.seed", "forge.demo_agents", "forge.ops", "forge.config",
     "sqlalchemy", "fastapi", "starlette", "httpx", "redis", "asyncpg",
 ]
 
@@ -107,7 +107,7 @@ forbidden_modules = [
 name = "Layers"
 type = "layers"
 layers = [
-    "forge.api | forge.workers | forge.cli | forge.seed | forge.demo_agents",
+    "forge.api | forge.workers | forge.cli | forge.seed | forge.demo_agents | forge.ops",
     "forge.services",
     "forge.adapters",
     "forge.infra",

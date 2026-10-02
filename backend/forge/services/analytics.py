@@ -368,7 +368,8 @@ async def explore_errors(
             ).all()
         )
         for item in items:
-            item["trace_event_seq"] = seqs.get(item.get("trace_event_id"))
+            event_id = item.get("trace_event_id")
+            item["trace_event_seq"] = seqs.get(event_id) if event_id else None
 
     async def grouped(*columns: Any, order_limit: int | None = None) -> list[Any]:
         stmt = (
