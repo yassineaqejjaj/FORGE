@@ -95,7 +95,7 @@ export function RunHeader({ run, rounds, round, onRoundChange, onReevaluated }: 
             ) : (
               <span className="font-medium text-foreground">{agentLabel}</span>
             )}
-            {agent.model ? <span className="font-mono text-xs">{String(agent.model)}</span> : null}
+            {modelLabel(agent.model) ? <span className="font-mono text-xs">{modelLabel(agent.model)}</span> : null}
             {agent.adapter_kind ? <AdapterKindBadge value={String(agent.adapter_kind)} withTooltip={false} /> : null}
           </p>
           <div className="flex flex-wrap items-center gap-1.5 text-xs text-muted-foreground">
@@ -171,4 +171,17 @@ export function RunHeader({ run, rounds, round, onRoundChange, onReevaluated }: 
       {run.redacted ? <RedactedNotice /> : null}
     </div>
   );
+}
+
+/** The run detail exposes the frozen ``ModelSpec`` (object) — older payloads a plain model name. */
+function modelLabel(model: unknown): string | null {
+  if (!model) return null;
+  if (typeof model === "string") return model;
+  if (typeof model === "object" && "model" in model) {
+    const spec = model as { model?: unknown; model_version?: unknown };
+    const name = typeof spec.model === "string" ? spec.model : null;
+    const version = typeof spec.model_version === "string" ? spec.model_version : null;
+    return name ? (version ? `${name} (${version})` : name) : null;
+  }
+  return null;
 }

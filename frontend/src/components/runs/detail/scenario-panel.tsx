@@ -166,7 +166,7 @@ export function ScenarioPanel({ run, compact = false }: ScenarioPanelProps) {
                 <ExternalLink className="size-3.5" aria-hidden />
               </Link>
             </CardTitle>
-            <p className="font-mono text-[11.5px] text-muted-foreground">
+            <p className="break-all font-mono text-[11.5px] text-muted-foreground">
               {scenario.slug}
               {scenario.version ? ` · v${scenario.version}` : ""}
               {scenario.variant_label ? ` · variante ${scenario.variant_label}` : ""}
