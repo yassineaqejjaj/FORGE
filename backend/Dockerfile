@@ -1,5 +1,6 @@
 # syntax=docker/dockerfile:1.7
 # FORGE backend image (API, workers, demo agents, CLI). Build context: ./backend
+# No BuildKit cache mounts: the same Dockerfile builds on Railway, which restricts cache mount ids.
 #   docker build -t forge-backend .
 ARG PYTHON_VERSION=3.12
 
@@ -25,15 +26,13 @@ WORKDIR /app
 
 # 1. Dependencies (cached layer: only invalidated when pyproject/uv.lock change)
 COPY pyproject.toml uv.lock .python-version README.md ./
-RUN --mount=type=cache,target=/root/.cache/uv \
-    uv sync --frozen --no-dev --no-install-project --python "$(which python3)"
+RUN uv sync --frozen --no-dev --no-install-project --python "$(which python3)"
 
 # 2. Application code
 COPY alembic.ini ./
 COPY alembic ./alembic
 COPY forge ./forge
-RUN --mount=type=cache,target=/root/.cache/uv \
-    uv sync --frozen --no-dev --python "$(which python3)"
+RUN uv sync --frozen --no-dev --python "$(which python3)"
 COPY docker/entrypoint.sh /usr/local/bin/forge-entrypoint
 RUN chmod 0755 /usr/local/bin/forge-entrypoint \
     && python -m compileall -q forge \
@@ -41,5 +40,5 @@ RUN chmod 0755 /usr/local/bin/forge-entrypoint \
 
 USER forge
 EXPOSE 8000
+# Role from the command (docker compose) or FORGE_ROLE (PaaS: api | worker | demo-agents | migrate).
 ENTRYPOINT ["/usr/local/bin/forge-entrypoint"]
-CMD ["api"]

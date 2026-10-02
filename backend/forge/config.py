@@ -110,6 +110,16 @@ class Settings(BaseSettings):
     worker_shutdown_grace_seconds: float = 30.0
     worker_metrics_port: int = 9464  # 0 disables the worker Prometheus endpoint
 
+    @field_validator("database_url")
+    @classmethod
+    def _async_driver(cls, value: str) -> str:
+        """Accept PaaS-style URLs (``postgres://`` / ``postgresql://``, e.g. Railway, Heroku)."""
+        value = value.strip()
+        for prefix in ("postgres://", "postgresql://"):
+            if value.startswith(prefix):
+                return "postgresql+asyncpg://" + value[len(prefix) :]
+        return value
+
     @field_validator("log_level")
     @classmethod
     def _upper_level(cls, value: str) -> str:

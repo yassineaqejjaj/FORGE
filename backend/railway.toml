@@ -1,0 +1,9 @@
+# Railway: every FORGE backend service (api, runner-worker, evaluation-worker, demo-agents) builds
+# this Dockerfile from the `backend/` root directory; the role comes from the FORGE_ROLE variable.
+[build]
+builder = "DOCKERFILE"
+dockerfilePath = "Dockerfile"
+
+[deploy]
+restartPolicyType = "ON_FAILURE"
+restartPolicyMaxRetries = 10

@@ -44,15 +44,18 @@ run_migrations() {
   alembic upgrade head
 }
 
-command="${1:-api}"
+# Role: first argument, else FORGE_ROLE (PaaS services sharing one image), else api.
+command="${1:-${FORGE_ROLE:-api}}"
+# Bind address: "::" on platforms whose private network is IPv6 (Railway).
+bind_host="${FORGE_BIND_HOST:-0.0.0.0}"
 case "$command" in
   api)
     shift || true
     wait_for_postgres
     run_migrations
     exec uvicorn forge.api.main:app \
-      --host 0.0.0.0 \
-      --port "${FORGE_API_PORT:-8000}" \
+      --host "$bind_host" \
+      --port "${FORGE_API_PORT:-${PORT:-8000}}" \
       --proxy-headers \
       --forwarded-allow-ips "${FORGE_FORWARDED_ALLOW_IPS:-*}" \
       --timeout-graceful-shutdown 20 \
@@ -65,13 +68,17 @@ case "$command" in
     ;;
   demo-agents)
     shift || true
-    exec uvicorn forge.demo_agents.app:app --host 0.0.0.0 --port "${FORGE_DEMO_AGENTS_PORT:-8190}" "$@"
+    exec uvicorn forge.demo_agents.app:app --host "$bind_host" --port "${FORGE_DEMO_AGENTS_PORT:-${PORT:-8190}}" "$@"
     ;;
   migrate)
     wait_for_postgres
     run_migrations
     ;;
   *)
+    if [ "$#" -eq 0 ]; then
+      echo "[entrypoint] unknown FORGE_ROLE '$command' (api | worker | demo-agents | migrate)" >&2
+      exit 64
+    fi
     exec "$@"
     ;;
 esac
