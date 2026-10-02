@@ -176,3 +176,42 @@ class ErrorsPageOut(ApiModel):
     page: int
     page_size: int
     aggregations: ErrorAggregationsOut
+
+
+class ResultsAgentRowOut(ApiModel):
+    agent_version_id: str
+    agent_id: str
+    agent_label: str
+    model: str | None = None
+    n_runs: int
+    n_scored: int
+    n_failed: int
+    composite_mean: float | None = None
+    composite_ci_low: float | None = None
+    composite_ci_high: float | None = None
+    pass_rate: float | None = None
+    gate_failure_rate: float | None = None
+    error_rate: float | None = None
+    dimensions: dict[str, float] = Field(default_factory=dict)
+    cost_mean: float | None = None
+    latency_mean: float | None = None
+    latency_p95: float | None = None
+    tokens_mean: float | None = None
+    errors_by_type: dict[str, int] = Field(default_factory=dict)
+
+
+class ResultsErrorRowOut(ApiModel):
+    error_type: str
+    count: int
+    runs_affected: int
+    max_severity: str
+    by_severity: dict[str, int] = Field(default_factory=dict)
+
+
+class ResultsOverviewOut(ApiModel):
+    days: int
+    since: datetime
+    n_runs: int
+    truncated: bool
+    agents: list[ResultsAgentRowOut]
+    errors: list[ResultsErrorRowOut]

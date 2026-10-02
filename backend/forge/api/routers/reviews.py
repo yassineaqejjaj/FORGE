@@ -29,6 +29,10 @@ async def review_queue(
     paging: PageQuery,
     dataset_id: uuid.UUID | None = Query(default=None, description="Jeu de données gold"),
     blind: bool = Query(default=False, description="Mode aveugle : masque les scores IA"),
+    priority: bool = Query(
+        default=False,
+        description="Exécutions qui demandent un humain (désaccord des juges, confiance faible, jeu gold)",
+    ),
 ) -> Page[ReviewQueueItem]:
     if principal.user_id is None:
         raise forbidden("La file de revue est réservée aux utilisateurs (pas aux clés d'API)")
@@ -38,6 +42,7 @@ async def review_queue(
             principal,
             principal.user_id,
             dataset_id=dataset_id,
+            priority_only=priority,
             offset=paging.offset,
             limit=paging.page_size,
         )

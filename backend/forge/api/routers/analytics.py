@@ -10,7 +10,7 @@ from fastapi import APIRouter, Query
 
 from forge.api.deps import RequireViewer, SessionDep
 from forge.api.routers.benchmarks import Paging
-from forge.api.schemas.analytics import DashboardOut, ErrorsPageOut
+from forge.api.schemas.analytics import DashboardOut, ErrorsPageOut, ResultsOverviewOut
 from forge.domain.enums import ErrorSeverity
 from forge.services import analytics as service
 
@@ -26,6 +26,22 @@ async def get_dashboard(
     days: Annotated[int, Query(ge=1, le=365, description="Fenêtre en jours")] = 30,
 ) -> DashboardOut:
     return DashboardOut.model_validate(await service.dashboard(session, principal, days=days))
+
+
+@router.get(
+    "/results/overview",
+    response_model=ResultsOverviewOut,
+    summary="Résultats : runs évalués de la période agrégés par version d'agent",
+)
+async def get_results_overview(
+    session: SessionDep,
+    principal: RequireViewer,
+    days: Annotated[int, Query(ge=1, le=365, description="Fenêtre en jours")] = 30,
+    agent_id: uuid.UUID | None = None,
+) -> ResultsOverviewOut:
+    return ResultsOverviewOut.model_validate(
+        await service.results_overview(session, principal, days=days, agent_id=agent_id)
+    )
 
 
 @router.get("/errors", response_model=ErrorsPageOut, summary="Explorateur d'erreurs (filtres et agrégations)")

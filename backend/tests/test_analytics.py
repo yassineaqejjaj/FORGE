@@ -106,3 +106,41 @@ async def test_errors_explorer_filters_and_redaction(client_as) -> None:
     assert by_type_filter["total"] == 1
     by_run = (await viewer.get("/api/v1/errors", params={"run_id": str(ids["runs"][0])})).json()
     assert by_run["total"] == 1
+
+
+async def test_results_overview_aggregates_per_agent_version(db_session, client_as) -> None:
+    """« Analyser › Résultats »: evaluated runs of the window, one row per agent version."""
+    from forge.domain.enums import Role
+    from tests.factories import (
+        complete_with_scores,
+        create_agent_version,
+        create_run,
+        create_scenario_version,
+    )
+
+    v1 = await create_agent_version(db_session, version="1.0")
+    v2 = await create_agent_version(db_session, version="2.0")
+    sv = await create_scenario_version(db_session)
+    for rep, (version, score) in enumerate([(v1, 60.0), (v1, 64.0), (v2, 88.0), (v2, 92.0)]):
+        run = await create_run(db_session, sv, version, repetition=rep)
+        await complete_with_scores(
+            db_session, run, composite=score, errors=[("HALLUCINATION", "high")] if version is v1 else None
+        )
+    await db_session.commit()
+
+    viewer = await client_as(Role.viewer)
+    response = await viewer.get("/api/v1/results/overview", params={"days": 7})
+    assert response.status_code == 200, response.text
+    body = response.json()
+    rows = {r["agent_version_id"]: r for r in body["agents"]}
+    assert rows[str(v2.id)]["composite_mean"] == 90.0 and rows[str(v2.id)]["n_runs"] == 2
+    assert rows[str(v1.id)]["composite_mean"] == 62.0
+    assert rows[str(v1.id)]["errors_by_type"].get("HALLUCINATION") == 2
+    assert any(e["error_type"] == "HALLUCINATION" for e in body["errors"])
+    # Sorted by mean composite, best first.
+    ordered = [
+        r["agent_version_id"]
+        for r in body["agents"]
+        if r["agent_version_id"] in rows and r["agent_version_id"] in (str(v1.id), str(v2.id))
+    ]
+    assert ordered == [str(v2.id), str(v1.id)]

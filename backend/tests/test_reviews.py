@@ -171,3 +171,39 @@ async def test_human_evaluation_rescores_a_really_evaluated_run(client_as, db_se
         await db_session.scalars(select(Score).where(Score.run_id == run.id, Score.source == "human"))
     )
     assert any(s.criterion_key == "quality.accuracy" for s in scores)
+
+
+async def test_priority_queue_keeps_runs_that_need_a_human(db_session, client_as) -> None:
+    """The navigation badge counts the priority queue: disagreement, low confidence or gold runs."""
+    from forge.domain.enums import Dimension, Role, ScoreSource
+    from forge.infra.models import Score
+    from tests.factories import (
+        complete_with_scores,
+        create_agent_version,
+        create_run,
+        create_scenario_version,
+    )
+
+    av = await create_agent_version(db_session)
+    sv = await create_scenario_version(db_session)
+    calm = await create_run(db_session, sv, av, repetition=0)
+    disputed = await create_run(db_session, sv, av, repetition=1)
+    for run in (calm, disputed):
+        await complete_with_scores(db_session, run, composite=80.0)
+    db_session.add(
+        Score(
+            run_id=disputed.id, round=1, evaluation_config_id=disputed.evaluation_config_id,
+            criterion_key="quality.accuracy", dimension=Dimension.quality, value=0.5, weight=1.0,
+            source=ScoreSource.ai, confidence=0.9, explanation="Juges en désaccord", method="median(2)", spread=0.6,
+        )
+    )  # fmt: skip
+    await db_session.commit()
+
+    evaluator = await client_as(Role.evaluator, clearance=3)
+    everything = (await evaluator.get("/api/v1/reviews/queue", params={"page_size": 200})).json()
+    priority = (
+        await evaluator.get("/api/v1/reviews/queue", params={"page_size": 200, "priority": "true"})
+    ).json()
+    ids = {i["run_id"] for i in priority["items"]}
+    assert str(disputed.id) in ids and str(calm.id) not in ids
+    assert priority["total"] < everything["total"]

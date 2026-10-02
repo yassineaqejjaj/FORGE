@@ -20,6 +20,7 @@ import { PageHeader } from "@/components/ui/page-header";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { JudgesAreaTabs } from "@/components/layout/area-tabs";
 import { useCalibration, useJudgeOptions, type CalibrationMetrics, type CalibrationReport, type ScorePair } from "@/lib/api/calibration";
 import { useCriteriaCatalog, useGoldDatasets } from "@/lib/api/reviews";
 import { formatNumber, formatPercent, formatScore, formatSigned } from "@/lib/format";
@@ -215,7 +216,7 @@ export function CalibrationView() {
   return (
     <>
       <PageHeader
-        eyebrow="Évaluer"
+        eyebrow="Configuration · Juges"
         title="Calibration"
         icon={<Crosshair />}
         description="Les juges IA sont-ils d'accord avec les humains ? Accord, corrélations et kappa pondéré, par juge et par critère."
@@ -228,7 +229,9 @@ export function CalibrationView() {
             </Link>
           </Button>
         }
-      />
+      >
+        <JudgesAreaTabs />
+      </PageHeader>
 
       <FilterBar activeCount={search.countActive(["judge", "criterion", "dataset"])} onReset={() => search.clear()} className="mb-4">
         <FilterSelect

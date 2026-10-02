@@ -3,7 +3,7 @@ import { Suspense } from "react";
 
 import { ConfigsListView } from "@/components/evaluation-configs/configs-list-view";
 
-export const metadata: Metadata = { title: "Configurations d'évaluation" };
+export const metadata: Metadata = { title: "Configurations de score" };
 
 export default function Page() {
   return (

@@ -60,8 +60,7 @@ export function DashboardView() {
   return (
     <>
       <PageHeader
-        eyebrow="Pilotage"
-        title="Tableau de bord"
+        title="Vue d'ensemble"
         icon={<LayoutDashboard />}
         description="Vue d'ensemble des évaluations : scores, coûts, latences, erreurs et activité récente."
         meta={query.isFetching && !query.isPending ? <Spinner label="Actualisation…" /> : null}
@@ -98,10 +97,10 @@ function QuickActions() {
   return (
     <section aria-label="Actions rapides" className="flex flex-wrap gap-2">
       <RoleButton minRole="editor" href="/runs?new=1" leftIcon={<Play aria-hidden />} size="sm">
-        Nouveau run
+        Nouvelle exécution
       </RoleButton>
       <RoleButton minRole="editor" href="/benchmarks?new=1" variant="secondary" leftIcon={<Layers aria-hidden />} size="sm">
-        Nouveau benchmark
+        Nouvelle comparaison
       </RoleButton>
       <RoleButton
         minRole="editor"
@@ -143,11 +142,11 @@ function KpiGrid({ data, days }: { data: Dashboard | undefined; days: number }) 
       />
       <KpiCard label="Scénarios" icon={<ScrollText />} tone="blue" value={formatNumber(counts.scenarios, 0)} href="/scenarios" />
       <KpiCard
-        label={`Runs (${days} j)`}
+        label={`Exécutions (${days} j)`}
         icon={<Play />}
         tone="violet"
         value={formatNumber(counts.runs, 0)}
-        hint={`${plural(kpis.evaluated_runs, "run évalué", "runs évalués")}`}
+        hint={`${plural(kpis.evaluated_runs, "exécution évaluée", "exécutions évaluées")}`}
         trend={trend(data, "runs")}
         href="/runs"
       />
@@ -161,7 +160,7 @@ function KpiGrid({ data, days }: { data: Dashboard | undefined; days: number }) 
         trendDomain={[0, 100]}
       />
       <KpiCard
-        label="Coût moyen par run"
+        label="Coût moyen par exécution"
         icon={<Coins />}
         tone="amber"
         value={formatCost(kpis.average_cost)}
@@ -180,7 +179,7 @@ function KpiGrid({ data, days }: { data: Dashboard | undefined; days: number }) 
         icon={<Bug />}
         tone="red"
         value={formatPercent(kpis.error_rate)}
-        hint={`Runs en échec : ${formatPercent(kpis.failure_rate)}`}
+        hint={`Exécutions en échec : ${formatPercent(kpis.failure_rate)}`}
         trend={trend(data, "error_rate")}
         trendDomain={[0, 1]}
         href="/errors"
@@ -190,7 +189,7 @@ function KpiGrid({ data, days }: { data: Dashboard | undefined; days: number }) 
         icon={<CircleCheck />}
         tone="green"
         value={formatPercent(kpis.pass_rate)}
-        hint="Runs au-dessus du seuil, sans garde-fou en échec"
+        hint="Exécutions au-dessus du seuil, sans garde-fou en échec"
         trend={trend(data, "pass_rate")}
         trendDomain={[0, 1]}
       />
@@ -211,7 +210,7 @@ function TrendsSection({ data }: { data: Dashboard | undefined }) {
     },
     {
       key: "average_cost" as const,
-      title: "Coût moyen par run",
+      title: "Coût moyen par exécution",
       description: "Coût estimé moyen par jour",
       format: (v: number) => formatCost(v),
       tick: undefined,
@@ -230,7 +229,7 @@ function TrendsSection({ data }: { data: Dashboard | undefined }) {
     {
       key: "error_rate" as const,
       title: "Taux d'erreur",
-      description: "Part des runs évalués avec au moins une erreur",
+      description: "Part des exécutions évaluées avec au moins une erreur",
       format: (v: number) => formatPercent(v),
       tick: undefined,
       domain: [0, 1] as [number, number],
@@ -372,7 +371,7 @@ function TopErrors({ data, days }: { data: Dashboard | undefined; days: number }
         {!data ? (
           <ListSkeleton rows={5} />
         ) : data.top_error_types.length === 0 ? (
-          <EmptyState size="sm" icon={<Bug />} title="Aucune erreur détectée" description="Aucun run évalué n'a remonté d'erreur sur la période." />
+          <EmptyState size="sm" icon={<Bug />} title="Aucune erreur détectée" description="Aucune exécution évaluée n'a remonté d'erreur sur la période." />
         ) : (
           <ul className="grid gap-3">
             {data.top_error_types.map((err) => (
@@ -406,7 +405,7 @@ function RecentExecutions({ data, className }: { data: Dashboard | undefined; cl
     <Card className={className}>
       <CardHeader className="flex-row items-start">
         <div className="grid gap-1">
-          <CardTitle>Exécutions de benchmark récentes</CardTitle>
+          <CardTitle>Comparaisons récentes</CardTitle>
           <CardDescription>Progression et version en tête</CardDescription>
         </div>
         <CardAction>
@@ -421,7 +420,7 @@ function RecentExecutions({ data, className }: { data: Dashboard | undefined; cl
             size="sm"
             icon={<Layers />}
             title="Aucune exécution récente"
-            description="Lancez un benchmark pour comparer plusieurs versions d'agents sur une matrice de scénarios."
+            description="Lancez une comparaison pour évaluer plusieurs versions d'agents sur une matrice de scénarios."
           />
         ) : (
           <ul className="grid divide-y divide-border">
@@ -491,7 +490,7 @@ function WorkerActivity({ data }: { data: Dashboard | undefined }) {
           <Activity className="size-4 text-muted-foreground" aria-hidden />
           Activité des workers
         </CardTitle>
-        <CardDescription>Jobs en file et statut des runs de la période</CardDescription>
+        <CardDescription>Jobs en file et statut des exécutions de la période</CardDescription>
       </CardHeader>
       <CardContent className="grid gap-4">
         {!data ? (
@@ -519,7 +518,7 @@ function WorkerActivity({ data }: { data: Dashboard | undefined }) {
                 <TriangleAlert className="size-3.5" aria-hidden /> File chargée : les résultats peuvent arriver avec du retard.
               </p>
             ) : null}
-            <ul className="grid gap-1.5" aria-label="Runs par statut">
+            <ul className="grid gap-1.5" aria-label="Exécutions par statut">
               {RUN_STATUSES.map((status) => {
                 const n = data.runs_by_status[status] ?? 0;
                 return (
@@ -542,8 +541,8 @@ function WorkerActivity({ data }: { data: Dashboard | undefined }) {
                 size="sm"
                 variant="plain"
                 icon={<Inbox />}
-                title="Aucun run sur la période"
-                description="Lancez un run ponctuel, un benchmark ou une expérience pour alimenter le tableau de bord."
+                title="Aucune exécution sur la période"
+                description="Lancez une exécution, une comparaison ou une expérience pour alimenter la vue d'ensemble."
               />
             ) : null}
           </>

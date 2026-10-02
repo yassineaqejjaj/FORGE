@@ -20,6 +20,7 @@ import { PageHeader } from "@/components/ui/page-header";
 import { Pagination } from "@/components/ui/pagination";
 import { Switch } from "@/components/ui/switch";
 import { Table, TableBody, TableCell, TableEmptyRow, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { JudgesAreaTabs } from "@/components/layout/area-tabs";
 import { useEvaluationConfigs } from "@/lib/api/evaluation-configs";
 import { formatNumber } from "@/lib/format";
 import { WeightsBar } from "./config-helpers";
@@ -38,8 +39,8 @@ export function ConfigsListView() {
   return (
     <>
       <PageHeader
-        eyebrow="Évaluer"
-        title="Configurations d'évaluation"
+        eyebrow="Configuration · Juges"
+        title="Configurations de score"
         icon={<SlidersHorizontal />}
         description="Pondérations des dimensions et critères, normalisation des coûts et latences, garde-fous, juges épinglés, agrégation multi-juges et seuil de réussite. Chaque version est immuable."
         actions={
@@ -51,7 +52,9 @@ export function ConfigsListView() {
             </Button>
           </RequireRole>
         }
-      />
+      >
+        <JudgesAreaTabs />
+      </PageHeader>
       <Card>
         <div className="flex flex-wrap items-center gap-2 border-b border-border p-3">
           <Input

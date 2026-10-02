@@ -64,6 +64,8 @@ class Capabilities(ApiModel):
 
 class MetaOut(ApiModel):
     version: str
+    #: Deployment environment (``production``, ``development``, ``test``) — shown in the context selector.
+    environment: str = "development"
     enums: dict[str, list[EnumOption]]
     classifications: list[EnumOption]
     categories: list[EnumOption]

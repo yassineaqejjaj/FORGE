@@ -32,11 +32,14 @@ export function Breadcrumbs({ className }: { className?: string }) {
 
   const crumbs: Crumb[] = [];
   if (match) {
-    crumbs.push({ label: match.section.label });
+    // The overview has no group: « Vue d'ensemble » alone, not « Vue d'ensemble › Vue d'ensemble ».
+    if (match.section.heading) crumbs.push({ label: match.section.label });
     crumbs.push({ label: match.item.label, href: match.item.href });
+    // Pages reached through the entry's local tabs (Juges › Calibration, Résultats › Erreurs détectées).
+    if (match.subPage) crumbs.push({ label: match.subPage.label, href: match.subPage.href });
     const settings = activeSettingsNav(pathname);
     if (settings) crumbs.push({ label: settings.label, href: settings.href });
-    const base = settings?.href ?? match.item.href;
+    const base = settings?.href ?? match.base;
     const rest = pathname
       .slice(base === "/" ? 1 : base.length)
       .split("/")

@@ -33,6 +33,7 @@ export type ResourceName =
   | "calibration"
   | "dashboard"
   | "errors"
+  | "results"
   | "feedback-reports"
   | "users"
   | "api-keys"

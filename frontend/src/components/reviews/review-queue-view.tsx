@@ -81,7 +81,7 @@ export function ReviewQueueView() {
   return (
     <RoleGate min="evaluator">
       <PageHeader
-        eyebrow="Évaluer"
+        eyebrow="Améliorer"
         title="Revue humaine"
         icon={<ClipboardCheck />}
         description="Notez les runs où les juges IA sont le moins fiables : vos évaluations calibrent les juges et peuvent remplacer les scores IA."
