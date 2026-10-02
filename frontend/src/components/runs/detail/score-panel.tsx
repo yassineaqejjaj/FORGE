@@ -46,7 +46,7 @@ function CompositeCard({ scores, run }: { scores: RunScores; run: RunDetail }) {
         <CardDescription>Round {composite.round} · calculé par l&apos;API à partir des dimensions disponibles</CardDescription>
       </CardHeader>
       <CardContent className="grid gap-4">
-        <div className="flex items-center gap-4">
+        <div className="flex flex-wrap items-center justify-center gap-4">
           <ScoreGauge
             value={composite.value}
             size="lg"
@@ -55,8 +55,8 @@ function CompositeCard({ scores, run }: { scores: RunScores; run: RunDetail }) {
             passed={composite.passed}
             gateFailed={composite.gate_failed}
           />
-          <dl className="grid flex-1 gap-2 text-[13px]">
-            <div className="flex items-center justify-between gap-2">
+          <dl className="grid min-w-[12rem] flex-1 gap-2 text-[13px]">
+            <div className="flex flex-wrap items-center justify-between gap-2">
               <dt className="text-muted-foreground">Résultat</dt>
               <dd>
                 {composite.gate_failed ? (
