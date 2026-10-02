@@ -339,6 +339,12 @@
     border-color: var(--color-border);
   }
 
+  /* Grid items default to min-width: auto, so a wide table or a long identifier would stretch its
+     track beyond the viewport. Let tracks shrink: wide content scrolls inside its own container. */
+  .grid > * {
+    min-width: 0;
+  }
+
   html {
     -webkit-text-size-adjust: 100%;
     text-rendering: optimizeLegibility;

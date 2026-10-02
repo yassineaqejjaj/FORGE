@@ -108,7 +108,8 @@ flowchart LR
 Détails : [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) (contrat d'implémentation),
 [docs/AGENT_PROTOCOL.md](docs/AGENT_PROTOCOL.md) (brancher un agent),
 [docs/CI.md](docs/CI.md) (bloquer un déploiement sur régression),
-[docs/DEMO.md](docs/DEMO.md) (scénario de démonstration).
+[docs/DEMO.md](docs/DEMO.md) (scénario de démonstration),
+[docs/OPERATIONS.md](docs/OPERATIONS.md) (production : secrets, TLS, sauvegardes, supervision, mises à jour).
 
 ## Stack
 

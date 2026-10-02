@@ -6,12 +6,12 @@ import asyncio
 from logging.config import fileConfig
 from typing import Any
 
-from alembic import context
-from sqlalchemy import pool
+from sqlalchemy import pool, text
 from sqlalchemy.engine import Connection
 from sqlalchemy.ext.asyncio import async_engine_from_config
 
 import forge.infra.models  # noqa: F401  (registers every table)
+from alembic import context
 from forge.config import settings
 from forge.infra.db import Base
 from forge.infra.models._types import StrEnumType
@@ -50,9 +50,14 @@ def run_migrations_offline() -> None:
         context.run_migrations()
 
 
+#: Advisory lock serialising concurrent ``alembic upgrade`` (several API replicas starting together).
+MIGRATION_LOCK_ID = 0x464F5247454D  # "FORGEM"
+
+
 def _run_sync(connection: Connection) -> None:
     _configure(connection)
     with context.begin_transaction():
+        connection.execute(text("SELECT pg_advisory_xact_lock(:id)"), {"id": MIGRATION_LOCK_ID})
         context.run_migrations()
 
 
