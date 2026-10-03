@@ -144,3 +144,59 @@ async def test_results_overview_aggregates_per_agent_version(db_session, client_
         if r["agent_version_id"] in rows and r["agent_version_id"] in (str(v1.id), str(v2.id))
     ]
     assert ordered == [str(v2.id), str(v1.id)]
+
+
+async def test_dashboard_previous_period_reliability_and_system_filter(db_session, client_as) -> None:
+    """Variations need the previous window; reliability ≠ pass rate; agent_id scopes everything."""
+    from datetime import timedelta
+
+    from forge.domain.enums import Role
+    from forge.infra.db import utcnow
+    from tests.factories import (
+        complete_with_scores,
+        create_agent_version,
+        create_run,
+        create_scenario_version,
+    )
+
+    system = await create_agent_version(db_session, name="Système filtré")
+    other = await create_agent_version(db_session, name="Autre système")
+    sv = await create_scenario_version(db_session)
+    # Current window: one clean pass, one pass with a critical leak (passes the threshold, not reliable).
+    clean = await create_run(db_session, sv, system, repetition=0)
+    await complete_with_scores(db_session, clean, composite=90.0)
+    leak = await create_run(db_session, sv, system, repetition=1)
+    await complete_with_scores(db_session, leak, composite=80.0, errors=[("DATA_LEAK", "critical")])
+    # Previous window (8 days ago with a 7-day period): a lower score.
+    old = await create_run(db_session, sv, system, repetition=2)
+    await complete_with_scores(db_session, old, composite=60.0)
+    old.created_at = utcnow() - timedelta(days=8)
+    # Another system, current window: must disappear with agent_id.
+    noise = await create_run(db_session, sv, other, repetition=0)
+    await complete_with_scores(db_session, noise, composite=10.0)
+    await db_session.commit()
+
+    viewer = await client_as(Role.viewer)
+    body = (
+        await viewer.get("/api/v1/dashboard", params={"days": 7, "agent_id": str(system.agent_id)})
+    ).json()
+    kpis = body["kpis"]
+    assert body["counts"]["runs"] == 2 and body["counts"]["agents"] == 1
+    assert kpis["average_composite"] == 85.0
+    assert kpis["pass_rate"] == 1.0  # both above the threshold
+    assert kpis["reliability_rate"] == 0.5  # the leak is not reliable
+    assert kpis["critical_error_runs"] == 1
+    assert body["previous_kpis"]["runs"] == 1 and body["previous_kpis"]["average_composite"] == 60.0
+    critical = [e["error_type"] for e in body["attention"]["critical_errors"]]
+    assert critical == ["DATA_LEAK"]
+    assert body["top_error_types"][0]["max_severity"] == "critical"
+    assert body["first_activity"] is not None
+
+
+async def test_worker_activity_counts_jobs_per_queue(client_as) -> None:
+    from forge.domain.enums import Role
+
+    viewer = await client_as(Role.viewer)
+    body = (await viewer.get("/api/v1/workers/activity")).json()
+    assert set(body["queues"]) == {"execution", "evaluation"}
+    assert all({"queued", "running"} <= set(q) for q in body["queues"].values())

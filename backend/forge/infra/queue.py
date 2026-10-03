@@ -236,3 +236,18 @@ async def queue_depth(session: AsyncSession) -> dict[str, int]:
     for queue, count in rows.all():
         depth[JobQueue(queue).value] = int(count)
     return depth
+
+
+async def queue_activity(session: AsyncSession) -> dict[str, dict[str, int]]:
+    """Queued and running jobs per queue (worker activity, shown on the Exécutions page)."""
+    from sqlalchemy import func
+
+    rows = await session.execute(
+        select(Job.queue, Job.status, func.count())
+        .where(Job.status.in_([JobStatus.queued, JobStatus.running]))
+        .group_by(Job.queue, Job.status)
+    )
+    activity = {q.value: {"queued": 0, "running": 0} for q in JobQueue}
+    for queue, status, count in rows.all():
+        activity[JobQueue(queue).value][JobStatus(status).value] = int(count)
+    return activity

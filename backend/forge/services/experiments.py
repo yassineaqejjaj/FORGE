@@ -39,6 +39,7 @@ from forge.domain.experiments import compare, evaluate_gate
 from forge.domain.types import RunSummary, to_dict
 from forge.infra.db import utcnow
 from forge.infra.models import (
+    AgentVersion,
     BenchmarkScenario,
     EvaluationConfig,
     EvaluationRun,
@@ -594,8 +595,13 @@ async def experiment_gate(
     return result  # type: ignore[no-any-return]
 
 
-async def recent_experiments(session: AsyncSession, *, limit: int = 5) -> list[ExperimentListing]:
-    items = list(
-        await session.scalars(select(Experiment).order_by(Experiment.created_at.desc()).limit(limit))
-    )
+async def recent_experiments(
+    session: AsyncSession, *, limit: int = 5, agent_id: uuid.UUID | None = None
+) -> list[ExperimentListing]:
+    stmt = select(Experiment)
+    if agent_id is not None:
+        stmt = stmt.join(AgentVersion, AgentVersion.id == Experiment.baseline_version_id).where(
+            AgentVersion.agent_id == agent_id
+        )
+    items = list(await session.scalars(stmt.order_by(Experiment.created_at.desc()).limit(limit)))
     return await _listings(session, items)

@@ -27,7 +27,42 @@ class DashboardKpisOut(ApiModel):
     average_cost: float | None = None
     total_cost: float | None = None
     average_latency_ms: float | None = None
-    evaluated_runs: int = 0
+    evaluated_runs: int
+    reliability_rate: float | None = Field(
+        default=None, description="Évaluations sans erreur critique ni garde-fou déclenché / évaluations"
+    )
+    completed_runs: int
+    interrupted_runs: int = Field(description="Exécutions en échec technique (statut failed)")
+    gate_failed_runs: int = Field(description="Évaluations dont un garde-fou a été déclenché")
+    critical_error_runs: int = Field(description="Évaluations avec au moins une erreur critique")
+
+
+class PreviousKpisOut(ApiModel):
+    """Same indicators over the previous window of the same length (variations)."""
+
+    runs: int
+    evaluated_runs: int
+    average_composite: float | None = None
+    pass_rate: float | None = None
+    reliability_rate: float | None = None
+    error_rate: float | None = None
+    average_cost: float | None = None
+    average_latency_ms: float | None = None
+
+
+class AttentionExperimentOut(ApiModel):
+    id: uuid.UUID
+    name: str
+    critical_regressions: int
+
+
+class DashboardAttentionOut(ApiModel):
+    experiments_with_regression: int
+    latest_regression: AttentionExperimentOut | None
+    gate_failed_runs: int
+    interrupted_runs: int
+    critical_error_runs: int
+    critical_errors: list[TopErrorOut]
 
 
 class TrendPointOut(ApiModel):
@@ -47,6 +82,7 @@ class TopErrorOut(ApiModel):
     label: str
     count: int
     runs_affected: int
+    max_severity: ErrorSeverity
 
 
 class RecentExecutionOut(ApiModel):
@@ -73,6 +109,8 @@ class RecentExperimentOut(ApiModel):
     recommendation: Recommendation | None = None
     confidence: str | None = None
     composite_delta: float | None = None
+    regressions: int
+    critical_regressions: int
     total_runs: int
     completed_runs: int
     failed_runs: int
@@ -91,6 +129,12 @@ class DashboardOut(ApiModel):
     recent_benchmark_executions: list[RecentExecutionOut]
     recent_experiments: list[RecentExperimentOut]
     queue_depth: dict[str, int]
+    agent_id: uuid.UUID | None
+    first_activity: datetime | None
+    previous_kpis: PreviousKpisOut | None
+    attention: DashboardAttentionOut
+    error_types_total: int
+    comparisons_completed: int
 
 
 class ErrorScenarioOut(ApiModel):
@@ -215,3 +259,17 @@ class ResultsOverviewOut(ApiModel):
     truncated: bool
     agents: list[ResultsAgentRowOut]
     errors: list[ResultsErrorRowOut]
+
+
+DashboardAttentionOut.model_rebuild()
+
+
+class QueueActivityOut(ApiModel):
+    queued: int = 0
+    running: int = 0
+
+
+class WorkerActivityOut(ApiModel):
+    """Technical activity of the workers (Exécutions page, not the overview)."""
+
+    queues: dict[str, QueueActivityOut]

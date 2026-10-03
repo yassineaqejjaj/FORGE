@@ -10,7 +10,7 @@ from fastapi import APIRouter, Query
 
 from forge.api.deps import RequireViewer, SessionDep
 from forge.api.routers.benchmarks import Paging
-from forge.api.schemas.analytics import DashboardOut, ErrorsPageOut, ResultsOverviewOut
+from forge.api.schemas.analytics import DashboardOut, ErrorsPageOut, ResultsOverviewOut, WorkerActivityOut
 from forge.domain.enums import ErrorSeverity
 from forge.services import analytics as service
 
@@ -24,8 +24,11 @@ async def get_dashboard(
     session: SessionDep,
     principal: RequireViewer,
     days: Annotated[int, Query(ge=1, le=365, description="Fenêtre en jours")] = 30,
+    agent_id: Annotated[uuid.UUID | None, Query(description="Restreindre à un système (agent)")] = None,
 ) -> DashboardOut:
-    return DashboardOut.model_validate(await service.dashboard(session, principal, days=days))
+    return DashboardOut.model_validate(
+        await service.dashboard(session, principal, days=days, agent_id=agent_id)
+    )
 
 
 @router.get(
@@ -42,6 +45,17 @@ async def get_results_overview(
     return ResultsOverviewOut.model_validate(
         await service.results_overview(session, principal, days=days, agent_id=agent_id)
     )
+
+
+@router.get(
+    "/workers/activity",
+    response_model=WorkerActivityOut,
+    summary="Activité des workers : jobs en file et en cours par file (exécution, évaluation)",
+)
+async def get_worker_activity(session: SessionDep, principal: RequireViewer) -> WorkerActivityOut:
+    from forge.infra.queue import queue_activity
+
+    return WorkerActivityOut.model_validate({"queues": await queue_activity(session)})
 
 
 @router.get("/errors", response_model=ErrorsPageOut, summary="Explorateur d'erreurs (filtres et agrégations)")
