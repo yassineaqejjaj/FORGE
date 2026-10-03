@@ -1290,6 +1290,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/workers/activity": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Activité des workers : jobs en file et en cours par file (exécution, évaluation) */
+        get: operations["get_worker_activity_api_v1_workers_activity_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/errors": {
         parameters: {
             query?: never;
@@ -1952,6 +1969,18 @@ export interface components {
             error_rate?: number | null;
             /** Robustness */
             robustness?: number | null;
+        };
+        /** AttentionExperimentOut */
+        AttentionExperimentOut: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Name */
+            name: string;
+            /** Critical Regressions */
+            critical_regressions: number;
         };
         /** AuditEventOut */
         AuditEventOut: {
@@ -2979,6 +3008,20 @@ export interface components {
              */
             created_at: string;
         };
+        /** DashboardAttentionOut */
+        DashboardAttentionOut: {
+            /** Experiments With Regression */
+            experiments_with_regression: number;
+            latest_regression: components["schemas"]["AttentionExperimentOut"] | null;
+            /** Gate Failed Runs */
+            gate_failed_runs: number;
+            /** Interrupted Runs */
+            interrupted_runs: number;
+            /** Critical Error Runs */
+            critical_error_runs: number;
+            /** Critical Errors */
+            critical_errors: components["schemas"]["TopErrorOut"][];
+        };
         /** DashboardCountsOut */
         DashboardCountsOut: {
             /** Agents */
@@ -3015,11 +3058,30 @@ export interface components {
             total_cost?: number | null;
             /** Average Latency Ms */
             average_latency_ms?: number | null;
-            /**
-             * Evaluated Runs
-             * @default 0
-             */
+            /** Evaluated Runs */
             evaluated_runs: number;
+            /**
+             * Reliability Rate
+             * @description Évaluations sans erreur critique ni garde-fou déclenché / évaluations
+             */
+            reliability_rate?: number | null;
+            /** Completed Runs */
+            completed_runs: number;
+            /**
+             * Interrupted Runs
+             * @description Exécutions en échec technique (statut failed)
+             */
+            interrupted_runs: number;
+            /**
+             * Gate Failed Runs
+             * @description Évaluations dont un garde-fou a été déclenché
+             */
+            gate_failed_runs: number;
+            /**
+             * Critical Error Runs
+             * @description Évaluations avec au moins une erreur critique
+             */
+            critical_error_runs: number;
         };
         /** DashboardOut */
         DashboardOut: {
@@ -3053,6 +3115,16 @@ export interface components {
             queue_depth: {
                 [key: string]: number;
             };
+            /** Agent Id */
+            agent_id: string | null;
+            /** First Activity */
+            first_activity: string | null;
+            previous_kpis: components["schemas"]["PreviousKpisOut"] | null;
+            attention: components["schemas"]["DashboardAttentionOut"];
+            /** Error Types Total */
+            error_types_total: number;
+            /** Comparisons Completed */
+            comparisons_completed: number;
         };
         /** DatasetCreateIn */
         DatasetCreateIn: {
@@ -5252,6 +5324,28 @@ export interface components {
             /** Notes */
             notes?: string[];
         };
+        /**
+         * PreviousKpisOut
+         * @description Same indicators over the previous window of the same length (variations).
+         */
+        PreviousKpisOut: {
+            /** Runs */
+            runs: number;
+            /** Evaluated Runs */
+            evaluated_runs: number;
+            /** Average Composite */
+            average_composite?: number | null;
+            /** Pass Rate */
+            pass_rate?: number | null;
+            /** Reliability Rate */
+            reliability_rate?: number | null;
+            /** Error Rate */
+            error_rate?: number | null;
+            /** Average Cost */
+            average_cost?: number | null;
+            /** Average Latency Ms */
+            average_latency_ms?: number | null;
+        };
         /** PromptCreateIn */
         PromptCreateIn: {
             /**
@@ -5578,6 +5672,19 @@ export interface components {
          * @enum {string}
          */
         ProviderKind: "openai" | "anthropic" | "nova" | "orbit" | "http";
+        /** QueueActivityOut */
+        QueueActivityOut: {
+            /**
+             * Queued
+             * @default 0
+             */
+            queued: number;
+            /**
+             * Running
+             * @default 0
+             */
+            running: number;
+        };
         /** RankingEntryOut */
         RankingEntryOut: {
             /** Rank */
@@ -5666,6 +5773,10 @@ export interface components {
             confidence?: string | null;
             /** Composite Delta */
             composite_delta?: number | null;
+            /** Regressions */
+            regressions: number;
+            /** Critical Regressions */
+            critical_regressions: number;
             /** Total Runs */
             total_runs: number;
             /** Completed Runs */
@@ -6970,6 +7081,7 @@ export interface components {
             count: number;
             /** Runs Affected */
             runs_affected: number;
+            max_severity: components["schemas"]["ErrorSeverity"];
         };
         /** TotalsOut */
         TotalsOut: {
@@ -7138,6 +7250,16 @@ export interface components {
          * @enum {string}
          */
         Verdict: "better" | "worse" | "equivalent" | "inconclusive";
+        /**
+         * WorkerActivityOut
+         * @description Technical activity of the workers (Exécutions page, not the overview).
+         */
+        WorkerActivityOut: {
+            /** Queues */
+            queues: {
+                [key: string]: components["schemas"]["QueueActivityOut"];
+            };
+        };
     };
     responses: never;
     parameters: never;
@@ -9370,6 +9492,8 @@ export interface operations {
                 dataset_id?: string | null;
                 /** @description Mode aveugle : masque les scores IA */
                 blind?: boolean;
+                /** @description Exécutions qui demandent un humain (désaccord des juges, confiance faible, jeu gold) */
+                priority?: boolean;
                 /** @description Numéro de page (à partir de 1) */
                 page?: number;
                 /** @description Éléments par page */
@@ -10387,6 +10511,8 @@ export interface operations {
             query?: {
                 /** @description Fenêtre en jours */
                 days?: number;
+                /** @description Restreindre à un système (agent) */
+                agent_id?: string | null;
             };
             header?: never;
             path?: never;
@@ -10443,6 +10569,26 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_worker_activity_api_v1_workers_activity_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WorkerActivityOut"];
                 };
             };
         };

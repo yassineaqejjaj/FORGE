@@ -24,15 +24,17 @@ from typing import Any
 from sqlalchemy import ColumnElement, Date, case, cast, distinct, exists, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from forge.domain.enums import ErrorSeverity, RunStatus
+from forge.domain.enums import ErrorSeverity, ExecutionStatus, Recommendation, RunStatus
 from forge.domain.redaction import redact_error
 from forge.infra.db import utcnow
 from forge.infra.models import (
     Agent,
     AgentVersion,
+    BenchmarkExecution,
     ErrorType,
     EvaluationRun,
     ExecutionTrace,
+    Experiment,
     RunError,
     Scenario,
     TraceEvent,
@@ -56,6 +58,16 @@ def _has_error() -> ColumnElement[bool]:
     return exists(select(RunError.id).where(RunError.run_id == EvaluationRun.id, _current_round()))
 
 
+def _has_critical_error() -> ColumnElement[bool]:
+    return exists(
+        select(RunError.id).where(
+            RunError.run_id == EvaluationRun.id,
+            _current_round(),
+            RunError.severity == ErrorSeverity.critical,
+        )
+    )
+
+
 def _ratio(numerator: Any, denominator: Any) -> float | None:
     return float(numerator) / float(denominator) if denominator else None
 
@@ -64,21 +76,28 @@ def _float(value: Any) -> float | None:
     return float(value) if value is not None else None
 
 
-async def dashboard(session: AsyncSession, viewer: Viewer, *, days: int = 30) -> dict[str, Any]:
+async def dashboard(
+    session: AsyncSession, viewer: Viewer, *, days: int = 30, agent_id: uuid.UUID | None = None
+) -> dict[str, Any]:
+    """Vue d'ensemble: KPIs of the window (and of the previous window of the same length, for the
+    variations), daily trends, items needing an action, error causes and recent experiments.
+    ``agent_id`` restricts everything to one evaluated system."""
     now = utcnow()
     since = now - timedelta(days=days)
+    previous_since = since - timedelta(days=days)
     visible = access.classification_condition(viewer)
-    window = [EvaluationRun.created_at >= since, visible]
+    scope = [visible] + ([EvaluationRun.agent_id == agent_id] if agent_id else [])
+    window = [EvaluationRun.created_at >= since, *scope]
+    previous_window = [EvaluationRun.created_at >= previous_since, EvaluationRun.created_at < since, *scope]
 
+    agent_scope = [Agent.archived.is_(False)] + ([Agent.id == agent_id] if agent_id else [])
     counts = {
-        "agents": await session.scalar(
-            select(func.count()).select_from(Agent).where(Agent.archived.is_(False))
-        ),
+        "agents": await session.scalar(select(func.count()).select_from(Agent).where(*agent_scope)),
         "agent_versions": await session.scalar(
             select(func.count())
             .select_from(AgentVersion)
             .join(Agent, Agent.id == AgentVersion.agent_id)
-            .where(Agent.archived.is_(False))
+            .where(*agent_scope)
         ),
         "scenarios": await session.scalar(
             select(func.count()).select_from(Scenario).where(Scenario.archived.is_(False), visible)
@@ -99,6 +118,11 @@ async def dashboard(session: AsyncSession, viewer: Viewer, *, days: int = 30) ->
         func.avg(ExecutionTrace.total_latency_ms),
         func.sum(ExecutionTrace.estimated_cost),
     )
+    reliability_cols = (
+        func.count().filter(evaluated, EvaluationRun.gate_failed.is_(False), ~_has_critical_error()),
+        func.count().filter(evaluated, EvaluationRun.gate_failed.is_(True)),
+        func.count().filter(evaluated, _has_critical_error()),
+    )
     base = (
         select(*stats_cols)
         .select_from(EvaluationRun)
@@ -109,6 +133,44 @@ async def dashboard(session: AsyncSession, viewer: Viewer, *, days: int = 30) ->
     total, completed, failed, cancelled, n_eval, avg_comp, n_passed, n_err, avg_cost, avg_lat, sum_cost = (
         await session.execute(base)
     ).one()
+    reliability_stmt = (
+        select(*reliability_cols)
+        .select_from(EvaluationRun)
+        .join(Scenario, Scenario.id == EvaluationRun.scenario_id)
+    )
+    n_reliable, n_gate_failed, n_critical = (await session.execute(reliability_stmt.where(*window))).one()
+
+    previous = (
+        await session.execute(
+            select(*stats_cols, *reliability_cols)
+            .select_from(EvaluationRun)
+            .join(Scenario, Scenario.id == EvaluationRun.scenario_id)
+            .outerjoin(ExecutionTrace, ExecutionTrace.run_id == EvaluationRun.id)
+            .where(*previous_window)
+        )
+    ).one()
+    p_total, _pc, _pf, _pcan, p_eval, p_comp, p_passed, p_err, p_cost, p_lat, _ps, p_reliable, _pg, _pcr = (
+        previous
+    )
+    previous_kpis = (
+        {
+            "runs": int(p_total),
+            "evaluated_runs": int(p_eval or 0),
+            "average_composite": _float(p_comp),
+            "pass_rate": _ratio(p_passed, p_eval),
+            "reliability_rate": _ratio(p_reliable, p_eval),
+            "error_rate": _ratio(p_err, p_eval),
+            "average_cost": _float(p_cost),
+            "average_latency_ms": _float(p_lat),
+        }
+        if p_total
+        else None
+    )
+    first_activity = await session.scalar(
+        select(func.min(EvaluationRun.created_at))
+        .join(Scenario, Scenario.id == EvaluationRun.scenario_id)
+        .where(*window)
+    )
     status_rows = await session.execute(
         select(EvaluationRun.status, func.count())
         .join(Scenario, Scenario.id == EvaluationRun.scenario_id)
@@ -164,20 +226,35 @@ async def dashboard(session: AsyncSession, viewer: Viewer, *, days: int = 30) ->
             }
         )
 
+    severity_rank = case(
+        *[(RunError.severity == sev, rank) for rank, sev in enumerate(SEVERITY_ORDER)], else_=0
+    )
     error_rows = await session.execute(
-        select(RunError.error_type, ErrorType.label, func.count(), func.count(distinct(RunError.run_id)))
+        select(
+            RunError.error_type,
+            ErrorType.label,
+            func.count(),
+            func.count(distinct(RunError.run_id)),
+            func.max(severity_rank),
+        )
         .join(EvaluationRun, EvaluationRun.id == RunError.run_id)
         .join(Scenario, Scenario.id == EvaluationRun.scenario_id)
         .outerjoin(ErrorType, ErrorType.code == RunError.error_type)
         .where(*window, _current_round())
         .group_by(RunError.error_type, ErrorType.label)
         .order_by(func.count().desc(), RunError.error_type)
-        .limit(10)
     )
-    top_errors = [
-        {"error_type": t, "label": label or t, "count": int(c), "runs_affected": int(r)}
-        for t, label, c, r in error_rows.all()
+    all_errors = [
+        {
+            "error_type": t,
+            "label": label or t,
+            "count": int(c),
+            "runs_affected": int(r),
+            "max_severity": SEVERITY_ORDER[int(rank or 0)],
+        }
+        for t, label, c, r, rank in error_rows.all()
     ]
+    top_errors = all_errors[:10]
 
     executions = []
     for execution, benchmark in await recent_executions(session, limit=5):
@@ -200,9 +277,10 @@ async def dashboard(session: AsyncSession, viewer: Viewer, *, days: int = 30) ->
             }
         )
     experiments = []
-    for listing in await recent_experiments(session, limit=5):
+    for listing in await recent_experiments(session, limit=5, agent_id=agent_id):
         exp = listing.experiment
         comparison = exp.comparison or {}
+        regressions = comparison.get("regressions") or []
         experiments.append(
             {
                 "id": exp.id,
@@ -213,6 +291,8 @@ async def dashboard(session: AsyncSession, viewer: Viewer, *, days: int = 30) ->
                 "recommendation": exp.recommendation,
                 "confidence": (comparison.get("recommendation") or {}).get("confidence"),
                 "composite_delta": (comparison.get("composite") or {}).get("delta"),
+                "regressions": len(regressions),
+                "critical_regressions": sum(1 for r in regressions if r.get("severity") == "critical"),
                 "total_runs": exp.total_runs,
                 "completed_runs": exp.completed_runs,
                 "failed_runs": exp.failed_runs,
@@ -220,10 +300,33 @@ async def dashboard(session: AsyncSession, viewer: Viewer, *, days: int = 30) ->
             }
         )
 
+    attention = await _attention(
+        session,
+        since=since,
+        agent_id=agent_id,
+        gate_failed=int(n_gate_failed or 0),
+        interrupted=int(failed or 0),
+        critical_runs=int(n_critical or 0),
+        errors=all_errors,
+    )
+    comparisons_completed = await session.scalar(
+        select(func.count())
+        .select_from(BenchmarkExecution)
+        .where(
+            BenchmarkExecution.status == ExecutionStatus.completed, BenchmarkExecution.finished_at >= since
+        )
+    )
+
     return {
         "days": days,
         "since": since,
         "generated_at": now,
+        "agent_id": agent_id,
+        "first_activity": first_activity,
+        "previous_kpis": previous_kpis,
+        "attention": attention,
+        "error_types_total": len(all_errors),
+        "comparisons_completed": int(comparisons_completed or 0),
         "counts": {
             "agents": int(counts["agents"] or 0),
             "agent_versions": int(counts["agent_versions"] or 0),
@@ -240,12 +343,53 @@ async def dashboard(session: AsyncSession, viewer: Viewer, *, days: int = 30) ->
             "total_cost": _float(sum_cost),
             "average_latency_ms": _float(avg_lat),
             "evaluated_runs": int(n_eval or 0),
+            "reliability_rate": _ratio(n_reliable, n_eval),
+            "completed_runs": int(completed or 0),
+            "interrupted_runs": int(failed or 0),
+            "gate_failed_runs": int(n_gate_failed or 0),
+            "critical_error_runs": int(n_critical or 0),
         },
         "trends": trends,
         "top_error_types": top_errors,
         "recent_benchmark_executions": executions,
         "recent_experiments": experiments,
         "queue_depth": await queue_depth(session),
+    }
+
+
+async def _attention(
+    session: AsyncSession,
+    *,
+    since: datetime,
+    agent_id: uuid.UUID | None,
+    gate_failed: int,
+    interrupted: int,
+    critical_runs: int,
+    errors: list[dict[str, Any]],
+) -> dict[str, Any]:
+    """Facts that call for an action (the UI decides how to phrase and order them)."""
+    stmt = select(Experiment).where(
+        Experiment.created_at >= since, Experiment.status == ExecutionStatus.completed
+    )
+    if agent_id is not None:
+        stmt = stmt.join(AgentVersion, AgentVersion.id == Experiment.baseline_version_id).where(
+            AgentVersion.agent_id == agent_id
+        )
+    regressing = []
+    for experiment in await session.scalars(stmt.order_by(Experiment.created_at.desc())):
+        regressions = (experiment.comparison or {}).get("regressions") or []
+        critical = sum(1 for r in regressions if r.get("severity") == "critical")
+        if critical or experiment.recommendation == Recommendation.do_not_ship.value:
+            regressing.append(
+                {"id": experiment.id, "name": experiment.name, "critical_regressions": critical}
+            )
+    return {
+        "experiments_with_regression": len(regressing),
+        "latest_regression": regressing[0] if regressing else None,
+        "gate_failed_runs": gate_failed,
+        "interrupted_runs": interrupted,
+        "critical_error_runs": critical_runs,
+        "critical_errors": [e for e in errors if e["max_severity"] == ErrorSeverity.critical.value][:3],
     }
 
 

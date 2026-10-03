@@ -39,6 +39,7 @@ import { DateFilter, FilterBar, FilterSelect, MultiFilter, NumberFilter, SearchF
 import { NewRunDialog } from "./new-run-dialog";
 import { RunOrigin } from "./run-origin";
 import { dateInputToIso, useSearchState } from "./use-search-state";
+import { WorkerActivityIndicator } from "./worker-activity";
 
 const FILTER_KEYS = [
   "q",
@@ -276,11 +277,14 @@ export function RunsListView() {
         icon={<Play />}
         description="Chaque exécution d'un agent sur un scénario : trace, sortie, scores expliqués, erreurs et feedback."
         meta={
-          liveCount > 0 ? (
-            <Badge tone="blue" pulse>
-              {liveCount} en cours · actualisation automatique
-            </Badge>
-          ) : null
+          <>
+            {liveCount > 0 ? (
+              <Badge tone="blue" pulse>
+                {liveCount} en cours · actualisation automatique
+              </Badge>
+            ) : null}
+            <WorkerActivityIndicator />
+          </>
         }
         actions={
           <>

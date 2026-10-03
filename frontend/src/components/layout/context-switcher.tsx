@@ -57,7 +57,8 @@ function store(value: string | null) {
   }
 }
 
-function useEnvironment() {
+/** Deployment environment reported by `/meta` (label + status dot colour), `null` while unknown. */
+export function useEnvironment() {
   const meta = useQuery({
     queryKey: queryKeys.meta(),
     queryFn: ({ signal }) => http.get<Record<string, unknown>>("/meta", { signal }),
