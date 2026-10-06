@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { ArrowLeft, LayoutDashboard } from "lucide-react";
 
-import { ForgeMark } from "@/components/brand/forge-logo";
+import { ForgeWordmark } from "@/components/brand/forge-logo";
 import { Button } from "@/components/ui/button";
 
 export const metadata = { title: "Page introuvable" };
@@ -14,7 +14,7 @@ export default function NotFound() {
         aria-hidden
       />
       <div className="relative grid max-w-md justify-items-center gap-5">
-        <ForgeMark width={48} height={48} />
+        <ForgeWordmark height={40} />
         <p className="font-mono text-sm font-medium tracking-widest text-brand">ERREUR 404</p>
         <h1 className="text-2xl font-semibold tracking-tight">Cette page n&apos;est jamais sortie de la forge</h1>
         <p className="text-sm leading-relaxed text-muted-foreground">

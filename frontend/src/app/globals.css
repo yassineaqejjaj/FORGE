@@ -26,6 +26,9 @@
   --primary-hover: #9a3412;
   --primary-foreground: #ffffff;
   --ember: #f59e0b; /* amber spark — decorative only */
+  /* "forge" wordmark gradient (logo artwork: #F83C50 → #340C6A) */
+  --wordmark-from: #f83c50;
+  --wordmark-to: #340c6a;
 
   /* NOVA constellation accents (subtle use only) */
   --nova: #d92d20; /* NOVA Core */
@@ -107,6 +110,9 @@
 
   --brand: #fb923c;
   --brand-soft: #2b1a0d;
+  /* The logo's deep violet is unreadable on dark surfaces: same hue, lighter end */
+  --wordmark-from: #ff5468;
+  --wordmark-to: #a78bfa;
   --primary: #f97316;
   --primary-hover: #fb923c;
   --primary-foreground: #1f0d02;
@@ -426,5 +432,23 @@
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
     scroll-behavior: auto !important;
+  }
+}
+
+/* -------------------------------------------------------------------------- */
+/* "forge" wordmark — artwork as a mask, filled with the brand gradient        */
+/* -------------------------------------------------------------------------- */
+.forge-wordmark {
+  background-image: linear-gradient(100deg, var(--wordmark-from) 8%, var(--wordmark-to) 96%);
+  -webkit-mask: url("/brand/forge-wordmark-mask.png") center / contain no-repeat;
+  mask: url("/brand/forge-wordmark-mask.png") center / contain no-repeat;
+}
+.forge-wordmark-on-dark {
+  --wordmark-from: #ff5468;
+  --wordmark-to: #a78bfa;
+}
+@media (forced-colors: active) {
+  .forge-wordmark {
+    background: CanvasText;
   }
 }

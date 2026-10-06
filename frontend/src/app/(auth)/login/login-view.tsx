@@ -4,7 +4,7 @@ import * as React from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { ArrowRight, Eye, EyeOff, GitCompareArrows, KeyRound, Lock, Mail, ScanSearch, ShieldCheck } from "lucide-react";
 
-import { ConstellationDots, ForgeLogo, ForgeMark } from "@/components/brand/forge-logo";
+import { ConstellationDots, ForgeLogo, ForgeWordmark } from "@/components/brand/forge-logo";
 import { ForgeHero } from "@/components/brand/forge-hero";
 import { ThemeToggle } from "@/components/layout/theme-toggle";
 import { Alert } from "@/components/ui/alert";
@@ -122,10 +122,9 @@ export function LoginView() {
         <div className="pointer-events-none absolute -bottom-40 right-0 size-[420px] rounded-full bg-amber-500/10 blur-3xl" aria-hidden />
 
         <div className="relative flex items-center gap-2.5 px-10 pt-10">
-          <ForgeMark width={32} height={32} />
-          <span className="grid leading-none">
-            <span className="text-base font-semibold tracking-[0.16em] text-white">FORGE</span>
-            <span className="mt-1 text-[11px] font-medium tracking-wide text-stone-400">
+          <span className="grid justify-items-start gap-1.5 leading-none">
+            <ForgeWordmark height={32} tone="on-dark" />
+            <span className="text-[11px] font-medium tracking-wide text-stone-400">
               Laboratoire d&apos;évaluation des agents IA
             </span>
           </span>
