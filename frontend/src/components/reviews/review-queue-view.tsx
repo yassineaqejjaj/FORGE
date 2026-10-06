@@ -132,7 +132,7 @@ export function ReviewQueueView() {
         />
       ) : (
         <div className={cn("grid gap-3", queue.isPlaceholderData && "opacity-60")}>
-          <Table dense containerClassName="rounded-xl border border-border bg-card shadow-xs">
+          <Table dense containerClassName="rounded-xl border border-border bg-card shadow-panel">
             <TableHeader>
               <TableRow>
                 <TableHead className="w-10">#</TableHead>

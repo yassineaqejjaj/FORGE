@@ -17,7 +17,7 @@ const itemClasses =
   "relative flex cursor-default select-none items-center gap-2 rounded-md px-2 py-1.5 text-[13px] outline-none transition-colors data-[highlighted]:bg-accent data-[highlighted]:text-accent-foreground data-[disabled]:pointer-events-none data-[disabled]:opacity-50 [&_svg]:size-4 [&_svg]:shrink-0";
 
 const contentClasses =
-  "z-50 min-w-[12rem] overflow-hidden rounded-lg border border-border bg-popover p-1 text-popover-foreground shadow-lg data-[state=open]:animate-pop-in";
+  "z-50 min-w-[12rem] overflow-hidden rounded-[12px] border border-border bg-popover p-1 text-popover-foreground shadow-elevated data-[state=open]:animate-pop-in";
 
 export const DropdownMenuSubTrigger = React.forwardRef<
   React.ElementRef<typeof DropdownMenuPrimitive.SubTrigger>,

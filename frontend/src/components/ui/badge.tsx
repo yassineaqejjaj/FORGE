@@ -28,7 +28,7 @@ export const Badge = React.forwardRef<HTMLSpanElement, BadgeProps>(
       <span
         ref={ref}
         className={cn(
-          "inline-flex max-w-full shrink-0 items-center gap-1 whitespace-nowrap rounded-md font-medium ring-1 ring-inset",
+          "inline-flex max-w-full shrink-0 items-center gap-1 whitespace-nowrap rounded-sm font-medium ring-1 ring-inset",
           size === "sm" ? "h-5 px-1.5 text-[11px] leading-none" : "h-6 px-2 text-xs",
           variant === "soft" && t.soft,
           variant === "outline" && t.outline,

@@ -18,29 +18,25 @@ export interface PageHeaderProps {
   children?: React.ReactNode;
 }
 
-export function PageHeader({ title, description, eyebrow, icon, actions, meta, className, children }: PageHeaderProps) {
+/**
+ * Editorial page header (design system: 28px semibold title, 14px muted lead, no decoration).
+ * `icon` is kept in the API for the navigation context but no longer drawn next to the title.
+ */
+export function PageHeader({ title, description, eyebrow, actions, meta, className, children }: PageHeaderProps) {
   return (
     <header className={cn("flex flex-col gap-4 pb-6", className)}>
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
         <div className="flex min-w-0 items-start gap-3">
-          {icon ? (
-            <span
-              className="mt-0.5 flex size-9 shrink-0 items-center justify-center rounded-lg border border-border bg-card text-brand shadow-xs [&_svg]:size-[18px]"
-              aria-hidden
-            >
-              {icon}
-            </span>
-          ) : null}
           <div className="grid min-w-0 gap-1">
             {eyebrow ? (
               <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-subtle-foreground">{eyebrow}</p>
             ) : null}
             <div className="flex min-w-0 flex-wrap items-center gap-2">
-              <h1 className="truncate text-xl font-semibold tracking-tight text-foreground sm:text-[22px]">{title}</h1>
+              <h1 className="truncate text-[24px] font-semibold leading-tight tracking-tight text-foreground sm:text-[28px]">{title}</h1>
               {meta}
             </div>
             {description ? (
-              <p className="max-w-3xl text-sm leading-relaxed text-muted-foreground text-balance">{description}</p>
+              <p className="mt-0.5 max-w-3xl text-sm leading-relaxed text-muted-foreground text-balance">{description}</p>
             ) : null}
           </div>
         </div>

@@ -25,14 +25,15 @@ export interface ToneClasses {
 
 export const TONE_CLASSES: Record<Tone, ToneClasses> = {
   neutral: {
-    soft: "bg-slate-100 text-slate-700 ring-slate-500/15 dark:bg-slate-400/10 dark:text-slate-300 dark:ring-slate-400/20",
-    outline: "text-slate-700 ring-slate-300 dark:text-slate-300 dark:ring-slate-600",
-    solid: "bg-slate-700 text-white ring-transparent dark:bg-slate-300 dark:text-slate-900",
-    dot: "bg-slate-400 dark:bg-slate-500",
-    text: "text-slate-600 dark:text-slate-400",
-    bar: "bg-slate-500 dark:bg-slate-400",
-    track: "bg-slate-200/70 dark:bg-slate-700/50",
-    callout: "border-slate-200 bg-slate-50 text-slate-800 dark:border-slate-700/60 dark:bg-slate-800/40 dark:text-slate-200",
+    // Warm neutrals from the design system tokens (surface-3 / text-muted)
+    soft: "bg-surface-3 text-muted-foreground ring-border",
+    outline: "text-muted-foreground ring-border-strong",
+    solid: "bg-foreground text-background ring-transparent",
+    dot: "bg-subtle-foreground",
+    text: "text-muted-foreground",
+    bar: "bg-subtle-foreground",
+    track: "bg-surface-3",
+    callout: "border-border bg-surface-2 text-foreground",
   },
   teal: {
     soft: "bg-teal-50 text-teal-800 ring-teal-600/20 dark:bg-teal-400/10 dark:text-teal-300 dark:ring-teal-400/25",

@@ -21,7 +21,7 @@ export const TabsList = React.forwardRef<React.ElementRef<typeof TabsPrimitive.L
         ref={ref}
         className={cn(
           "flex max-w-full items-center overflow-x-auto",
-          variant === "underline" ? "gap-4 border-b border-border" : "inline-flex gap-1 rounded-lg bg-muted p-1",
+          variant === "underline" ? "gap-4 border-b border-border" : "inline-flex gap-1 rounded-[12px] bg-surface-2 p-1",
           className,
         )}
         {...props}
@@ -48,7 +48,7 @@ export const TabsTrigger = React.forwardRef<React.ElementRef<typeof TabsPrimitiv
           "[&_svg]:size-4",
           variant === "underline"
             ? "-mb-px h-10 border-b-2 border-transparent px-0.5 hover:text-foreground data-[state=active]:border-primary data-[state=active]:text-foreground"
-            : "h-7 rounded-md px-2.5 hover:text-foreground data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow-sm",
+            : "h-7 rounded-md px-2.5 hover:text-foreground data-[state=active]:bg-card data-[state=active]:text-foreground data-[state=active]:shadow-sm",
           className,
         )}
         {...props}

@@ -68,7 +68,8 @@ export function CommandPalette() {
 
   useHotkey("k", () => setOpen(!open), { mod: true });
   useHotkey("/", () => setOpen(true), { enabled: !open });
-  useHotkey("b", () => toggleSidebar(), { mod: true, allowInInputs: false });
+  useHotkey("\\", () => toggleSidebar(), { mod: true, allowInInputs: false }); // ⌘\ (design system)
+  useHotkey("b", () => toggleSidebar(), { mod: true, allowInInputs: false }); // ⌘B, kept for existing users
 
   React.useEffect(() => {
     if (!open) setQuery("");

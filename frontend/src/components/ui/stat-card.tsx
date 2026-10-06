@@ -43,7 +43,7 @@ export function StatCard({ label, value, icon, tone = "orange", hint, delta, loa
   const body = (
     <div
       className={cn(
-        "group relative flex h-full flex-col gap-3 rounded-xl border border-border bg-card p-4 shadow-xs",
+        "group relative flex h-full flex-col gap-3 rounded-xl border border-border bg-card p-4 shadow-panel",
         href && "transition-[border-color,box-shadow] hover:border-border-strong hover:shadow-md",
         className,
       )}

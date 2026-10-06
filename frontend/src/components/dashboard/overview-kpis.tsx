@@ -59,7 +59,7 @@ function QualityCard({ data, days }: { data: Dashboard; days: number }) {
   return (
     <section
       aria-labelledby="kpi-quality"
-      className="relative flex h-full flex-col gap-3 overflow-hidden rounded-xl border border-border bg-card p-5 shadow-xs"
+      className="relative flex h-full flex-col gap-3 overflow-hidden rounded-xl border border-border bg-card p-5 shadow-panel"
     >
       <span className="absolute inset-x-0 top-0 h-1 bg-brand" aria-hidden />
       <h2 id="kpi-quality" className="flex items-center gap-2 text-[13px] font-semibold text-foreground">
@@ -109,7 +109,7 @@ export function OverviewKpis({ data, days }: { data: Dashboard | undefined; days
     return (
       <>
         <div className="order-1">
-          <div className="h-full rounded-xl border border-border bg-card p-5 shadow-xs" aria-hidden>
+          <div className="h-full rounded-xl border border-border bg-card p-5 shadow-panel" aria-hidden>
             <Skeleton className="h-4 w-28" />
             <Skeleton className="mt-4 h-10 w-32" />
             <Skeleton className="mt-3 h-3 w-48" />

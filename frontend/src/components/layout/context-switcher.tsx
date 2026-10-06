@@ -107,7 +107,7 @@ export function ContextSwitcher({ collapsed = false, onNavigate }: { collapsed?:
     <button
       type="button"
       aria-label={label}
-      className="flex size-9 items-center justify-center rounded-md border border-sidebar-border bg-background text-sidebar-foreground transition-colors hover:bg-sidebar-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+      className="flex size-9 items-center justify-center rounded-lg bg-sidebar-accent text-sidebar-foreground transition-colors hover:bg-surface-3 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
     >
       <Boxes className="size-4" aria-hidden />
     </button>
@@ -116,8 +116,8 @@ export function ContextSwitcher({ collapsed = false, onNavigate }: { collapsed?:
       type="button"
       aria-label={label}
       className={cn(
-        "group flex w-full min-w-0 items-center gap-2.5 rounded-lg border border-sidebar-border bg-background px-2.5 py-2 text-left shadow-xs transition-colors",
-        "hover:border-border-strong focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring data-[state=open]:border-border-strong",
+        "group flex w-full min-w-0 items-center gap-2.5 rounded-xl bg-sidebar-accent px-2.5 py-2 text-left transition-colors",
+        "hover:bg-surface-3 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50 data-[state=open]:bg-surface-3",
       )}
     >
       <span className="flex size-7 shrink-0 items-center justify-center rounded-md bg-brand-soft text-brand" aria-hidden>

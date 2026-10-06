@@ -113,13 +113,13 @@ export function LoginView() {
   return (
     <div className="grid min-h-dvh lg:grid-cols-[minmax(0,1.08fr)_minmax(0,1fr)]">
       {/* Brand panel */}
-      <aside className="relative hidden overflow-hidden bg-[#0c0907] text-stone-100 lg:flex lg:flex-col">
+      <aside className="relative hidden overflow-hidden bg-[#0d0c0d] text-stone-100 lg:flex lg:flex-col">
         <div
           className="bg-grid pointer-events-none absolute inset-0 opacity-[0.12] [mask-image:radial-gradient(ellipse_at_50%_40%,black_10%,transparent_70%)]"
           aria-hidden
         />
-        <div className="pointer-events-none absolute -left-32 -top-32 size-[520px] rounded-full bg-orange-500/10 blur-3xl" aria-hidden />
-        <div className="pointer-events-none absolute -bottom-40 right-0 size-[420px] rounded-full bg-amber-500/10 blur-3xl" aria-hidden />
+        <div className="pointer-events-none absolute -left-32 -top-32 size-[520px] rounded-full bg-primary/12 blur-3xl" aria-hidden />
+        <div className="pointer-events-none absolute -bottom-40 right-0 size-[420px] rounded-full bg-violet-500/10 blur-3xl" aria-hidden />
 
         <div className="relative flex items-center gap-2.5 px-10 pt-10">
           <span className="grid justify-items-start gap-1.5 leading-none">
@@ -143,7 +143,7 @@ export function LoginView() {
             <ul className="mt-8 grid gap-4">
               {FEATURES.map(({ icon: Icon, title, text }) => (
                 <li key={title} className="flex items-start gap-3">
-                  <span className="mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-lg border border-white/10 bg-white/5 text-orange-300">
+                  <span className="mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-lg border border-white/10 bg-white/5 text-rose-300">
                     <Icon className="size-4" aria-hidden />
                   </span>
                   <span className="grid gap-0.5">
@@ -161,7 +161,7 @@ export function LoginView() {
             <ConstellationDots />
             <span>
               <span className="text-stone-400">NOVA Core</span> · <span className="text-stone-400">ORBIT</span> ·{" "}
-              <span className="text-orange-300">FORGE</span>
+              <span className="text-rose-300">FORGE</span>
             </span>
           </span>
           <span>Devoteam — Programme NOVA</span>

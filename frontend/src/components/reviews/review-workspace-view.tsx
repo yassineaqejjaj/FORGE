@@ -108,7 +108,7 @@ export function ReviewWorkspaceView({ runId }: { runId: string }) {
       ) : (
         <>
           <ClassificationBanner level={run.data.scenario.classification} context="run" className="mb-4" />
-          <header className="mb-4 flex flex-wrap items-start justify-between gap-4 rounded-xl border border-border bg-card p-4 shadow-xs">
+          <header className="mb-4 flex flex-wrap items-start justify-between gap-4 rounded-xl border border-border bg-card p-4 shadow-panel">
             <div className="grid min-w-0 gap-1">
               <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-subtle-foreground">Revue humaine</p>
               <h1 className="text-xl font-semibold tracking-tight">{run.data.scenario.name}</h1>

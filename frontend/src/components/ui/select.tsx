@@ -21,7 +21,7 @@ export const SelectTrigger = React.forwardRef<React.ElementRef<typeof SelectPrim
       ref={ref}
       aria-invalid={invalid || undefined}
       className={cn(
-        "flex w-full min-w-0 items-center justify-between gap-2 rounded-md border border-input bg-background px-3 text-left text-sm shadow-xs",
+        "flex w-full min-w-0 items-center justify-between gap-2 rounded-lg border border-input bg-surface-2 px-3 text-left text-sm",
         "transition-[border-color,box-shadow] duration-150 data-[placeholder]:text-subtle-foreground",
         "focus-visible:border-ring focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring/20",
         "disabled:cursor-not-allowed disabled:opacity-60 aria-invalid:border-destructive",
@@ -50,7 +50,7 @@ export const SelectContent = React.forwardRef<
       position={position}
       sideOffset={sideOffset}
       className={cn(
-        "relative z-50 max-h-[min(var(--radix-select-content-available-height),22rem)] min-w-[8rem] overflow-hidden rounded-lg border border-border bg-popover text-popover-foreground shadow-lg",
+        "relative z-50 max-h-[min(var(--radix-select-content-available-height),22rem)] min-w-[8rem] overflow-hidden rounded-[12px] border border-border bg-popover text-popover-foreground shadow-elevated",
         "data-[state=open]:animate-pop-in",
         position === "popper" && "w-full min-w-[var(--radix-select-trigger-width)]",
         className,

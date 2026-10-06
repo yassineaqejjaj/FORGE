@@ -63,7 +63,7 @@ export function KpiCard({
   const body = (
     <div
       className={cn(
-        "group relative flex h-full flex-col gap-3 overflow-hidden rounded-xl border border-border bg-card p-4 shadow-xs",
+        "group relative flex h-full flex-col gap-3 overflow-hidden rounded-xl border border-border bg-card p-4 shadow-panel",
         href && "transition-[border-color,box-shadow] hover:border-border-strong hover:shadow-md",
         className,
       )}
@@ -120,7 +120,7 @@ export function KpiCard({
 /** Skeleton grid placeholder for a row of KPI cards. */
 export function KpiCardSkeleton({ className }: { className?: string }) {
   return (
-    <div className={cn("flex h-full flex-col gap-3 rounded-xl border border-border bg-card p-4 shadow-xs", className)} aria-hidden>
+    <div className={cn("flex h-full flex-col gap-3 rounded-xl border border-border bg-card p-4 shadow-panel", className)} aria-hidden>
       <div className="flex items-start justify-between">
         <Skeleton className="h-3.5 w-24" />
         <Skeleton className="size-7 rounded-lg" />

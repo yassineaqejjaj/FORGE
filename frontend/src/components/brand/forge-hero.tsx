@@ -27,12 +27,12 @@ export function ForgeHero({ className }: { className?: string }) {
     <svg viewBox={`0 0 ${SIZE} ${SIZE}`} className={cn("h-auto w-full", className)} aria-hidden>
       <defs>
         <radialGradient id={`glow-${uid}`} cx="50%" cy="50%" r="50%">
-          <stop offset="0" stopColor="#F97316" stopOpacity="0.22" />
-          <stop offset="1" stopColor="#F97316" stopOpacity="0" />
+          <stop offset="0" stopColor="#F8485E" stopOpacity="0.22" />
+          <stop offset="1" stopColor="#F8485E" stopOpacity="0" />
         </radialGradient>
         <linearGradient id={`cand-${uid}`} x1="0" y1="0" x2="1" y2="1">
-          <stop offset="0" stopColor="#FDBA74" stopOpacity="0.55" />
-          <stop offset="1" stopColor="#EA580C" stopOpacity="0.3" />
+          <stop offset="0" stopColor="#FF8A99" stopOpacity="0.55" />
+          <stop offset="1" stopColor="#E8344B" stopOpacity="0.3" />
         </linearGradient>
       </defs>
       <circle cx={CENTER} cy={CENTER} r={RADIUS * 1.35} fill={`url(#glow-${uid})`} />
@@ -66,10 +66,10 @@ export function ForgeHero({ className }: { className?: string }) {
         );
       })}
       <polygon points={polygon(BASELINE)} fill="#A8A29E" fillOpacity={0.1} stroke="#A8A29E" strokeOpacity={0.6} strokeDasharray="4 4" />
-      <polygon points={polygon(CANDIDATE)} fill={`url(#cand-${uid})`} stroke="#FB923C" strokeWidth={2} strokeLinejoin="round" />
+      <polygon points={polygon(CANDIDATE)} fill={`url(#cand-${uid})`} stroke="#FF6276" strokeWidth={2} strokeLinejoin="round" />
       {CANDIDATE.map((v, i) => {
         const [x, y] = point(i, v);
-        return <circle key={i} cx={x} cy={y} r={3} fill="#FFF7ED" stroke="#F97316" strokeWidth={1.5} />;
+        return <circle key={i} cx={x} cy={y} r={3} fill="#FFF1F2" stroke="#F8485E" strokeWidth={1.5} />;
       })}
     </svg>
   );

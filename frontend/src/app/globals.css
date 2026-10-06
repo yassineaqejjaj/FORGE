@@ -4,75 +4,80 @@
 @custom-variant dark (&:where(.dark, .dark *));
 
 /* -------------------------------------------------------------------------- */
-/* Design tokens — light (FORGE: warm neutrals, forge orange / amber accent)   */
+/* Design tokens — light (NOVA design system: warm minimalism, Red Poppy)      */
+/* Fills use the design-system values; text tokens keep the hue with the      */
+/* lightness adjusted to reach WCAG AA (>= 4.5:1) on every surface.           */
 /* -------------------------------------------------------------------------- */
 :root {
   color-scheme: light;
 
-  /* Surfaces */
-  --background: #ffffff;
-  --foreground: #1c1917;
-  --surface: #faf8f6; /* app canvas behind cards, sidebar */
+  /* Surfaces: canvas, cards, inputs/hover (surface-2), pressed/skeletons (surface-3) */
+  --background: #faf8f7;
+  --foreground: #191716;
+  --surface: #faf8f7;
   --surface-raised: #ffffff;
+  --surface-2: #f6f2f1;
+  --surface-3: #efe9e7;
   --card: #ffffff;
-  --card-foreground: #1c1917;
+  --card-foreground: #191716;
   --popover: #ffffff;
-  --popover-foreground: #1c1917;
+  --popover-foreground: #191716;
 
-  /* Brand — FORGE orange (#F97316 in the logo). `--brand`/`--primary` are darker for AA text contrast. */
-  --brand: #c2410c; /* text-safe (>= 4.5:1 on every light surface) */
-  --brand-soft: #fff3eb;
-  --primary: #c2410c;
-  --primary-hover: #9a3412;
+  /* Accent — Red Poppy. `--primary` fills (buttons, pills, focus); `--brand` is the text-safe accent. */
+  --brand: #c93a4c; /* accent text: >= 4.5:1 on every light surface */
+  --brand-soft: #feedef; /* accent-soft: tinted chips, selection */
+  --primary: #f8485e;
+  --primary-hover: #e8344b;
   --primary-foreground: #ffffff;
+  --glow: rgb(248 72 94 / 0.3);
   --ember: #f59e0b; /* amber spark — decorative only */
   /* "forge" wordmark gradient (logo artwork: #F83C50 → #340C6A) */
   --wordmark-from: #f83c50;
   --wordmark-to: #340c6a;
 
   /* NOVA constellation accents (subtle use only) */
-  --nova: #d92d20; /* NOVA Core */
+  --nova: #f8485e; /* NOVA Core */
   --orbit: #0e9384; /* ORBIT */
   --forge: #f97316; /* FORGE */
 
-  /* Neutrals (warm stone) */
-  --secondary: #f5f3f1;
-  --secondary-foreground: #292524;
-  --muted: #f5f3f1;
-  --muted-foreground: #57534e;
-  --subtle-foreground: #6b635c; /* RGAA 3.2 / WCAG 1.4.3: >= 4.5:1 on every surface */
-  --accent: #f3efeb;
-  --accent-foreground: #1c1917;
-  --border: #ebe6e1;
-  --border-strong: #d8d1ca;
-  --input: #d8d1ca;
-  --ring: #ea580c;
+  /* Neutrals */
+  --secondary: #f6f2f1;
+  --secondary-foreground: #191716;
+  --muted: #f6f2f1;
+  --muted-foreground: #5f5856; /* text-muted */
+  --subtle-foreground: #746d6a; /* text-subtle (#9A918E in the system) darkened for AA */
+  --accent: #f6f2f1; /* hover / active nav item */
+  --accent-foreground: #191716;
+  --border: rgb(30 20 18 / 0.07);
+  --border-strong: rgb(30 20 18 / 0.12);
+  --input: rgb(30 20 18 / 0.1);
+  --ring: #f8485e;
 
-  /* Feedback */
-  --destructive: #d92d20;
-  --destructive-hover: #b42318;
+  /* Feedback (text-safe; status tints use 12–15 % of the colour) */
+  --destructive: #dc2626;
+  --destructive-hover: #b91c1c;
   --destructive-foreground: #ffffff;
-  --success: #067647;
-  --warning: #b54708;
+  --success: #117f3a; /* #16A34A in the system, darkened for AA text */
+  --warning: #a75c05; /* #D97706 in the system, darkened for AA text */
   --info: #175cd3;
 
-  /* Sidebar */
-  --sidebar: #faf8f6;
-  --sidebar-foreground: #44403c;
-  --sidebar-muted: #6b635c;
-  --sidebar-border: #efe9e3;
-  --sidebar-accent: #f2ece6;
-  --sidebar-accent-foreground: #1c1917;
+  /* Sidebar (surface) */
+  --sidebar: #ffffff;
+  --sidebar-foreground: #5f5856;
+  --sidebar-muted: #746d6a;
+  --sidebar-border: rgb(30 20 18 / 0.07);
+  --sidebar-accent: #f6f2f1;
+  --sidebar-accent-foreground: #191716;
 
   /* Charts — categorical slots, fixed order (baseline/candidate comparisons use 1 then 2) */
-  --chart-1: #e8590c; /* forge orange */
+  --chart-1: #e8344b; /* red poppy */
   --chart-2: #2a78d6; /* blue */
   --chart-3: #0e9384; /* teal */
   --chart-4: #7a5af8; /* violet */
   --chart-5: #eda100; /* yellow — < 3:1 on light: pair with labels */
   --chart-6: #e87ba4; /* magenta — < 3:1 on light: pair with labels */
-  --chart-grid: #efeae5;
-  --chart-axis: #6b635c;
+  --chart-grid: #efe9e7;
+  --chart-axis: #746d6a;
 
   /* Evaluation dimensions — stable identity colours (never reused for status) */
   --dim-quality: #2563eb;
@@ -85,12 +90,14 @@
   --dim-ux: #db2777;
 
   /* Status (reserved — never for series identity; always with icon + label) */
-  --status-good: #0ca30c;
-  --status-warning: #fab219;
+  --status-good: #16a34a;
+  --status-warning: #d97706;
   --status-serious: #ec835a;
-  --status-critical: #d03b3b;
+  --status-critical: #dc2626;
 
-  --shadow-color: 25 30% 15%;
+  --shadow-color: 15 25% 9%;
+  --elevation-panel: 0 1px 2px rgb(30 20 18 / 0.04), 0 10px 30px -12px rgb(30 20 18 / 0.12);
+  --elevation-elevated: 0 18px 50px -30px rgb(0 0 0 / 0.3), 0 0 0 1px rgb(30 20 18 / 0.07);
 }
 
 /* -------------------------------------------------------------------------- */
@@ -99,63 +106,66 @@
 .dark {
   color-scheme: dark;
 
-  --background: #0e0b09;
-  --foreground: #f2ede8;
-  --surface: #120f0c;
-  --surface-raised: #181410;
-  --card: #15110e;
-  --card-foreground: #f2ede8;
-  --popover: #1a1612;
-  --popover-foreground: #f2ede8;
+  --background: #0d0c0d;
+  --foreground: #f1eeed;
+  --surface: #0d0c0d;
+  --surface-raised: #151314;
+  --surface-2: #1b1819;
+  --surface-3: #231f20;
+  --card: #151314;
+  --card-foreground: #f1eeed;
+  --popover: #1b1819;
+  --popover-foreground: #f1eeed;
 
-  --brand: #fb923c;
-  --brand-soft: #2b1a0d;
+  --brand: #ff6276;
+  --brand-soft: rgb(248 72 94 / 0.14);
+  --primary: #f8485e;
+  --primary-hover: #ff6276;
+  --primary-foreground: #ffffff;
+  --glow: rgb(248 72 94 / 0.22);
+  --ember: #fbbf24;
   /* The logo's deep violet is unreadable on dark surfaces: same hue, lighter end */
   --wordmark-from: #ff5468;
   --wordmark-to: #a78bfa;
-  --primary: #f97316;
-  --primary-hover: #fb923c;
-  --primary-foreground: #1f0d02;
-  --ember: #fbbf24;
 
-  --nova: #f97066;
+  --nova: #ff6276;
   --orbit: #2ed3b7;
   --forge: #fb923c;
 
-  --secondary: #1f1a16;
-  --secondary-foreground: #e0d8d0;
-  --muted: #1b1713;
-  --muted-foreground: #b5aaa0;
-  --subtle-foreground: #968b80; /* RGAA 3.2 / WCAG 1.4.3: >= 4.5:1 on every surface */
-  --accent: #241e19;
-  --accent-foreground: #f2ede8;
-  --border: #2a231e;
-  --border-strong: #3a312a;
-  --input: #3a312a;
-  --ring: #fb923c;
+  --secondary: #1b1819;
+  --secondary-foreground: #f1eeed;
+  --muted: #1b1819;
+  --muted-foreground: #aaa3a1;
+  --subtle-foreground: #87817f; /* #736C6A in the system, lightened for AA */
+  --accent: #1b1819;
+  --accent-foreground: #f1eeed;
+  --border: rgb(255 255 255 / 0.07);
+  --border-strong: rgb(255 255 255 / 0.12);
+  --input: rgb(255 255 255 / 0.1);
+  --ring: #f8485e;
 
-  --destructive: #f97066;
-  --destructive-hover: #fda29b;
-  --destructive-foreground: #1f0a07;
-  --success: #47cd89;
-  --warning: #fdb022;
+  --destructive: oklch(0.68 0.17 25);
+  --destructive-hover: oklch(0.74 0.15 25);
+  --destructive-foreground: #1a0607;
+  --success: oklch(0.76 0.13 155);
+  --warning: oklch(0.8 0.13 75);
   --info: #53b1fd;
 
-  --sidebar: #110e0b;
-  --sidebar-foreground: #d6cdc4;
-  --sidebar-muted: #978b80;
-  --sidebar-border: #221c17;
-  --sidebar-accent: #1f1a15;
-  --sidebar-accent-foreground: #f8f4f0;
+  --sidebar: #151314;
+  --sidebar-foreground: #aaa3a1;
+  --sidebar-muted: #87817f;
+  --sidebar-border: rgb(255 255 255 / 0.07);
+  --sidebar-accent: #1b1819;
+  --sidebar-accent-foreground: #f1eeed;
 
-  --chart-1: #f76b15;
+  --chart-1: #ff6276;
   --chart-2: #3987e5;
   --chart-3: #12a594;
   --chart-4: #9085e9;
   --chart-5: #c98500;
   --chart-6: #d55181;
-  --chart-grid: #241e19;
-  --chart-axis: #968b80;
+  --chart-grid: #231f20;
+  --chart-axis: #87817f;
 
   --dim-quality: #60a5fa;
   --dim-coherence: #2dd4bf;
@@ -166,7 +176,14 @@
   --dim-latency: #38bdf8;
   --dim-ux: #f472b6;
 
-  --shadow-color: 25 60% 2%;
+  --status-good: oklch(0.76 0.13 155);
+  --status-warning: oklch(0.8 0.13 75);
+  --status-serious: #f2a07b;
+  --status-critical: oklch(0.68 0.17 25);
+
+  --shadow-color: 0 0% 0%;
+  --elevation-panel: inset 0 1px 0 rgb(255 255 255 / 0.03), 0 12px 32px -12px rgb(0 0 0 / 0.6);
+  --elevation-elevated: 0 18px 50px -30px rgb(0 0 0 / 0.7), 0 0 0 1px rgb(255 255 255 / 0.07);
 }
 
 
@@ -178,6 +195,9 @@
   --color-foreground: var(--foreground);
   --color-surface: var(--surface);
   --color-surface-raised: var(--surface-raised);
+  --color-surface-2: var(--surface-2);
+  --color-surface-3: var(--surface-3);
+  --color-glow: var(--glow);
   --color-card: var(--card);
   --color-card-foreground: var(--card-foreground);
   --color-popover: var(--popover);
@@ -238,17 +258,21 @@
   --font-sans: var(--font-geist-sans), ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
   --font-mono: var(--font-geist-mono), ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
 
-  --radius-sm: 0.3rem;
-  --radius-md: 0.45rem;
-  --radius-lg: 0.6rem;
-  --radius-xl: 0.8rem;
-  --radius-2xl: 1rem;
+  /* Radii: 6 badges/kbd · 8 small · 10 buttons/inputs/nav · 14 cards · 18 panels · 26 hero/composer */
+  --radius-sm: 6px;
+  --radius-md: 8px;
+  --radius-lg: 10px;
+  --radius-xl: 14px;
+  --radius-2xl: 18px;
+  --radius-3xl: 26px;
 
   --shadow-xs: 0 1px 2px 0 hsl(var(--shadow-color) / 0.05);
   --shadow-sm: 0 1px 2px 0 hsl(var(--shadow-color) / 0.06), 0 1px 3px 0 hsl(var(--shadow-color) / 0.08);
   --shadow-md: 0 4px 8px -2px hsl(var(--shadow-color) / 0.08), 0 2px 4px -2px hsl(var(--shadow-color) / 0.05);
   --shadow-lg: 0 12px 16px -4px hsl(var(--shadow-color) / 0.1), 0 4px 6px -2px hsl(var(--shadow-color) / 0.04);
   --shadow-xl: 0 20px 24px -4px hsl(var(--shadow-color) / 0.12), 0 8px 8px -4px hsl(var(--shadow-color) / 0.04);
+  --shadow-panel: var(--elevation-panel);
+  --shadow-elevated: var(--elevation-elevated);
 
   --animate-fade-in: fade-in 160ms ease-out;
   --animate-fade-out: fade-out 120ms ease-in;
@@ -366,11 +390,12 @@
   }
 
   ::selection {
-    background-color: color-mix(in oklab, var(--brand) 28%, transparent);
+    background-color: var(--brand-soft);
   }
 
+  /* Focus: 2px ring in accent at 50 % */
   :focus-visible {
-    outline: 2px solid var(--color-ring);
+    outline: 2px solid color-mix(in oklab, var(--color-ring) 50%, transparent);
     outline-offset: 2px;
   }
 
@@ -403,9 +428,9 @@
   .skeleton-shimmer {
     background-image: linear-gradient(
       90deg,
-      var(--color-muted) 0%,
-      color-mix(in oklab, var(--color-muted) 55%, var(--color-background)) 50%,
-      var(--color-muted) 100%
+      var(--color-surface-3) 0%,
+      color-mix(in oklab, var(--color-surface-3) 55%, var(--color-card)) 50%,
+      var(--color-surface-3) 100%
     );
     background-size: 200% 100%;
   }

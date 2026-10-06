@@ -81,7 +81,7 @@ export function RunHeader({ run, rounds, round, onRoundChange, onReevaluated }: 
     <div className="grid gap-3 pb-5">
       <ClassificationBanner level={run.scenario.classification} context="run" message={run.scenario.classification_warning ?? undefined} />
 
-      <header className="flex flex-col gap-4 rounded-xl border border-border bg-card p-4 shadow-xs sm:p-5 lg:flex-row lg:items-start lg:justify-between">
+      <header className="flex flex-col gap-4 rounded-xl border border-border bg-card p-4 shadow-panel sm:p-5 lg:flex-row lg:items-start lg:justify-between">
         <div className="grid min-w-0 gap-2">
           <p className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.08em] text-subtle-foreground">
             Run <span className="font-mono normal-case tracking-normal">{shortId(run.id)}</span>

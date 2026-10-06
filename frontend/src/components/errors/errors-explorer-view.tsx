@@ -166,7 +166,7 @@ function runHref(item: ErrorItem): string {
 
 function ErrorsTable({ items }: { items: ErrorItem[] }) {
   return (
-    <Table dense containerClassName="rounded-xl border border-border bg-card shadow-xs">
+    <Table dense containerClassName="rounded-xl border border-border bg-card shadow-panel">
       <TableHeader>
         <TableRow>
           <TableHead>Type</TableHead>

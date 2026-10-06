@@ -48,7 +48,7 @@ export function ErrorsSection({ errors, names }: { errors: RunError[]; names: Ma
       {sorted.map((err) => {
         const evidence = readEvidence(err.evidence);
         return (
-          <li key={err.id} className="rounded-xl border border-border bg-card p-4 shadow-xs">
+          <li key={err.id} className="rounded-xl border border-border bg-card p-4 shadow-panel">
             <div className="flex flex-wrap items-center gap-2">
               <ErrorTypeBadge code={err.error_type} label={err.label} size="md" />
               <SeverityBadge severity={err.severity} size="md" withPrefix />

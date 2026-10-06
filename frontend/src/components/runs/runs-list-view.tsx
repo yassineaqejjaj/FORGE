@@ -124,7 +124,7 @@ function RunsTable({ runs, loading }: { runs: Run[]; loading: boolean; }) {
   const onSort = (s: RunSort) => search.set({ sort: s === "-created_at" ? undefined : s });
 
   return (
-    <Table dense containerClassName="rounded-xl border border-border bg-card shadow-xs">
+    <Table dense containerClassName="rounded-xl border border-border bg-card shadow-panel">
       <TableHeader>
         <TableRow>
           <TableHead>Scénario</TableHead>

@@ -102,8 +102,8 @@ export function MultiFilter({ id, label, values, onChange, options, allLabel = "
             id={id}
             type="button"
             className={cn(
-              "flex h-8 w-full min-w-0 items-center justify-between gap-2 rounded-md border border-input bg-background px-3 text-left text-[13px] shadow-xs",
-              "focus-visible:border-ring focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring/20",
+              "flex h-8 w-full min-w-0 items-center justify-between gap-2 rounded-lg border border-input bg-surface-2 px-3 text-left text-[13px]",
+              "focus-visible:border-ring/60 focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring/40",
               values.length === 0 && "text-subtle-foreground",
             )}
             aria-label={`${label} : ${summary}`}
@@ -277,7 +277,7 @@ export function FilterBar({
   label?: string;
 }) {
   return (
-    <section aria-label={label} className={cn("rounded-xl border border-border bg-card p-3 shadow-xs sm:p-4", className)}>
+    <section aria-label={label} className={cn("rounded-xl border border-border bg-card p-3 shadow-panel sm:p-4", className)}>
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6">{children}</div>
       {activeCount > 0 ? (
         <div className="mt-3 flex items-center justify-between gap-2 border-t border-border pt-3 text-xs text-muted-foreground">

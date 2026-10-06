@@ -8,6 +8,7 @@ import { AppHeader } from "@/components/layout/app-header";
 import { AppSidebar } from "@/components/layout/app-sidebar";
 import { CommandPalette } from "@/components/layout/command-palette";
 import { MobileNav } from "@/components/layout/mobile-nav";
+import { MobileTabBar } from "@/components/layout/mobile-tab-bar";
 import { ShellProvider } from "@/components/layout/shell-context";
 import { SplashScreen } from "@/components/layout/splash-screen";
 import { Button } from "@/components/ui/button";
@@ -54,10 +55,12 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
       <div className="flex min-h-dvh bg-background">
         <AppSidebar />
         <MobileNav />
+        <MobileTabBar />
         <div className="flex min-w-0 flex-1 flex-col">
           <AppHeader />
           <main id="main-content" tabIndex={-1} className="flex-1 focus:outline-none">
-            <div className="mx-auto w-full max-w-[1440px] px-4 py-6 sm:px-6 lg:px-8 lg:py-8">{children}</div>
+            {/* Content column (design system): 1180px, 20–32px gutters, 32–40px vertical; room for the mobile tab bar */}
+            <div className="mx-auto w-full max-w-[1180px] px-5 pb-24 pt-8 md:px-8 lg:pb-10 lg:pt-10">{children}</div>
           </main>
         </div>
       </div>
