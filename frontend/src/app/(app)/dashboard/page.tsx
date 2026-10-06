@@ -3,7 +3,8 @@ import type { Metadata } from "next";
 
 import { DashboardView } from "@/components/dashboard/dashboard-view";
 
-export const metadata: Metadata = { title: "Vue d'ensemble" };
+/** The home of the app: the tab shows the product name alone. */
+export const metadata: Metadata = { title: { absolute: "FORGE" } };
 
 export default function DashboardPage() {
   return (
