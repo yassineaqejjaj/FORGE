@@ -157,6 +157,8 @@ function MetricComparisonCard({
           {stats.equivalence_delta} pts et IC ⊂ ±{stats.equivalence_margin}.
         </CardDescription>
       </CardHeader>
+      {/* 2xl: the table and its forest plot side by side instead of one under the other */}
+      <div className={cn(plot && "2xl:grid 2xl:grid-cols-[minmax(0,1.3fr)_minmax(0,1fr)] 2xl:items-center 2xl:gap-2")}>
       <Table dense>
         <TableHeader>
           <TableRow>
@@ -203,10 +205,11 @@ function MetricComparisonCard({
         </TableBody>
       </Table>
       {plot ? (
-        <CardContent className="pt-4">
+        <CardContent className="pt-4 2xl:pt-0">
           <ForestPlot rows={rows} equivalenceMargin={stats.equivalence_margin} />
         </CardContent>
       ) : null}
+      </div>
     </Card>
   );
 }

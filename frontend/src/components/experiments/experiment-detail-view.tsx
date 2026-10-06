@@ -269,8 +269,11 @@ export function ExperimentDetailView({ id }: { id: string }) {
               <>
                 <DimensionComparisonCard comparison={c} />
                 <CriterionComparisonCard comparison={c} />
-                <ResourcesCard comparison={c} />
-                <ArmsCard comparison={c} />
+                {/* xl: resources and arms side by side */}
+                <div className="grid items-start gap-4 xl:grid-cols-2">
+                  <ResourcesCard comparison={c} />
+                  <ArmsCard comparison={c} />
+                </div>
                 <StatisticsNote comparison={c} />
               </>
             ) : null}

@@ -64,12 +64,13 @@ export function DashboardView() {
       ) : (
         <div className={cn("grid gap-4 transition-opacity", query.isPlaceholderData && "opacity-70")}>
           <OverviewContext data={data} />
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+          {/* 2xl: 12-column grid — four KPIs, then « À traiter », performance and error causes on one row */}
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4 2xl:grid-cols-12">
             <OverviewKpis data={data} days={days} />
-            <AttentionList data={data} className="order-2 sm:col-span-2" />
-            <PerformanceChart data={data} className="order-4 sm:col-span-2" />
-            <TopErrors data={data} days={days} className="order-5 sm:col-span-2" />
-            <RecentExperiments data={data} className="order-6 sm:col-span-2" />
+            <AttentionList data={data} className="order-2 sm:col-span-2 2xl:col-span-4" />
+            <PerformanceChart data={data} className="order-4 sm:col-span-2 2xl:col-span-4" />
+            <TopErrors data={data} days={days} className="order-5 sm:col-span-2 2xl:col-span-4" />
+            <RecentExperiments data={data} className="order-6 sm:col-span-2 2xl:col-span-12" />
           </div>
         </div>
       )}

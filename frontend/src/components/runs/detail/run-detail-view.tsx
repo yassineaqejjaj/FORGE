@@ -279,7 +279,8 @@ export function RunDetailView({ id }: { id: string }) {
       />
 
       {wide ? (
-        <div className="grid items-start gap-4 xl:grid-cols-[minmax(0,0.9fr)_minmax(0,1.4fr)_minmax(0,1fr)]">
+        // xl: scenario · trace · scores; 2xl: the scores split into verdict and detail (four columns)
+        <div className="grid items-start gap-4 xl:grid-cols-[minmax(0,0.9fr)_minmax(0,1.4fr)_minmax(0,1fr)] 2xl:grid-cols-[minmax(0,0.85fr)_minmax(0,1.35fr)_minmax(0,1.9fr)]">
           <section aria-label="Scénario" className="min-w-0 [&_.grid]:min-w-0 [&_.grid>*]:min-w-0">{left}</section>
           <section aria-label="Exécution" className="min-w-0 [&_.grid]:min-w-0 [&_.grid>*]:min-w-0">{centre}</section>
           <section aria-label="Scores" className="min-w-0 [&_.grid]:min-w-0 [&_.grid>*]:min-w-0">{right}</section>

@@ -101,14 +101,14 @@ function QualityCard({ data, days }: { data: Dashboard; days: number }) {
 }
 
 /** Mobile: quality, then « À traiter » (order-2), then these. From sm up, the four KPIs come first. */
-const SECONDARY = "order-3 grid sm:order-1";
+const SECONDARY = "order-3 grid sm:order-1 2xl:col-span-3";
 
 /** Quality first, then reliability, cost and activity — four indicators instead of eight. */
 export function OverviewKpis({ data, days }: { data: Dashboard | undefined; days: number }) {
   if (!data) {
     return (
       <>
-        <div className="order-1">
+        <div className="order-1 2xl:col-span-3">
           <div className="h-full rounded-xl border border-border bg-card p-5 shadow-panel" aria-hidden>
             <Skeleton className="h-4 w-28" />
             <Skeleton className="mt-4 h-10 w-32" />
@@ -125,7 +125,7 @@ export function OverviewKpis({ data, days }: { data: Dashboard | undefined; days
   const vs = `vs ${days} j précédents`;
   return (
     <>
-      <div className="order-1">
+      <div className="order-1 2xl:col-span-3">
         <QualityCard data={data} days={days} />
       </div>
       <div className={SECONDARY}>

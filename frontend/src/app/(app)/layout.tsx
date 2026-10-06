@@ -59,8 +59,9 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         <div className="flex min-w-0 flex-1 flex-col">
           <AppHeader />
           <main id="main-content" tabIndex={-1} className="flex-1 focus:outline-none">
-            {/* Content column (design system): 1180px, 20–32px gutters, 32–40px vertical; room for the mobile tab bar */}
-            <div className="mx-auto w-full max-w-[1180px] px-5 pb-24 pt-8 md:px-8 lg:pb-10 lg:pt-10">{children}</div>
+            {/* Content column: 1600px max — wide screens get more grid columns, not longer lines;
+                20–32px gutters, 32–40px vertical; room for the mobile tab bar */}
+            <div className="mx-auto w-full max-w-[1600px] px-5 pb-24 pt-8 md:px-8 lg:pb-10 lg:pt-10">{children}</div>
           </main>
         </div>
       </div>

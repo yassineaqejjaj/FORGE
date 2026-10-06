@@ -308,15 +308,22 @@ function ResourcesCard({ run }: { run: RunDetail }) {
   );
 }
 
-/** Right column: composite + formula, gates, dimensions (bars / radar), criteria by dimension, resources. */
+/**
+ * Scores: composite + formula and gates (the verdict), then dimensions, criteria and resources (the detail).
+ * One column up to xl; on 2xl screens the two groups sit side by side (the page then has four columns).
+ */
 export function ScorePanel({ run, scores }: { run: RunDetail; scores: RunScores }) {
   return (
-    <div className="grid gap-4">
-      <CompositeCard scores={scores} run={run} />
-      <GatesCard scores={scores} />
-      <DimensionsCard scores={scores} />
-      <CriteriaCard scores={scores} />
-      <ResourcesCard run={run} />
+    <div className="grid items-start gap-4 2xl:grid-cols-2">
+      <div className="grid gap-4">
+        <CompositeCard scores={scores} run={run} />
+        <GatesCard scores={scores} />
+      </div>
+      <div className="grid gap-4">
+        <DimensionsCard scores={scores} />
+        <CriteriaCard scores={scores} />
+        <ResourcesCard run={run} />
+      </div>
     </div>
   );
 }
