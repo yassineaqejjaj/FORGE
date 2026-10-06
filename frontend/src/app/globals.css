@@ -443,6 +443,10 @@
   -webkit-mask: url("/brand/forge-wordmark-mask.png") center / contain no-repeat;
   mask: url("/brand/forge-wordmark-mask.png") center / contain no-repeat;
 }
+.forge-mark {
+  -webkit-mask-image: url("/brand/forge-f-mask.png");
+  mask-image: url("/brand/forge-f-mask.png");
+}
 .forge-wordmark-on-dark {
   --wordmark-from: #ff5468;
   --wordmark-to: #a78bfa;

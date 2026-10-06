@@ -5,7 +5,7 @@ import { usePathname } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
 import { PanelLeftClose, PanelLeftOpen } from "lucide-react";
 
-import { ForgeLogo, ForgeWordmark } from "@/components/brand/forge-logo";
+import { ForgeLogo, ForgeMark } from "@/components/brand/forge-logo";
 import { ContextSwitcher } from "@/components/layout/context-switcher";
 import { activeNav, NAV_SECTIONS, type NavItem, type NavSection } from "@/components/layout/nav";
 import { useShell } from "@/components/layout/shell-context";
@@ -172,7 +172,7 @@ function SidebarContent({ collapsed }: { collapsed: boolean }) {
           className={cn("rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring", !collapsed && "px-1")}
           aria-label="FORGE — vue d'ensemble"
         >
-          {collapsed ? <ForgeWordmark height={16} label={null} /> : <ForgeLogo />}
+          {collapsed ? <ForgeMark height={26} label={null} /> : <ForgeLogo />}
         </Link>
         <ContextSwitcher collapsed={collapsed} />
       </div>

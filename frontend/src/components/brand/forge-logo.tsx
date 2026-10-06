@@ -38,6 +38,22 @@ export function ForgeWordmark({ height = 24, tone = "auto", animated = false, la
   );
 }
 
+/** Width / height of the "F" mark artwork (public/brand/forge-f-mask.png; app icon: src/app/icon.png). */
+export const MARK_RATIO = 177 / 256;
+
+/** The "F" mark alone (collapsed sidebar and other square spots), same gradient as the wordmark. */
+export function ForgeMark({ height = 24, tone = "auto", label = "FORGE", className }: Omit<ForgeWordmarkProps, "animated">) {
+  return (
+    <span
+      role={label ? "img" : undefined}
+      aria-label={label ?? undefined}
+      aria-hidden={label ? undefined : true}
+      className={cn("forge-wordmark forge-mark inline-block shrink-0", tone === "on-dark" && "forge-wordmark-on-dark", className)}
+      style={{ height, width: Math.round(height * MARK_RATIO) }}
+    />
+  );
+}
+
 export interface ForgeLogoProps {
   className?: string;
   /** Wordmark height in px (default 26). */
