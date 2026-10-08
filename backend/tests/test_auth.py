@@ -29,6 +29,22 @@ async def test_login_sets_http_only_cookie_and_returns_user(client, make_user) -
     assert me.status_code == 200 and me.json()["email"] == user.email
 
 
+async def test_remember_me_controls_cookie_persistence(app, make_user) -> None:
+    import httpx
+
+    user = await make_user(Role.viewer)
+    async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="http://t") as c:
+        kept = await c.post("/api/v1/auth/login", json={"email": user.email, "password": user.password})
+        assert "max-age=" in kept.headers["set-cookie"].lower()  # « Rester connecté » (default)
+    async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="http://t") as c:
+        session_only = await c.post(
+            "/api/v1/auth/login", json={"email": user.email, "password": user.password, "remember": False}
+        )
+        cookie = session_only.headers["set-cookie"].lower()
+        assert SESSION_COOKIE_NAME in cookie and "max-age=" not in cookie and "expires=" not in cookie
+        assert (await c.get("/api/v1/auth/me")).status_code == 200
+
+
 async def test_login_can_return_token_for_cli(app, make_user) -> None:
     import httpx
 

@@ -37,11 +37,12 @@ def client_ip(request: Request) -> str:
     return request.client.host if request.client else "unknown"
 
 
-def set_session_cookie(response: Response, token: str) -> None:
+def set_session_cookie(response: Response, token: str, *, persistent: bool = True) -> None:
+    """``persistent=False``: browser-session cookie (« Rester connecté » unchecked); same token TTL."""
     response.set_cookie(
         key=SESSION_COOKIE_NAME,
         value=token,
-        max_age=settings.session_ttl_seconds,
+        max_age=settings.session_ttl_seconds if persistent else None,
         httponly=True,
         secure=settings.cookie_secure,
         samesite="lax",
@@ -95,7 +96,7 @@ async def login(body: LoginIn, request: Request, response: Response, session: Se
     )
     await session.commit()
     token = create_access_token(user.id, password_hash=user.password_hash)
-    set_session_cookie(response, token)
+    set_session_cookie(response, token, persistent=body.remember)
     return LoginOut(user=UserOut.model_validate(user), token=token if body.return_token else None)
 
 

@@ -11,6 +11,10 @@ from forge.api.schemas.users import PASSWORD_MIN_LENGTH, UserOut
 class LoginIn(ApiModel):
     email: str = Field(min_length=3, max_length=254)
     password: str = Field(min_length=1, max_length=256)
+    remember: bool = Field(
+        default=True,
+        description="« Rester connecté » : cookie persistant ; sinon cookie de session du navigateur",
+    )
     return_token: bool = Field(
         default=False,
         description="Renvoyer aussi le jeton de session (clients hors navigateur : CLI, scripts)",

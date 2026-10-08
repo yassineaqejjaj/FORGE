@@ -52,6 +52,8 @@ export interface CurrentUser {
 export interface LoginRequest {
   email: string;
   password: string;
+  /** « Rester connecté » — false: browser-session cookie. */
+  remember?: boolean;
 }
 
 /** `POST /auth/login` response (`LoginOut`): the session itself travels in the httpOnly cookie. */

@@ -77,14 +77,3 @@ export function ForgeLogo({ className, size = 26, hideTagline = false, tagline =
     </span>
   );
 }
-
-/** The three NOVA programme constellation dots (NOVA Core red, ORBIT teal, FORGE orange). */
-export function ConstellationDots({ className }: { className?: string }) {
-  return (
-    <span className={cn("inline-flex items-center gap-1", className)} aria-hidden>
-      <span className="size-1.5 rounded-full bg-nova" />
-      <span className="size-1.5 rounded-full bg-orbit" />
-      <span className="size-1.5 rounded-full bg-forge" />
-    </span>
-  );
-}
