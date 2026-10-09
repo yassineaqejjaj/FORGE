@@ -24,6 +24,8 @@ d'exécution + évaluations + scores, figés dans un manifeste reproductible.
 3. **Agent Runner** : adapters OpenAI, Anthropic, NOVA, API HTTP générique (FORGE Agent
    Protocol ou requête/réponse mappées), agent simulé ; boucle d'outils pilotée par FORGE,
    budgets, délais, limites de concurrence distribuées, propagation W3C `traceparent`.
+   Des **agents de démonstration** simulés et déterministes (ProductAgent, SupportAgent,
+   ResearchAgent) permettent de tester la plateforme sans clé LLM.
 4. **Trace Collector** : trace complète (messages, appels de modèles et d'outils, erreurs,
    tokens, coût, latence par étape) ; ingestion **OpenTelemetry (OTLP/HTTP)** avec les
    conventions GenAI ; timeline rejouable.
@@ -45,10 +47,15 @@ d'exécution + évaluations + scores, figés dans un manifeste reproductible.
    version, scénario, famille, catégorie, type d'erreur, coût, latence.
 10. **Expériences** baseline → candidate : deltas par critère avec intervalles de confiance,
     tests statistiques appariés, **régressions par scénario**, recommandation
-    (déployer / avec prudence / ne pas déployer / non concluant), **garde-fou CI**.
+    (déployer / avec prudence / ne pas déployer / non concluant), **garde-fou CI** (CLI `forge`,
+    voir [docs/CI.md](docs/CI.md)).
 11. **Calibration humaine** : gold datasets, accord IA/humain (kappa pondéré, corrélations,
     écart moyen), file de revue priorisée par le désaccord des juges.
 12. **Auditabilité** : journal immuable, manifestes, hashes de contenu, provenance des scores.
+13. **Runs observés** : un système externe (par exemple NOVA) peut ingérer un run déjà exécuté
+    (`POST /api/v1/runs/observed`, idempotent via `external_id`) ; FORGE l'évalue avec son
+    pipeline normal (règles du scénario, métriques, juges de la configuration). Voir
+    [docs/OBSERVED_RUNS.md](docs/OBSERVED_RUNS.md).
 
 ## En ligne
 
@@ -70,6 +77,8 @@ make seed                   # charge la démonstration (agents, scénarios, benc
 * API : <http://localhost:8100/api/v1/docs> · OTLP : `POST http://localhost:8100/v1/traces`
 * Sans clé LLM, FORGE utilise un **juge heuristique hors ligne** clairement signalé ; configurez
   un juge LLM pour des évaluations de production.
+* `make reseed` efface les données de démonstration et les recharge ; `make down` arrête la
+  plateforme (les données sont conservées) ; `make help` liste toutes les cibles.
 
 ## Architecture
 
@@ -86,6 +95,7 @@ flowchart LR
     PG[("PostgreSQL 17<br/>référentiel + file de jobs")]
     VK[("Valkey 8<br/>concurrence, débit")]
     AG["Agents évalués<br/>OpenAI · Anthropic · NOVA · HTTP"]
+    DA["demo-agents :8190<br/>agents simulés"]
     JU["Juges LLM"]
     ORB["ORBIT<br/>contexte & mémoire"]
 
@@ -96,8 +106,10 @@ flowchart LR
     RW --> PG & VK
     EW --> PG & VK
     RW --> AG
+    RW --> DA
     RW -.-> ORB
     AG -. spans OTLP .-> API
+    DA -. spans OTLP .-> API
     EW --> JU
 ```
 
@@ -111,11 +123,16 @@ flowchart LR
 | `postgres` | Source de vérité, file de jobs `SKIP LOCKED` | 5434 |
 | `valkey` | Limites distribuées | 6381 |
 
-Détails : [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) (contrat d'implémentation),
-[docs/AGENT_PROTOCOL.md](docs/AGENT_PROTOCOL.md) (brancher un agent),
-[docs/CI.md](docs/CI.md) (bloquer un déploiement sur régression),
-[docs/DEMO.md](docs/DEMO.md) (scénario de démonstration),
-[docs/OPERATIONS.md](docs/OPERATIONS.md) (production : secrets, TLS, sauvegardes, supervision, mises à jour).
+## Documentation
+
+* [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) : contrat d'implémentation et référence de l'architecture.
+* [docs/AGENT_PROTOCOL.md](docs/AGENT_PROTOCOL.md) : brancher un agent (FORGE Agent Protocol).
+* [docs/OBSERVED_RUNS.md](docs/OBSERVED_RUNS.md) : ingérer des runs déjà exécutés par un système externe.
+* [docs/CI.md](docs/CI.md) : bloquer un déploiement sur régression (CLI `forge`).
+* [docs/DEMO.md](docs/DEMO.md) : scénario de démonstration guidée.
+* [docs/DEMO_AGENTS.md](docs/DEMO_AGENTS.md) : agents de démonstration simulés (comportements, paramètres).
+* [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) : déploiement (Vercel, Railway).
+* [docs/OPERATIONS.md](docs/OPERATIONS.md) : production — secrets, TLS, sauvegardes, supervision, mises à jour.
 
 ## Stack
 
@@ -138,9 +155,10 @@ TypeScript · Tailwind CSS v4 · Radix UI · TanStack Query · Recharts. Tout es
 ## Développement
 
 ```bash
-make infra          # postgres + valkey
-make dev-backend    # API sur :8100 avec rechargement
-make dev-worker     # worker (deux files)
-make dev-frontend   # UI sur :3000
-make check          # ruff, mypy, contrats d'architecture, tests, lint + typecheck frontend
+make infra              # postgres + valkey
+make dev-backend        # API sur :8100 avec rechargement
+make dev-worker         # worker (deux files)
+make dev-demo-agents    # agents de démonstration sur :8190
+make dev-frontend       # UI sur :3000
+make check              # ruff, mypy, contrats d'architecture, tests, lint + typecheck frontend
 ```
