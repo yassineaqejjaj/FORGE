@@ -336,13 +336,14 @@ export const TERMINAL_RUN_STATUSES: ReadonlySet<RunStatus> = new Set<RunStatus>(
 /** Statuses shown with a pulsing dot (work in progress). */
 export const ACTIVE_RUN_STATUSES: ReadonlySet<RunStatus> = new Set<RunStatus>(["running", "evaluating"]);
 
-export const RUN_ORIGINS = ["adhoc", "benchmark", "experiment"] as const;
+export const RUN_ORIGINS = ["adhoc", "benchmark", "experiment", "observed"] as const;
 export type RunOrigin = (typeof RUN_ORIGINS)[number];
 
 export const RUN_ORIGIN_META: Record<RunOrigin, EnumMeta> = {
   adhoc: { label: "Ponctuel", tone: "neutral", icon: "Target" },
   benchmark: { label: "Benchmark", tone: "blue", icon: "Layers" },
   experiment: { label: "Expérience", tone: "violet", icon: "GitCompareArrows" },
+  observed: { label: "Observé", tone: "green", icon: "Eye" },
 };
 
 export const EXPERIMENT_ARMS = ["baseline", "candidate"] as const;

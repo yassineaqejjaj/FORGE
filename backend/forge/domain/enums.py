@@ -146,6 +146,7 @@ class RunOrigin(StrEnum):
     adhoc = "adhoc"
     benchmark = "benchmark"
     experiment = "experiment"
+    observed = "observed"  # executed elsewhere, ingested through POST /runs/observed
 
 
 class ExperimentArm(StrEnum):

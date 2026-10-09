@@ -17,7 +17,7 @@ export interface RunOriginProps {
   className?: string;
 }
 
-/** Origin of a run (ad hoc / benchmark / experiment) with a link to its parent when there is one. */
+/** Origin of a run (ad hoc / benchmark / experiment / observed) with a link to its parent when there is one. */
 export function RunOrigin({ origin, benchmarkId, benchmarkExecutionId, experimentId, experimentName, arm, className }: RunOriginProps) {
   const meta = getMeta(RUN_ORIGIN_META, origin);
   let href: string | null = null;

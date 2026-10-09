@@ -128,6 +128,7 @@ class RunFilters:
     created_from: datetime | None = None
     created_to: datetime | None = None
     tag: str | None = None
+    external_id: str | None = None
     q: str | None = None
 
 
@@ -170,6 +171,8 @@ def _conditions(viewer: Viewer, f: RunFilters) -> list[Any]:
         c.append(EvaluationRun.created_at <= f.created_to)
     if f.tag:
         c.append(EvaluationRun.tags.contains([f.tag]))
+    if f.external_id:
+        c.append(EvaluationRun.external_id == f.external_id)
     if f.q and f.q.strip():
         pattern = f"%{f.q.strip()}%"
         c.append(or_(SCENARIO_NAME.ilike(pattern), SCENARIO_SLUG.ilike(pattern), AGENT_NAME.ilike(pattern)))
@@ -235,6 +238,7 @@ def run_summary(row: RunRow) -> dict[str, Any]:
         "arm": run.arm,
         "repetition": run.repetition,
         "tags": list(run.tags or []),
+        "external_id": run.external_id,
         "scenario_id": run.scenario_id,
         "scenario_version_id": run.scenario_version_id,
         "scenario_slug": s.get("slug") or scenario.slug,
@@ -414,6 +418,7 @@ async def run_detail(session: AsyncSession, viewer: Viewer, run_id: uuid.UUID) -
         "arm": run.arm,
         "repetition": run.repetition,
         "tags": list(run.tags or []),
+        "external_id": run.external_id,
         "error": (REDACTED_TEXT if redact and run.error else run.error),
         "error_type": run.error_type,
         "otel_trace_id": run.otel_trace_id,
@@ -701,7 +706,7 @@ async def default_evaluation_config(session: AsyncSession) -> EvaluationConfig:
     return config
 
 
-async def _resolve_config(session: AsyncSession, config_id: uuid.UUID | None) -> EvaluationConfig:
+async def resolve_config(session: AsyncSession, config_id: uuid.UUID | None) -> EvaluationConfig:
     if config_id is None:
         return await default_evaluation_config(session)
     config = await session.get(EvaluationConfig, config_id)
@@ -762,7 +767,7 @@ async def create_adhoc_runs(
     total = len(version_ids) * request.repetitions
     if total > MAX_RUNS_PER_REQUEST:
         raise InvalidError(f"Trop de runs demandés ({total}) : maximum {MAX_RUNS_PER_REQUEST} par requête")
-    config = await _resolve_config(session, request.evaluation_config_id)
+    config = await resolve_config(session, request.evaluation_config_id)
     plans = [
         runs.RunPlan(scenario_version_id=vid, agent_version_id=request.agent_version_id, repetition=rep)
         for vid in version_ids
@@ -811,6 +816,8 @@ async def retry_run(
     created_by: uuid.UUID | None = None,
 ) -> EvaluationRun:
     run, _ = await get_visible_run(session, viewer, run_id)
+    if run.origin == RunOrigin.observed:
+        raise ConflictError("Un run observé ne peut pas être relancé : il a été exécuté hors de FORGE")
     if run.status not in TERMINAL_RUN_STATUSES:
         raise ConflictError("Le run est encore en cours : annulez-le ou attendez sa fin avant de le relancer")
     config = await session.get(EvaluationConfig, run.evaluation_config_id)

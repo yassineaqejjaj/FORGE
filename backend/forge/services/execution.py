@@ -440,7 +440,7 @@ async def persist_trace(
     )
     if staged:
         await session.execute(delete(TraceEvent).where(TraceEvent.run_id == run.id))
-    await _insert_events(session, run.id, planned)
+    await insert_events(session, run.id, planned)
     trace = await session.scalar(select(ExecutionTrace).where(ExecutionTrace.run_id == run.id))
     if trace is None:
         trace = ExecutionTrace(run_id=run.id, started_at=outcome.started_at)
@@ -468,7 +468,7 @@ def _row_to_data(row: TraceEvent) -> TraceEventData:
     )
 
 
-async def _insert_events(
+async def insert_events(
     session: AsyncSession, run_id: uuid.UUID, planned: list[PlannedEvent]
 ) -> list[TraceEvent]:
     """Insert rows, then link parents (two flushes: parents may sort after their children)."""
