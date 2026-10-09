@@ -39,7 +39,5 @@ def test_readme_references_every_doc() -> None:
     text = _readme_text()
     if not DOCS_DIR.is_dir():
         pytest.skip("dossier docs/ indisponible")
-    unlinked = [
-        f"docs/{doc.name}" for doc in sorted(DOCS_DIR.glob("*.md")) if f"docs/{doc.name}" not in text
-    ]
+    unlinked = [f"docs/{doc.name}" for doc in sorted(DOCS_DIR.glob("*.md")) if f"docs/{doc.name}" not in text]
     assert not unlinked, f"Documents de docs/ absents du README.md : {unlinked}"
