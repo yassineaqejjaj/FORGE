@@ -103,7 +103,7 @@ ni `fastapi`, ni `httpx`, ni `redis`, ni `forge.config`.
 | **execution** | `adapters/**`, `domain/traces/**`, `services/{execution,context_providers,trace_ingest}.py`, `api/routers/traces.py`, `api/schemas/traces.py`, `demo_agents/**`, `docs/AGENT_PROTOCOL.md` |
 | **evaluation** | `domain/{rules,judges,scoring,feedback}/**`, `infra/llm/**`, `services/{evaluation,judges,evaluation_configs,feedback}.py`, `api/routers/{evaluations,judges,evaluation_configs}.py` + schémas |
 | **analytics** | `domain/{stats,benchmarks,experiments,calibration}/**`, `services/{benchmarks,experiments,calibration,analytics,run_summaries}.py`, `api/routers/{benchmarks,experiments,calibration,analytics}.py` + schémas, `cli/**`, `docs/CI.md` |
-| **platform** | `domain/scenarios/**`, `services/{agents,scenarios,datasets,taxonomy,api_keys,run_queries,reviews}.py`, `api/routers/{auth,users,api_keys,credentials,meta,agents,scenarios,datasets,taxonomy,runs,reviews,audit}.py` + schémas |
+| **platform** | `domain/scenarios/**`, `services/{agents,scenarios,datasets,taxonomy,api_keys,run_queries,observed_runs,reviews}.py`, `api/routers/{auth,users,api_keys,credentials,meta,agents,scenarios,datasets,taxonomy,runs,reviews,audit}.py` + schémas |
 | **fondation** (intégrateur) | tout le reste : `config.py`, `domain/{enums,types,ports,serialization,hashing,versioning,defaults,taxonomy,judge_defaults,redaction}.py`, `infra/{db,models,queue,cache,security,observability}`, `services/{runs,mapping,bootstrap,audit,users,credentials,access}.py`, `api/{main,deps,errors}.py`, `api/schemas/common.py`, `workers/**`, `alembic/**` |
 
 Un propriétaire qui a besoin d'une modification d'un fichier de fondation (nouvel enum, nouveau
@@ -167,7 +167,8 @@ d'avertissement dès qu'un contenu C2/C3 est affiché.
 Toutes dans `forge/domain/enums.py` (jamais redéfinies), stockées en `text` + `CHECK`, valeurs
 identiques dans `frontend/src/lib/enums.ts`. Principales : `Role`, `AdapterKind`,
 `ProviderKind`, `ContextSource`, `ScenarioVisibility` (public/private/fresh), `Difficulty`,
-`RunStatus` (pending/running/evaluating/completed/failed/cancelled), `RunOrigin`,
+`RunStatus` (pending/running/evaluating/completed/failed/cancelled), `RunOrigin`
+(adhoc/benchmark/experiment/observed),
 `ExperimentArm`, `TraceEventType`, `TraceEventSource`, `Dimension` (quality, coherence,
 reasoning, safety, robustness, cost, latency, ux), `EvaluatorKind`, `ScoreSource`, `RuleType`,
 `JudgeProvider`, `AggregationMethod`, `ErrorSeverity`, `BuiltinErrorType`, `GateAction`,
@@ -501,6 +502,16 @@ si `FORGE_OTLP_ENDPOINT`, métriques Prometheus (`forge_runs_total`,
 `forge_judge_cost_total`, `forge_errors_detected_total`, `forge_otlp_spans_total`,
 `forge_jobs_total`, `forge_worker_inflight_jobs`) sur `/metrics` (API) et `:9464` (workers).
 
+### 8.3 Runs observés (`origin=observed`)
+
+Un système externe (NOVA…) peut **ingérer un run déjà exécuté** : `POST /api/v1/runs/observed`
+(`services/observed_runs.py`). Le run est construit comme un run ad hoc (`runs.create_runs`, manifeste
+figé, `enqueue=False`) puis reçoit sa trace (`run_started`, `final_answer` | `error`, `run_completed`)
+écrite depuis le payload, et passe en `evaluating` : aucun `execute_run`, l'évaluation est le pipeline
+normal §7. Idempotence : `evaluation_runs.external_id`, unique par agent (index partiel). Un échec
+déclaré reproduit une erreur d'exécution capturée (§7.1 étape 6). Contrat complet, notation par
+règles sur `output_json` et exemples : `docs/OBSERVED_RUNS.md`.
+
 ---
 
 ## 12. Conventions de l'API
@@ -526,7 +537,7 @@ Endpoints (propriétaire entre crochets) :
 | scenarios [platform] | `POST/GET /scenarios`, `GET/PATCH /scenarios/{id}`, `POST/GET /scenarios/{id}/versions`, `GET /scenario-versions/{id}`, `POST /scenarios/{id}/variants`, `POST /scenarios/import`, `GET /scenarios/export` |
 | datasets [platform] | `POST/GET /datasets`, `GET/PATCH /datasets/{id}`, `POST /datasets/{id}/items`, `DELETE /datasets/{id}/items/{item_id}` |
 | taxonomy [platform] | `GET/POST /criteria`, `GET/POST /error-types` |
-| runs [platform] | `POST /runs`, `GET /runs`, `GET /runs/{id}`, `GET /runs/{id}/trace`, `GET /runs/{id}/timeline`, `GET /runs/{id}/manifest`, `POST /runs/{id}/cancel`, `POST /runs/{id}/retry` |
+| runs [platform] | `POST /runs`, `POST /runs/observed`, `GET /runs`, `GET /runs/{id}`, `GET /runs/{id}/trace`, `GET /runs/{id}/timeline`, `GET /runs/{id}/manifest`, `POST /runs/{id}/cancel`, `POST /runs/{id}/retry` |
 | traces [execution] | `POST /v1/traces` (racine), `POST /runs/{id}/events` |
 | evaluations [evaluation] | `POST /runs/{id}/evaluate`, `GET /runs/{id}/evaluations`, `GET /runs/{id}/scores`, `GET /runs/{id}/errors`, `GET /runs/{id}/feedback`, `GET /runs/{id}/scores/{criterion_key}/provenance`, `GET /feedback-reports/{id}` |
 | reviews [platform] | `GET /reviews/queue`, `POST /runs/{id}/human-evaluations`, `GET /runs/{id}/human-evaluations` |

@@ -54,6 +54,14 @@ class EvaluationRun(UUIDPkMixin, CreatedAtMixin, Base):
         Index("ix_evaluation_runs_agent_version_id_created_at", "agent_version_id", "created_at"),
         Index("ix_evaluation_runs_scenario_id", "scenario_id"),
         Index("ix_evaluation_runs_otel_trace_id", "otel_trace_id"),
+        #: Idempotency of observed runs: one run per (agent, caller-supplied id).
+        Index(
+            "uq_evaluation_runs_agent_external_id",
+            "agent_id",
+            "external_id",
+            unique=True,
+            postgresql_where=text("external_id IS NOT NULL"),
+        ),
     )
 
     origin: Mapped[RunOrigin] = mapped_column(StrEnumType(RunOrigin), nullable=False)
@@ -101,6 +109,8 @@ class EvaluationRun(UUIDPkMixin, CreatedAtMixin, Base):
         Boolean, nullable=False, default=False, server_default=text("false")
     )
     tags: Mapped[list[str]] = mapped_column(JSONB, nullable=False, default=list, server_default=_JSON_LIST)
+    #: Idempotency key given by the external system that executed an ``observed`` run (else ``NULL``).
+    external_id: Mapped[str | None] = mapped_column(Text, nullable=True)
     created_by: Mapped[uuid.UUID | None] = mapped_column(
         UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"), nullable=True
     )

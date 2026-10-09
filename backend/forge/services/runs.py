@@ -79,8 +79,13 @@ async def create_runs(
     priority: int = PRIORITY_INTERACTIVE,
     tags: Sequence[str] = (),
     enqueue: bool = True,
+    external_id: str | None = None,
 ) -> list[EvaluationRun]:
-    """Create one run per plan with its immutable manifest and (optionally) enqueue execution."""
+    """Create one run per plan with its immutable manifest and (optionally) enqueue execution.
+
+    ``external_id`` (idempotency key of an ``observed`` run) is only meaningful for a single plan: the
+    ``(agent, external_id)`` pair is unique.
+    """
     from forge.infra.models import Scenario  # local: avoid widening the module import surface
 
     catalog = await load_criteria_catalog(session)
@@ -142,6 +147,7 @@ async def create_runs(
             manifest_hash=manifest_hash,
             otel_trace_id=trace_id,
             tags=list(tags),
+            external_id=external_id,
             created_by=created_by,
             queued_at=now if enqueue else None,
         )

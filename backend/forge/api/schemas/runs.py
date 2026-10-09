@@ -4,9 +4,9 @@ from __future__ import annotations
 
 import uuid
 from datetime import datetime
-from typing import Any
+from typing import Any, Literal, Self
 
-from pydantic import Field
+from pydantic import AwareDatetime, Field, field_validator, model_validator
 
 from forge.api.schemas.common import ApiModel
 from forge.domain.enums import ExperimentArm, RunOrigin, RunStatus
@@ -25,6 +25,56 @@ class RunCreateIn(ApiModel):
     tags: list[str] = Field(default_factory=list, max_length=20)
 
 
+class ObservedUsageIn(ApiModel):
+    input_tokens: int = Field(default=0, ge=0)
+    output_tokens: int = Field(default=0, ge=0)
+    model_calls: int = Field(default=0, ge=0)
+
+
+class ObservedRunIn(ApiModel):
+    """A run already executed by an external system (docs/OBSERVED_RUNS.md): FORGE only evaluates it."""
+
+    agent_version_id: uuid.UUID
+    scenario_id: uuid.UUID = Field(description="La version courante du scénario est utilisée")
+    evaluation_config_id: uuid.UUID | None = Field(
+        default=None, description="Configuration par défaut (celle des runs ad hoc) si absente"
+    )
+    input: dict[str, Any] = Field(
+        description='Ce qui a été demandé à l\'agent : {"prompt": …, "context": {…}}'
+    )
+    output_text: str | None = Field(default=None, description="Résumé lisible de ce qui a été produit")
+    output_json: dict[str, Any] | None = Field(
+        default=None, description="Résultat structuré, lu par les règles du scénario (chemins JSON)"
+    )
+    execution_status: Literal["completed", "failed"]
+    error: str | None = Field(default=None, max_length=4000, description="Cause de l'échec (si failed)")
+    started_at: AwareDatetime
+    completed_at: AwareDatetime
+    usage: ObservedUsageIn = Field(default_factory=ObservedUsageIn)
+    tags: list[str] = Field(default_factory=list, max_length=20)
+    external_id: str = Field(
+        min_length=1,
+        max_length=200,
+        description="Clé d'idempotence (ex. « nova-sdlc:<uuid> ») : unique par agent",
+    )
+
+    @field_validator("external_id")
+    @classmethod
+    def _strip_external_id(cls, value: str) -> str:
+        value = value.strip()
+        if not value:
+            raise ValueError("la clé d'idempotence ne doit pas être vide")
+        return value
+
+    @model_validator(mode="after")
+    def _check_consistency(self) -> Self:
+        if self.completed_at < self.started_at:
+            raise ValueError("completed_at doit être postérieur ou égal à started_at")
+        if self.execution_status == "completed" and self.error:
+            raise ValueError("« error » n'est accepté que pour un run en échec (execution_status = failed)")
+        return self
+
+
 class RunOut(ApiModel):
     id: uuid.UUID
     status: RunStatus
@@ -33,6 +83,7 @@ class RunOut(ApiModel):
     arm: ExperimentArm | None = None
     repetition: int
     tags: list[str]
+    external_id: str | None = Field(default=None, description="Clé d'idempotence (runs observés)")
     scenario_id: uuid.UUID
     scenario_version_id: uuid.UUID
     scenario_slug: str
@@ -109,6 +160,7 @@ class RunDetailOut(ApiModel):
     arm: ExperimentArm | None = None
     repetition: int
     tags: list[str]
+    external_id: str | None = None
     error: str | None = None
     error_type: str | None = None
     otel_trace_id: str

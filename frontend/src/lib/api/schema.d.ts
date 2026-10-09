@@ -620,6 +620,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/runs/observed": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Ingérer un run déjà exécuté (évaluation seule)
+         * @description Enregistre un run exécuté par un système externe puis le fait évaluer par le pipeline normal (règles du scénario, métriques, juges de la configuration). `external_id` est une clé d'idempotence par agent : un second appel renvoie le run existant avec le code 200.
+         */
+        post: operations["create_observed_run_api_v1_runs_observed_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/runs/{run_id}": {
         parameters: {
             query?: never;
@@ -4748,6 +4768,12 @@ export interface components {
             /** Password */
             password: string;
             /**
+             * Remember
+             * @description « Rester connecté » : cookie persistant ; sinon cookie de session du navigateur
+             * @default true
+             */
+            remember: boolean;
+            /**
              * Return Token
              * @description Renvoyer aussi le jeton de session (clients hors navigateur : CLI, scripts)
              * @default false
@@ -4991,6 +5017,93 @@ export interface components {
             repetitions: number;
             /** Default Std */
             default_std: number;
+        };
+        /**
+         * ObservedRunIn
+         * @description A run already executed by an external system (docs/OBSERVED_RUNS.md): FORGE only evaluates it.
+         */
+        ObservedRunIn: {
+            /**
+             * Agent Version Id
+             * Format: uuid
+             */
+            agent_version_id: string;
+            /**
+             * Scenario Id
+             * Format: uuid
+             * @description La version courante du scénario est utilisée
+             */
+            scenario_id: string;
+            /**
+             * Evaluation Config Id
+             * @description Configuration par défaut (celle des runs ad hoc) si absente
+             */
+            evaluation_config_id?: string | null;
+            /**
+             * Input
+             * @description Ce qui a été demandé à l'agent : {"prompt": …, "context": {…}}
+             */
+            input: {
+                [key: string]: unknown;
+            };
+            /**
+             * Output Text
+             * @description Résumé lisible de ce qui a été produit
+             */
+            output_text?: string | null;
+            /**
+             * Output Json
+             * @description Résultat structuré, lu par les règles du scénario (chemins JSON)
+             */
+            output_json?: {
+                [key: string]: unknown;
+            } | null;
+            /**
+             * Execution Status
+             * @enum {string}
+             */
+            execution_status: "completed" | "failed";
+            /**
+             * Error
+             * @description Cause de l'échec (si failed)
+             */
+            error?: string | null;
+            /**
+             * Started At
+             * Format: date-time
+             */
+            started_at: string;
+            /**
+             * Completed At
+             * Format: date-time
+             */
+            completed_at: string;
+            usage?: components["schemas"]["ObservedUsageIn"];
+            /** Tags */
+            tags?: string[];
+            /**
+             * External Id
+             * @description Clé d'idempotence (ex. « nova-sdlc:<uuid> ») : unique par agent
+             */
+            external_id: string;
+        };
+        /** ObservedUsageIn */
+        ObservedUsageIn: {
+            /**
+             * Input Tokens
+             * @default 0
+             */
+            input_tokens: number;
+            /**
+             * Output Tokens
+             * @default 0
+             */
+            output_tokens: number;
+            /**
+             * Model Calls
+             * @default 0
+             */
+            model_calls: number;
         };
         /** Page[AgentOut] */
         Page_AgentOut_: {
@@ -6158,6 +6271,8 @@ export interface components {
             repetition: number;
             /** Tags */
             tags: string[];
+            /** External Id */
+            external_id?: string | null;
             /** Error */
             error?: string | null;
             /** Error Type */
@@ -6304,7 +6419,7 @@ export interface components {
          * RunOrigin
          * @enum {string}
          */
-        RunOrigin: "adhoc" | "benchmark" | "experiment";
+        RunOrigin: "adhoc" | "benchmark" | "experiment" | "observed";
         /** RunOut */
         RunOut: {
             /**
@@ -6321,6 +6436,11 @@ export interface components {
             repetition: number;
             /** Tags */
             tags: string[];
+            /**
+             * External Id
+             * @description Clé d'idempotence (runs observés)
+             */
+            external_id?: string | null;
             /**
              * Scenario Id
              * Format: uuid
@@ -8959,6 +9079,8 @@ export interface operations {
                 created_from?: string | null;
                 created_to?: string | null;
                 tag?: string | null;
+                /** @description Clé d'idempotence (runs observés) */
+                external_id?: string | null;
                 /** @description Nom de scénario ou d'agent */
                 q?: string | null;
                 /** @description -created_at, created_at, ±composite, ±latency */
@@ -9014,6 +9136,48 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["RunOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_observed_run_api_v1_runs_observed_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ObservedRunIn"];
+            };
+        };
+        responses: {
+            /** @description Run déjà ingéré avec cette clé d'idempotence */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RunOut"];
+                };
+            };
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RunOut"];
                 };
             };
             /** @description Validation Error */
