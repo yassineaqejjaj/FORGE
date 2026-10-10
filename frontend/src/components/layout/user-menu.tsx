@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { LogOut, Settings } from "lucide-react";
+import { Compass, LogOut, Settings } from "lucide-react";
 
 import { ClassificationBadge } from "@/components/domain/classification-badge";
 import { RoleBadge } from "@/components/domain/enum-badge";
@@ -13,6 +13,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { useShell } from "@/components/layout/shell-context";
 import { useCurrentUser } from "@/hooks/use-current-user";
 import { useLogout } from "@/lib/api/auth";
 
@@ -20,6 +21,7 @@ import { useLogout } from "@/lib/api/auth";
 export function UserMenu() {
   const { user, hasRole } = useCurrentUser();
   const logout = useLogout();
+  const { setOnboardingReplayOpen } = useShell();
   if (!user) return null;
   return (
     <DropdownMenu>
@@ -56,6 +58,11 @@ export function UserMenu() {
             <DropdownMenuSeparator />
           </>
         ) : null}
+        <DropdownMenuItem onSelect={() => setOnboardingReplayOpen(true)}>
+          <Compass aria-hidden />
+          Visite guidée
+        </DropdownMenuItem>
+        <DropdownMenuSeparator />
         <DropdownMenuItem destructive onSelect={() => logout.mutate()} disabled={logout.isPending}>
           <LogOut aria-hidden />
           Se déconnecter

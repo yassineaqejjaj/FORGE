@@ -11,6 +11,9 @@ interface ShellContextValue {
   setCommandPaletteOpen: (open: boolean) => void;
   mobileNavOpen: boolean;
   setMobileNavOpen: (open: boolean) => void;
+  /** Welcome tour opened on demand (« Visite guidée » in the user menu); the first-login tour opens by itself. */
+  onboardingReplayOpen: boolean;
+  setOnboardingReplayOpen: (open: boolean) => void;
   /** Desktop sidebar reduced to an icon rail (persisted per browser). */
   sidebarCollapsed: boolean;
   setSidebarCollapsed: (collapsed: boolean) => void;
@@ -33,6 +36,7 @@ function readCollapsed(): boolean {
 export function ShellProvider({ children }: { children: React.ReactNode }) {
   const [commandPaletteOpen, setCommandPaletteOpen] = React.useState(false);
   const [mobileNavOpen, setMobileNavOpen] = React.useState(false);
+  const [onboardingReplayOpen, setOnboardingReplayOpen] = React.useState(false);
   const [sidebarCollapsed, setCollapsedState] = React.useState(false);
   const [crumbLabels, setCrumbLabels] = React.useState<Record<string, string>>({});
 
@@ -82,13 +86,15 @@ export function ShellProvider({ children }: { children: React.ReactNode }) {
       setCommandPaletteOpen,
       mobileNavOpen,
       setMobileNavOpen,
+      onboardingReplayOpen,
+      setOnboardingReplayOpen,
       sidebarCollapsed,
       setSidebarCollapsed,
       toggleSidebar,
       crumbLabels,
       setCrumbLabel,
     }),
-    [commandPaletteOpen, mobileNavOpen, sidebarCollapsed, setSidebarCollapsed, toggleSidebar, crumbLabels, setCrumbLabel],
+    [commandPaletteOpen, mobileNavOpen, onboardingReplayOpen, sidebarCollapsed, setSidebarCollapsed, toggleSidebar, crumbLabels, setCrumbLabel],
   );
 
   return <ShellContext.Provider value={value}>{children}</ShellContext.Provider>;

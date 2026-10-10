@@ -102,6 +102,12 @@ invalidées (les clés d'API `fgk_…` ne sont pas affectées).
 
 * Rôles minimaux : donner `editor` aux équipes produit, `maintainer` aux responsables des
   benchmarks (contenu des scénarios privés, juges, configurations), `admin` à l'exploitation.
+* Accueil des nouveaux comptes : les comptes sont créés par un administrateur (Paramètres →
+  Utilisateurs). À sa première connexion, chaque compte voit une visite guidée (rôle, boucle
+  Concevoir → Tester → Analyser → Améliorer, premiers pas selon le rôle) ; `users.onboarded_at`
+  mémorise sa fin ou son abandon (`POST /api/v1/auth/onboarding/complete`, idempotent). Elle se
+  rouvre depuis le menu de l'avatar (« Visite guidée »). Les comptes antérieurs à la migration
+  `0003` sont considérés comme déjà accueillis.
 * Clés d'API : une par usage (CI, NOVA, agents), avec expiration ; les agents ne reçoivent que
   des clés `traces:write`.
 * Les agents évalués ne voient jamais le résultat attendu, les critères ni les règles des

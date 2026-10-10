@@ -46,6 +46,8 @@ export interface CurrentUser {
   avatar_color: string | null;
   active?: boolean;
   last_login_at?: string | null;
+  /** End of the first-login welcome tour; `null` = not done yet (`undefined`: API without onboarding). */
+  onboarded_at?: string | null;
   created_at?: string;
 }
 

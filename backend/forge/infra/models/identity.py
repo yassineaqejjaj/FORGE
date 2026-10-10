@@ -38,6 +38,8 @@ class User(UUIDPkMixin, CreatedAtMixin, Base):
         Text, nullable=False, default=DEFAULT_AVATAR_COLOR, server_default=text(f"'{DEFAULT_AVATAR_COLOR}'")
     )
     last_login_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    #: Set when the user finishes (or skips) the first-login welcome tour; ``NULL`` = not onboarded yet.
+    onboarded_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
 
 class ApiKey(UUIDPkMixin, CreatedAtMixin, Base):

@@ -11,6 +11,7 @@ import { MobileNav } from "@/components/layout/mobile-nav";
 import { MobileTabBar } from "@/components/layout/mobile-tab-bar";
 import { ShellProvider } from "@/components/layout/shell-context";
 import { SplashScreen } from "@/components/layout/splash-screen";
+import { OnboardingTour } from "@/components/onboarding/onboarding-tour";
 import { Button } from "@/components/ui/button";
 import { useMe } from "@/lib/api/auth";
 import { errorMessage } from "@/lib/api/client";
@@ -66,6 +67,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         </div>
       </div>
       <CommandPalette />
+      <OnboardingTour />
     </ShellProvider>
   );
 }
