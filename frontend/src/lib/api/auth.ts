@@ -19,6 +19,7 @@ export const authApi = {
     return "user" in res && res.user ? res.user : (res as CurrentUser);
   },
   logout: () => http.post<void>("/auth/logout", undefined, { redirectOnUnauthorized: false }),
+  completeOnboarding: () => http.post<CurrentUser>("/auth/onboarding/complete"),
 };
 
 export interface UseMeOptions extends Omit<UseQueryOptions<CurrentUser, ApiError>, "queryKey" | "queryFn"> {
@@ -60,5 +61,15 @@ export function useLogout() {
       qc.clear();
       if (typeof window !== "undefined") window.location.assign("/login");
     },
+  });
+}
+
+/** `POST /auth/onboarding/complete` — idempotent; the returned user refreshes the `me` cache. */
+export function useCompleteOnboarding() {
+  const qc = useQueryClient();
+  return useMutation<CurrentUser, ApiError, void>({
+    mutationFn: authApi.completeOnboarding,
+    meta: { silentError: true },
+    onSuccess: (user) => qc.setQueryData(queryKeys.me(), user),
   });
 }

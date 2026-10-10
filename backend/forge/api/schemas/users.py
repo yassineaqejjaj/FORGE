@@ -31,6 +31,9 @@ class UserOut(ApiModel):
     avatar_color: str
     active: bool
     last_login_at: datetime | None = None
+    onboarded_at: datetime | None = Field(
+        default=None, description="Fin de la visite de bienvenue (null : pas encore faite)"
+    )
     created_at: datetime
 
 

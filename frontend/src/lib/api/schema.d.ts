@@ -55,6 +55,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/auth/onboarding/complete": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Terminer la visite de bienvenue
+         * @description Idempotent: the first call stamps ``onboarded_at`` (finished or skipped), later calls change nothing.
+         */
+        post: operations["complete_onboarding_api_v1_auth_onboarding_complete_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/auth/password": {
         parameters: {
             query?: never;
@@ -7313,6 +7333,11 @@ export interface components {
             /** Last Login At */
             last_login_at?: string | null;
             /**
+             * Onboarded At
+             * @description Fin de la visite de bienvenue (null : pas encore faite)
+             */
+            onboarded_at?: string | null;
+            /**
              * Created At
              * Format: date-time
              */
@@ -7441,6 +7466,26 @@ export interface operations {
         };
     };
     me_api_v1_auth_me_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UserOut"];
+                };
+            };
+        };
+    };
+    complete_onboarding_api_v1_auth_onboarding_complete_post: {
         parameters: {
             query?: never;
             header?: never;

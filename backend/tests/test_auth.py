@@ -157,3 +157,27 @@ async def test_api_key_cannot_use_me(admin_client) -> None:
     key = created.json()["key"]
     response = await admin_client.get("/api/v1/auth/me", headers={"Authorization": f"Bearer {key}"})
     assert response.status_code == 403
+
+
+async def test_new_user_is_not_onboarded_and_completion_is_idempotent(client_as, admin_client) -> None:
+    c = await client_as(Role.evaluator)
+    me = await c.get("/api/v1/auth/me")
+    assert me.status_code == 200 and me.json()["onboarded_at"] is None
+
+    first = await c.post("/api/v1/auth/onboarding/complete")
+    assert first.status_code == 200, first.text
+    stamp = first.json()["onboarded_at"]
+    assert stamp is not None
+
+    again = await c.post("/api/v1/auth/onboarding/complete")
+    assert again.status_code == 200 and again.json()["onboarded_at"] == stamp
+    assert (await c.get("/api/v1/auth/me")).json()["onboarded_at"] == stamp
+
+    audit = await admin_client.get(
+        "/api/v1/audit", params={"target_id": first.json()["id"], "action": "auth.onboarding_completed"}
+    )
+    assert audit.status_code == 200 and audit.json()["total"] == 1
+
+
+async def test_onboarding_requires_authentication(client) -> None:
+    assert (await client.post("/api/v1/auth/onboarding/complete")).status_code == 401

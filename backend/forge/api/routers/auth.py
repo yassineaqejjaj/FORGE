@@ -122,6 +122,23 @@ async def me(user: CurrentUser) -> UserOut:
     return UserOut.model_validate(user)
 
 
+@router.post("/onboarding/complete", response_model=UserOut, summary="Terminer la visite de bienvenue")
+async def complete_onboarding(user: CurrentUser, session: SessionDep) -> UserOut:
+    """Idempotent: the first call stamps ``onboarded_at`` (finished or skipped), later calls are no-ops."""
+    if user.onboarded_at is None:
+        user.onboarded_at = utcnow()
+        await audit.record(
+            session,
+            user,
+            "auth.onboarding_completed",
+            "user",
+            user.id,
+            summary=f"Visite de bienvenue terminée par {user.full_name}",
+        )
+        await session.commit()
+    return UserOut.model_validate(user)
+
+
 @router.post(
     "/password", response_model=LoginOut, summary="Changer son mot de passe (révoque les autres sessions)"
 )
