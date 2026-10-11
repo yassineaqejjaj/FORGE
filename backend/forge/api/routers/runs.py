@@ -19,6 +19,8 @@ from forge.api.schemas.runs import (
     ContextGapIn,
     ContextGapOut,
     ObservedRunIn,
+    PromoteRunIn,
+    PromoteRunOut,
     RunCreateIn,
     RunDetailOut,
     RunManifestOut,
@@ -27,7 +29,7 @@ from forge.api.schemas.runs import (
 )
 from forge.domain.enums import ExperimentArm, RunOrigin, RunStatus
 from forge.infra.models import EvaluationRun
-from forge.services import context_gaps, observed_runs
+from forge.services import context_gaps, observed_runs, regression
 from forge.services import run_queries as service
 
 router = APIRouter(prefix="/runs", tags=["runs"])
@@ -269,4 +271,35 @@ async def fill_context_gap(
         completion=result.completion,
         candidate_version_id=result.candidate_version_id,
         retest_run_id=result.retest_run_id,
+    )
+
+
+@router.post(
+    "/{run_id}/promote-to-scenario",
+    response_model=PromoteRunOut,
+    summary="Faire d'un run en échec un scénario de régression",
+    description=(
+        "Crée une variante du scénario du run avec l'entrée et le contexte réellement reçus, et les erreurs "
+        "constatées en contraintes. Idempotent : `201` à la création, `200` si le run était déjà promu."
+    ),
+    responses={200: {"model": PromoteRunOut, "description": "Run déjà promu"}},
+)
+async def promote_run(
+    run_id: uuid.UUID,
+    response: Response,
+    principal: RequireEditor,
+    session: SessionDep,
+    body: PromoteRunIn | None = None,
+) -> PromoteRunOut:
+    with platform_errors():
+        promotion = await regression.promote_run(
+            session, principal, principal, run_id, label=body.label if body else None
+        )
+    await session.commit()
+    response.status_code = status.HTTP_201_CREATED if promotion.created else status.HTTP_200_OK
+    return PromoteRunOut(
+        scenario_id=promotion.scenario_id,
+        scenario_version_id=promotion.scenario_version_id,
+        slug=promotion.slug,
+        created=promotion.created,
     )

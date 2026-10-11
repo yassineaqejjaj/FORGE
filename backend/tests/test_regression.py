@@ -1,0 +1,84 @@
+"""Failed run → regression scenario (variant of the scenario carrying the input the run received)."""
+
+from __future__ import annotations
+
+import uuid
+
+from sqlalchemy import select
+
+from forge.domain.enums import ErrorSeverity, EvaluatorKind, Role, RunStatus
+from forge.infra.models import ExecutionTrace, RunError, Scenario, ScenarioVersion
+from tests.factories import attach_trace, create_agent_version, create_run, create_scenario_version
+
+
+async def _failed_run(db_session, *, with_input: bool = True, failed: bool = True):
+    av = await create_agent_version(db_session)
+    sv = await create_scenario_version(db_session)
+    run = await create_run(db_session, sv, av)
+    trace = await attach_trace(db_session, run, output_text="réponse incomplète")
+    if with_input:
+        trace.input = {
+            "prompt": "Rembourse mon billet de train",
+            "context": {"documents": [{"id": "d1", "content": "x"}]},
+        }
+    else:
+        trace.input = {}
+    if failed:
+        run.status = RunStatus.failed
+        db_session.add(
+            RunError(
+                run_id=run.id,
+                error_type="MISSING_INFORMATION",
+                severity=ErrorSeverity.high,
+                description="La règle de remboursement est absente",
+                evidence=[],
+                evaluator_kind=EvaluatorKind.rule,
+                evaluator_key="contains",
+            )
+        )
+    else:
+        run.status = RunStatus.completed
+        run.passed = True
+    await db_session.commit()
+    return run, sv
+
+
+async def test_failed_run_becomes_a_regression_variant_and_is_idempotent(client_as, db_session) -> None:
+    editor = await client_as(Role.editor)
+    run, sv = await _failed_run(db_session)
+    created = await editor.post(f"/api/v1/runs/{run.id}/promote-to-scenario", json={})
+    assert created.status_code == 201, created.text
+    body = created.json()
+    assert body["created"] is True and f"regression_{run.id.hex[:8]}" in body["slug"]
+
+    scenario = await db_session.get(Scenario, uuid.UUID(body["scenario_id"]))
+    assert (
+        scenario.parent_scenario_id == sv.scenario_id
+        and "regression" in scenario.tags
+        and f"from-run:{run.id}" in scenario.tags
+    )
+    version = await db_session.get(ScenarioVersion, uuid.UUID(body["scenario_version_id"]))
+    assert version.input["prompt"] == "Rembourse mon billet de train"
+    assert version.context["documents"][0]["id"] == "d1"
+    assert any("La règle de remboursement est absente" in c for c in version.constraints)
+    assert version.rules == sv.rules and version.criteria == sv.criteria  # same yardstick as the original
+
+    again = await editor.post(f"/api/v1/runs/{run.id}/promote-to-scenario", json={})
+    assert again.status_code == 200 and again.json()["created"] is False
+    assert again.json()["scenario_id"] == body["scenario_id"]
+    count = len(list(await db_session.scalars(select(Scenario).where(Scenario.slug == body["slug"]))))
+    assert count == 1
+
+
+async def test_only_failed_runs_with_a_recorded_input_can_be_promoted(client_as, db_session) -> None:
+    editor = await client_as(Role.editor)
+    ok_run, _ = await _failed_run(db_session, failed=False)
+    assert (await editor.post(f"/api/v1/runs/{ok_run.id}/promote-to-scenario")).status_code == 422
+    blank, _ = await _failed_run(db_session, with_input=False)
+    assert (await editor.post(f"/api/v1/runs/{blank.id}/promote-to-scenario", json={})).status_code == 422
+    viewer = await client_as(Role.viewer)
+    run, _ = await _failed_run(db_session)
+    assert (await viewer.post(f"/api/v1/runs/{run.id}/promote-to-scenario")).status_code == 403
+    assert (await editor.post(f"/api/v1/runs/{uuid.uuid4()}/promote-to-scenario")).status_code == 404
+    trace = await db_session.scalar(select(ExecutionTrace).where(ExecutionTrace.run_id == run.id))
+    assert trace is not None

@@ -303,3 +303,16 @@ class ContextGapOut(ApiModel):
     )
     candidate_version_id: uuid.UUID | None = None
     retest_run_id: uuid.UUID | None = None
+
+
+class PromoteRunIn(ApiModel):
+    label: str | None = Field(
+        default=None, max_length=60, description="Suffixe du scénario (défaut : regression-<id du run>)"
+    )
+
+
+class PromoteRunOut(ApiModel):
+    scenario_id: uuid.UUID
+    scenario_version_id: uuid.UUID
+    slug: str
+    created: bool = Field(description="Faux si ce run avait déjà été promu (même scénario renvoyé)")
