@@ -16,11 +16,15 @@ from forge.api.schemas.experiments import (
     ExperimentDetailOut,
     ExperimentOut,
     GateOut,
+    MultiExperimentCreatedOut,
+    MultiExperimentCreateIn,
+    MultiExperimentReportOut,
 )
 from forge.domain.enums import ExecutionStatus, Recommendation
 from forge.domain.experiments import RECOMMENDATION_LABELS
 from forge.infra.models import Experiment
 from forge.services import experiments as service
+from forge.services import multi_experiments
 
 router = APIRouter(prefix="/experiments", tags=["experiments"])
 
@@ -140,6 +144,57 @@ async def create_experiment(
         )
     await session.commit()
     return await _detail(session, principal, experiment)
+
+
+@router.post(
+    "/multi",
+    response_model=MultiExperimentCreatedOut,
+    status_code=status.HTTP_201_CREATED,
+    summary="Comparer plusieurs candidates à une même baseline",
+    description=(
+        "Lance une expérience appariée par candidate (mêmes cas, même baseline, 2 à 5 candidates) et les "
+        "regroupe. Rapport corrigé pour les comparaisons multiples : `GET /experiments/multi/{group_id}`."
+    ),
+)
+async def create_multi_experiment(
+    body: MultiExperimentCreateIn, session: SessionDep, principal: RequireEditor
+) -> MultiExperimentCreatedOut:
+    with analytics_errors():
+        group_id, experiments = await multi_experiments.create_multi_experiment(
+            session,
+            principal,
+            principal,
+            baseline_version_id=body.baseline_version_id,
+            candidate_version_ids=body.candidate_version_ids,
+            benchmark_id=body.benchmark_id,
+            scenario_ids=body.scenario_ids,
+            scenario_version_ids=body.scenario_version_ids,
+            evaluation_config_id=body.evaluation_config_id,
+            repetitions=body.repetitions,
+            name=body.name,
+            description=body.description,
+            hypothesis=body.hypothesis,
+            tags=body.tags,
+            trigger=body.trigger,
+        )
+    await session.commit()
+    listings = [await service.experiment_listing(session, e) for e in experiments]
+    return MultiExperimentCreatedOut(
+        group_id=group_id, experiments=[ExperimentOut(**_experiment(i)) for i in listings]
+    )
+
+
+@router.get(
+    "/multi/{group_id}",
+    response_model=MultiExperimentReportOut,
+    summary="Rapport d'une comparaison multiple : p-values corrigées, classement, vainqueur",
+)
+async def get_multi_report(
+    group_id: uuid.UUID, session: SessionDep, principal: RequireViewer
+) -> MultiExperimentReportOut:
+    with analytics_errors():
+        data = await multi_experiments.multi_report(session, principal, group_id)
+    return MultiExperimentReportOut.model_validate(data)
 
 
 @router.get("/{experiment_id}", response_model=ExperimentDetailOut, summary="Détail d'une expérience")

@@ -228,3 +228,97 @@ async def test_hidden_scenarios_are_excluded_for_low_clearance(client_as) -> Non
     assert str(secret) not in str(restricted)
     gate = (await low.get(f"/api/v1/experiments/{created['id']}/gate")).json()
     assert "habilitation" in gate["reasons"][-1]
+
+
+# --- Several candidates against one baseline ---------------------------------------------------------
+
+
+async def _multi(client, baseline, candidates, scenario_ids, **extra):
+    return await client.post(
+        "/api/v1/experiments/multi",
+        json={
+            "baseline_version_id": str(baseline),
+            "candidate_version_ids": [str(c) for c in candidates],
+            "scenario_ids": [str(s) for s in scenario_ids],
+            "repetitions": 1,
+            **extra,
+        },
+    )
+
+
+async def test_multi_experiment_validation_and_atomicity(client_as) -> None:
+    scenario_ids, (v1, v2, v3) = await make_catalog(n_scenarios=3, n_agents=3)
+    editor = await client_as(Role.editor)
+    viewer = await client_as(Role.viewer)
+    assert (await _multi(viewer, v1, [v2, v3], scenario_ids)).status_code == 403
+    assert (await _multi(editor, v1, [v2], scenario_ids)).status_code == 422  # at least two candidates
+    assert (await _multi(editor, v1, [v2, v2], scenario_ids)).status_code == 422  # duplicates collapse to one
+    too_many = [uuid.uuid4() for _ in range(6)]
+    assert (await _multi(editor, v1, too_many, scenario_ids)).status_code == 422
+    before = len((await editor.get("/api/v1/experiments")).json()["items"])
+    bad = await _multi(editor, v1, [v2, uuid.uuid4()], scenario_ids)
+    assert bad.status_code == 422  # one unknown candidate cancels the whole group
+    assert len((await editor.get("/api/v1/experiments")).json()["items"]) == before
+    unknown = await editor.get(f"/api/v1/experiments/multi/{uuid.uuid4()}")
+    assert unknown.status_code == 404
+
+
+async def test_multi_experiment_picks_a_winner_only_after_correction(client_as) -> None:
+    scenario_ids, (base, good, flat, worse) = await make_catalog(n_scenarios=8, n_agents=4)
+    editor = await client_as(Role.editor)
+    created = await _multi(editor, base, [good, flat, worse], scenario_ids, name="Trois variantes")
+    assert created.status_code == 201, created.text
+    body = created.json()
+    group_id, experiments = body["group_id"], body["experiments"]
+    assert len(experiments) == 3 and all(e["status"] == "running" for e in experiments)
+
+    pending = (await editor.get(f"/api/v1/experiments/multi/{group_id}")).json()
+    assert pending["complete"] is False and pending["winner"] is None and "pas terminées" in pending["reason"]
+
+    gain = {good: 9.0, flat: 0.0, worse: -6.0}
+
+    def scorer(run):
+        idx = scenario_index(run, scenario_ids)
+        value = 60.0 + 3 * idx
+        if run.arm == ExperimentArm.candidate:
+            # "flat" only wobbles around zero (+0.5 / -0.5): no real effect.
+            wobble = (0.5 if idx % 2 else -0.5) if run.agent_version_id == flat else 0.0
+            value += gain[run.agent_version_id] + wobble + (idx % 2) * 0.1
+        return value, {"dimensions": {"quality": value / 100, "safety": 1.0}}
+
+    for experiment in experiments:
+        await complete_runs(scorer, experiment_id=uuid.UUID(experiment["id"]))
+
+    report = (await editor.get(f"/api/v1/experiments/multi/{group_id}")).json()
+    assert report["complete"] is True and report["correction"] == "holm_bonferroni"
+    by_candidate = {c["candidate_version_id"]: c for c in report["candidates"]}
+    best, neutral, bad = by_candidate[str(good)], by_candidate[str(flat)], by_candidate[str(worse)]
+    assert best["delta"] > 8 and best["significant"] is True and best["eligible"] is True
+    assert best["p_adjusted"] >= best["p_value"]  # correction never lowers a p-value
+    assert neutral["significant"] is False and neutral["eligible"] is False
+    assert bad["delta"] < 0 and bad["significant"] is False and bad["eligible"] is False
+    assert report["winner"]["candidate_version_id"] == str(good)
+    assert report["candidates"][0]["candidate_version_id"] == str(good)  # ranked first
+    assert "p corrigée" in report["reason"]
+    # Each pairwise experiment keeps its own gate: the group does not replace it.
+    gate = (await editor.get(f"/api/v1/experiments/{experiments[2]['id']}/gate")).json()
+    assert gate["passed"] is False
+
+
+async def test_multi_experiment_without_a_real_gain_keeps_the_baseline(client_as) -> None:
+    scenario_ids, (base, a, b) = await make_catalog(n_scenarios=8, n_agents=3)
+    editor = await client_as(Role.editor)
+    created = (await _multi(editor, base, [a, b], scenario_ids)).json()
+
+    def scorer(run):
+        idx = scenario_index(run, scenario_ids)
+        wobble = (0.4 if idx % 2 else -0.4) if run.arm == ExperimentArm.candidate else 0.0
+        value = 60.0 + 3 * idx + wobble
+        return value, {"dimensions": {"quality": value / 100, "safety": 1.0}}
+
+    for experiment in created["experiments"]:
+        await complete_runs(scorer, experiment_id=uuid.UUID(experiment["id"]))
+    report = (await editor.get(f"/api/v1/experiments/multi/{created['group_id']}")).json()
+    assert report["complete"] is True and report["winner"] is None
+    assert not any(c["eligible"] for c in report["candidates"])
+    assert "on conserve la baseline" in report["reason"] or "aucun n'est livrable" in report["reason"]

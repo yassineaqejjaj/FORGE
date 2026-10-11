@@ -589,3 +589,14 @@ de l'utilisateur, pas la structure interne.
   `tests/factories.py`. Base isolée par suite : `FORGE_TEST_DATABASE=forge_test_<module>`.
 * Aucun appel réseau réel : `respx` pour HTTP, adapter `mock`, juge `heuristic`.
 * `make check` : ruff, format, mypy, lint-imports, pytest ; frontend : lint, typecheck, build.
+
+---
+
+## Comparaison de plusieurs candidates (ORION)
+
+`POST /api/v1/experiments/multi` lance une expérience **appariée par candidate** (2 à 5, mêmes cas, même
+baseline) et les regroupe par le tag `multi:<group_id>` (aucun changement de schéma ; la baseline est rejouée
+dans chaque expérience, d'où le plafond). `GET /api/v1/experiments/multi/{group_id}` renvoie le rapport du
+groupe : p-values corrigées pour le nombre de comparaisons (**Holm-Bonferroni**, α = 0,05), classement, et un
+**vainqueur** seulement s'il est significatif *après correction*, sans régression critique et recommandé par sa
+propre comparaison. Sinon on conserve la baseline. Chaque expérience garde sa comparaison et son gate.
