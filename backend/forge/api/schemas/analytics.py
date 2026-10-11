@@ -337,3 +337,33 @@ class ReleaseHealthOut(ApiModel):
     release: WindowStatsOut
     baseline: WindowStatsOut
     alerts: list[HealthAlertOut]
+
+
+class ModelStatsOut(WindowStatsOut):
+    model: str
+
+
+class EfficiencyRecommendationOut(ApiModel):
+    kind: str
+    from_model: str
+    to_model: str
+    pass_rate_from: float
+    pass_rate_to: float
+    cost_per_success_from: float
+    cost_per_success_to: float
+    saving: float = Field(description="Économie relative par réussite (0,4 = 40 % moins cher)")
+    p_value: float | None = None
+    message: str
+
+
+class EfficiencyCategoryOut(ApiModel):
+    category: str
+    models: list[ModelStatsOut]
+    recommendations: list[EfficiencyRecommendationOut]
+
+
+class EfficiencyOut(ApiModel):
+    days: int
+    n_runs: int
+    truncated: bool
+    categories: list[EfficiencyCategoryOut]

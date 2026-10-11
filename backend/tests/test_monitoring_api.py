@@ -159,3 +159,26 @@ async def test_a_release_is_compared_with_its_baseline_on_observed_runs_only(cli
     few = (await viewer.get(url, params={"release_id": thin, "baseline_release_id": baseline_id})).json()
     assert few["status"] == "insufficient_data"
     assert (await viewer.get(url, params={"baseline_release_id": baseline_id})).status_code == 422
+
+
+async def test_the_efficiency_report_finds_where_a_cheaper_model_is_as_good(client_as, db_session) -> None:
+    sv = await create_scenario_version(db_session, category="efficiency-test")
+    av = await create_agent_version(db_session)
+    for model, composites, cost in (
+        ("big-model", [90.0] * 28 + [30.0] * 2, 0.5),
+        ("small-model", [90.0] * 28 + [30.0] * 2, 0.1),
+    ):
+        for composite in composites:
+            run = await create_run(db_session, sv, av, origin=RunOrigin.benchmark)
+            run.manifest = {**run.manifest, "agent": {**run.manifest["agent"], "model": {"model": model}}}
+            await complete_with_scores(db_session, run, composite=composite, cost=cost)
+    await db_session.commit()
+    viewer = await client_as(Role.viewer)
+    report = (
+        await viewer.get("/api/v1/analytics/efficiency", params={"days": 30, "agent_id": str(av.agent_id)})
+    ).json()
+    (category,) = [c for c in report["categories"] if c["category"] == "efficiency-test"]
+    assert {m["model"] for m in category["models"]} == {"big-model", "small-model"}
+    (rec,) = category["recommendations"]
+    assert (rec["from_model"], rec["to_model"]) == ("big-model", "small-model") and rec["saving"] > 0.7
+    assert (await viewer.get("/api/v1/analytics/efficiency", params={"days": 0})).status_code == 422

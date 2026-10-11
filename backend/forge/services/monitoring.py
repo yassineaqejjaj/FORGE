@@ -282,3 +282,48 @@ async def release_health(
         "baseline": asdict(health.previous),
         "alerts": [asdict(a) for a in health.alerts],
     }
+
+
+async def efficiency_report(
+    session: AsyncSession, viewer: Viewer, *, days: int = 30, agent_id: uuid.UUID | None = None
+) -> dict[str, Any]:
+    """Per scenario category and model: success rate, cost per success, latency — and where a cheaper model
+    is as good (``forge.domain.efficiency``). Any origin counts: the same work run by different models is
+    exactly what the comparison needs."""
+    from forge.domain.efficiency import recommend
+
+    since = utcnow() - timedelta(days=days)
+    conditions = [EvaluationRun.created_at >= since, EvaluationRun.status.in_(list(EVALUATED))]
+    if agent_id is not None:
+        conditions.append(EvaluationRun.agent_id == agent_id)
+    ids = list(
+        await session.scalars(
+            select(EvaluationRun.id)
+            .where(*conditions)
+            .order_by(EvaluationRun.created_at.desc())
+            .limit(MAX_RUNS)
+        )
+    )
+    summaries = await load_run_summaries(session, run_ids=ids, viewer=viewer) if ids else []
+    groups: dict[str, dict[str, list[Any]]] = {}
+    for summary in summaries:
+        groups.setdefault(summary.category, {}).setdefault(summary.model or "(inconnu)", []).append(summary)
+    categories = []
+    for category in sorted(groups):
+        stats = {model: summarize(runs) for model, runs in groups[category].items()}
+        categories.append(
+            {
+                "category": category,
+                "models": [
+                    {"model": model, **asdict(s)}
+                    for model, s in sorted(stats.items(), key=lambda kv: -kv[1].n_runs)
+                ],
+                "recommendations": [asdict(r) for r in recommend(stats)],
+            }
+        )
+    return {
+        "days": days,
+        "n_runs": len(summaries),
+        "truncated": len(ids) >= MAX_RUNS,
+        "categories": categories,
+    }

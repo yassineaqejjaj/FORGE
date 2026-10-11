@@ -629,3 +629,8 @@ ORBIT est gardé en tag (`learning:<id>`) : publier deux fois renvoie le même a
   référence (une autre release, ou les runs sans release) sur les runs observés, avec la règle de la santé d'un
   agent : seule une baisse **significative** et d'au moins 5 points déclenche une alerte ; moins de 10 runs par
   côté → `insufficient_data`. NOVA s'en sert pour retirer automatiquement une release active qui se dégrade.
+* `GET /api/v1/analytics/efficiency?days=&agent_id=` — par catégorie de scénario et par modèle : taux de réussite,
+  coût par réussite, latence. Recommande `cheaper_equivalent` (un modèle moins cher pas significativement moins bon
+  que le meilleur — écart toléré 5 points, test unilatéral — et au moins 15 % moins cher par réussite) ou
+  `dominated` (le meilleur modèle est aussi le moins cher : les autres sont inutilement chers). Moins de 20 runs
+  évalués par modèle : aucune recommandation. À appliquer côté NOVA avec `NOVA_LLM_SKILL_MODELS`.

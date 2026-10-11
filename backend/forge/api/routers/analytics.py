@@ -14,6 +14,7 @@ from forge.api.routers.meta import platform_errors
 from forge.api.schemas.analytics import (
     AgentHealthOut,
     DashboardOut,
+    EfficiencyOut,
     ErrorsPageOut,
     ReleaseHealthOut,
     ReleasesOverviewOut,
@@ -164,4 +165,26 @@ async def compare_release(
         await monitoring.release_health(
             session, principal, release_id, baseline_release_id=baseline_release_id, days=days
         )
+    )
+
+
+@router.get(
+    "/analytics/efficiency",
+    response_model=EfficiencyOut,
+    summary="Efficacité des modèles : où un modèle moins cher fait aussi bien",
+    description=(
+        "Par catégorie de scénario et par modèle : taux de réussite, coût par réussite, latence. "
+        "Recommande un modèle moins cher quand il n'est pas significativement moins bon que le meilleur "
+        "(écart toléré : 5 points) et économise au moins 15 % par réussite. "
+        "Moins de 20 runs évalués par modèle : aucune recommandation."
+    ),
+)
+async def get_efficiency(
+    session: SessionDep,
+    principal: RequireViewer,
+    days: Annotated[int, Query(ge=1, le=365)] = 30,
+    agent_id: uuid.UUID | None = None,
+) -> EfficiencyOut:
+    return EfficiencyOut.model_validate(
+        await monitoring.efficiency_report(session, principal, days=days, agent_id=agent_id)
     )
