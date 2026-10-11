@@ -25,11 +25,12 @@ from forge.api.schemas.runs import (
     RunDetailOut,
     RunManifestOut,
     RunOut,
+    RunRiskOut,
     RunTraceOut,
 )
 from forge.domain.enums import ExperimentArm, RunOrigin, RunStatus
 from forge.infra.models import EvaluationRun
-from forge.services import context_gaps, observed_runs, regression
+from forge.services import context_gaps, monitoring, observed_runs, regression
 from forge.services import run_queries as service
 
 router = APIRouter(prefix="/runs", tags=["runs"])
@@ -303,3 +304,19 @@ async def promote_run(
         slug=promotion.slug,
         created=promotion.created,
     )
+
+
+@router.get(
+    "/{run_id}/risk",
+    response_model=RunRiskOut,
+    summary="Risque d'échec d'un run en cours, avant sa fin",
+    description=(
+        "Signes d'échec lus dans les étapes déjà rapportées : appel d'outil répété (boucle), outils en "
+        "échec, durée ou tokens très au-delà des runs réussis de la même version, budget presque consommé. "
+        "`level` : low, medium ou high."
+    ),
+)
+async def get_run_risk(run_id: uuid.UUID, principal: RequireViewer, session: SessionDep) -> RunRiskOut:
+    with platform_errors():
+        data = await monitoring.run_risk(session, principal, run_id)
+    return RunRiskOut.model_validate(data)

@@ -316,3 +316,24 @@ class PromoteRunOut(ApiModel):
     scenario_version_id: uuid.UUID
     slug: str
     created: bool = Field(description="Faux si ce run avait déjà été promu (même scénario renvoyé)")
+
+
+class RiskSignalOut(ApiModel):
+    kind: str = Field(
+        description="tool_loop, tool_errors, error_events, slow, token_overrun, *_budget, timeout"
+    )
+    message: str
+    weight: float
+
+
+class RunRiskOut(ApiModel):
+    run_id: uuid.UUID
+    run_status: str
+    level: str = Field(description="low | medium | high")
+    score: float = Field(description="0–1 ; combine les signaux indépendants")
+    finished: bool = Field(description="Le run est terminé : le risque ne concerne plus qu'un run en cours")
+    signals: list[RiskSignalOut]
+    observed: dict[str, int] = Field(
+        description="Ce qui a été observé : événements, appels d'outils, tokens, durée"
+    )
+    reference_runs: int = Field(description="Runs réussis de la même version servant de référence")

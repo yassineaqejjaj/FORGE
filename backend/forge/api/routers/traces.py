@@ -10,6 +10,7 @@ Both accept a ``traces:write`` API key or an editor+ principal.
 
 from __future__ import annotations
 
+import logging
 import uuid
 
 from fastapi import APIRouter, Request
@@ -20,8 +21,9 @@ from forge.api.errors import ApiError, not_found
 from forge.api.schemas.traces import EventsIngestRequest, EventsIngestResponse
 from forge.config import settings
 from forge.infra.models import EvaluationRun
-from forge.services import trace_ingest
+from forge.services import monitoring, trace_ingest
 
+logger = logging.getLogger("forge.traces")
 router = APIRouter(tags=["traces"])
 otlp_router = APIRouter(tags=["traces"])
 
@@ -97,4 +99,17 @@ async def push_run_events(
         duplicates=result.duplicates,
         first_seq=result.first_seq,
         last_seq=result.last_seq,
+        risk=await _early_warning(session, principal, run.id),
     )
+
+
+async def _early_warning(
+    session: SessionDep, principal: TraceWriter, run_id: uuid.UUID
+) -> dict[str, object] | None:
+    """Risk of failure from the steps so far: a monitoring problem must never fail an ingestion."""
+    try:
+        data = await monitoring.run_risk(session, principal, run_id)  # type: ignore[arg-type]
+    except Exception:
+        logger.warning("Risk assessment of run %s failed", run_id, exc_info=True)
+        return None
+    return {"level": data["level"], "score": data["score"], "signals": [s["kind"] for s in data["signals"]]}

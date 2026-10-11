@@ -10,9 +10,18 @@ from fastapi import APIRouter, Query
 
 from forge.api.deps import RequireViewer, SessionDep
 from forge.api.routers.benchmarks import Paging
-from forge.api.schemas.analytics import DashboardOut, ErrorsPageOut, ResultsOverviewOut, WorkerActivityOut
+from forge.api.routers.meta import platform_errors
+from forge.api.schemas.analytics import (
+    AgentHealthOut,
+    DashboardOut,
+    ErrorsPageOut,
+    ReleasesOverviewOut,
+    ResultsOverviewOut,
+    WorkerActivityOut,
+)
 from forge.domain.enums import ErrorSeverity
 from forge.services import analytics as service
+from forge.services import monitoring
 
 router = APIRouter(tags=["analytics"])
 
@@ -90,3 +99,43 @@ async def explore_errors(
     )
     data = await service.explore_errors(session, principal, filters, offset=page.offset, limit=page.page_size)
     return ErrorsPageOut.model_validate({**data, "page": page.page, "page_size": page.page_size})
+
+
+@router.get(
+    "/analytics/releases",
+    response_model=ReleasesOverviewOut,
+    summary="Résultats par release : réussite, coût par réussite, latence, écart avec les runs sans release",
+)
+async def get_releases_overview(
+    session: SessionDep,
+    principal: RequireViewer,
+    days: Annotated[int, Query(ge=1, le=365, description="Fenêtre en jours")] = 30,
+    agent_id: uuid.UUID | None = None,
+) -> ReleasesOverviewOut:
+    return ReleasesOverviewOut.model_validate(
+        await monitoring.releases_overview(session, principal, days=days, agent_id=agent_id)
+    )
+
+
+@router.get(
+    "/agents/{agent_id}/health",
+    response_model=AgentHealthOut,
+    summary="Santé d'un agent en production : fenêtre récente contre la période précédente",
+    description=(
+        "Compare les runs de production (observés et captures) de la fenêtre récente à ceux de la période "
+        "d'avant : baisse significative du taux de réussite, hausse des échecs, du coût par réussite "
+        "ou de la latence p95. Trop peu de runs → `insufficient_data` (jamais de fausse alerte)."
+    ),
+)
+async def get_agent_health(
+    agent_id: uuid.UUID,
+    session: SessionDep,
+    principal: RequireViewer,
+    window_hours: Annotated[int, Query(ge=1, le=720)] = 24,
+    baseline_hours: Annotated[int, Query(ge=1, le=2160)] = 168,
+) -> AgentHealthOut:
+    with platform_errors():
+        data = await monitoring.agent_health(
+            session, principal, agent_id, window_hours=window_hours, baseline_hours=baseline_hours
+        )
+    return AgentHealthOut.model_validate(data)

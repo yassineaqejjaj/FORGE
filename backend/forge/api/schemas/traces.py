@@ -42,3 +42,5 @@ class EventsIngestResponse(ApiModel):
     duplicates: int = 0
     first_seq: int | None = None
     last_seq: int | None = None
+    #: Early warning computed from the steps reported so far (``GET /runs/{id}/risk`` has the details).
+    risk: dict[str, object] | None = None

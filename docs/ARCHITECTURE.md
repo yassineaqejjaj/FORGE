@@ -610,3 +610,17 @@ expérience terminée, recommandée (`ship` / `ship_with_caution`), sans régres
 (`experiment_id`, benchmark, runs, score composite baseline → candidate) sont calculées par FORGE à partir de la
 comparaison ; l'appelant ne fournit que le titre, le texte, le champ d'application et le projet ORBIT. L'identifiant
 ORBIT est gardé en tag (`learning:<id>`) : publier deux fois renvoie le même apprentissage (`200`).
+
+## Surveillance en production (ORION)
+
+* `GET /api/v1/analytics/releases?days=` — runs de production (observés et captures, jamais benchmark ni
+  expérience) groupés par `release_id` : réussite, coût par réussite, latence p95, et écart avec les runs sans
+  release. C'est la mesure de « l'amélioration est-elle conservée » après déploiement.
+* `GET /api/v1/agents/{id}/health?window_hours=&baseline_hours=` — fenêtre récente contre la période d'avant :
+  baisse **significative** du taux de réussite (test z unilatéral, α = 0,05, et baisse ≥ 5 points), hausse des
+  échecs, du coût par réussite (> +25 %) ou de la latence p95 (> +50 %). Moins de 10 runs par fenêtre →
+  `insufficient_data` (jamais de fausse alerte).
+* `GET /api/v1/runs/{id}/risk` — risque d'échec d'un run **en cours** d'après ses étapes déjà rapportées : appel
+  d'outil répété (boucle), outils en échec, durée ou tokens bien au-delà des runs réussis de la même version
+  (≥ 10 références), budget presque consommé. Score = `1 − Π(1 − poids)` ; `low` < 0,3 ≤ `medium` < 0,6 ≤ `high`.
+  La réponse de `POST /runs/{id}/events` porte un résumé (`risk`) : l'agent est averti à chaque envoi d'étapes.
