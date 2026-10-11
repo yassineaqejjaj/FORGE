@@ -264,3 +264,42 @@ class RunManifestOut(ApiModel):
     manifest_hash: str
     redacted: bool
     manifest: dict[str, Any]
+
+
+class ContextGapIn(ApiModel):
+    """Combler le manque de contexte d'un run via ORBIT (docs/OBSERVED_RUNS.md §ORION)."""
+
+    missing: list[str] = Field(
+        default_factory=list,
+        max_length=10,
+        description="Informations manquantes (défaut : les erreurs MISSING_INFORMATION du run)",
+    )
+    orbit_project: str | None = Field(
+        default=None,
+        max_length=120,
+        description="Projet ORBIT, si ni la configuration de l'agent ni le run ne l'indiquent",
+    )
+    credential_id: uuid.UUID | None = Field(
+        default=None, description="Identifiants ORBIT (défaut : ceux de l'agent)"
+    )
+    snapshot: str | None = Field(
+        default=None,
+        max_length=120,
+        pattern=r"^[A-Za-z0-9][A-Za-z0-9._\-]*$",
+        description="Snapshot où ORBIT enregistre le résultat (défaut : version suivante de celui du run)",
+    )
+    retest: bool = Field(
+        default=False, description="Crée une version d'agent épinglée sur le nouveau snapshot et la relance"
+    )
+
+
+class ContextGapOut(ApiModel):
+    run_id: uuid.UUID
+    missing: list[str]
+    orbit_request_id: str
+    orbit_project: str
+    completion: dict[str, Any] = Field(
+        description="Réponse d'ORBIT : nouveau snapshot, éléments ajoutés, manques restants"
+    )
+    candidate_version_id: uuid.UUID | None = None
+    retest_run_id: uuid.UUID | None = None

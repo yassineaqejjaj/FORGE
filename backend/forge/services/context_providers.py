@@ -151,6 +151,19 @@ async def _orbit_config(session: AsyncSession, config: dict[str, Any]) -> OrbitC
     )
 
 
+async def orbit_config_for(session: AsyncSession, config: dict[str, Any]) -> OrbitConfig:
+    """Connection settings of an ORBIT project from a ``context_config`` (also used by the gap loop)."""
+    return await _orbit_config(session, config)
+
+
+async def call_orbit(
+    orbit: OrbitConfig, method: str, path: str, *, run_id: str | None = None, payload: Any = None
+) -> dict[str, Any]:
+    """One authenticated ORBIT call (JSON in, JSON out); failures raise ``ContextPreparationError``."""
+    data, _ = await _call_orbit(orbit, method, path, run_id=run_id, payload=payload)
+    return data
+
+
 def _headers(orbit: OrbitConfig, run_id: str | None) -> dict[str, str]:
     headers: dict[str, str] = {}
     if orbit.api_key:

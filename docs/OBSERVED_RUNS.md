@@ -341,3 +341,24 @@ revue sans correction (1) = 7/9 ≈ 0,778 en qualité ; autonomie 2 intervention
 * La trace d'un run observé ne contient pas d'étapes détaillées (`stages` reste dans `output_json`) ;
   les règles `tool_called` / `max_tool_calls` n'ont donc rien à mesurer.
 * Revenir en arrière sur la migration `0002` supprime les runs observés existants.
+
+---
+
+## Combler un manque de contexte (`POST /api/v1/runs/{id}/context-gap`)
+
+Quand un run échoue faute d'information (erreurs `MISSING_INFORMATION`, ou manque connu de l'appelant),
+FORGE demande à ORBIT de recomposer le contexte **servi à ce run** autour de ce qui manquait :
+
+1. les manques viennent de `missing` (corps) ou, à défaut, des erreurs `MISSING_INFORMATION` du run ;
+2. la requête ORBIT à compléter est lue sur la trace (runs exécutés par FORGE : `orbit_request_id`) ou dans
+   le manifeste rapporté (`manifest.context.retrieval_id` et `manifest.context.project_slug`, que NOVA envoie) ;
+3. FORGE appelle `POST /projects/{slug}/context/requests/{id}/complete` d'ORBIT, qui enregistre le résultat
+   comme **version suivante du snapshot** (rien n'est écrasé) ;
+4. avec `"retest": true`, FORGE crée une version d'agent dérivée, épinglée sur le nouveau snapshot
+   (`context_config.source = orbit_snapshot`), et relance le même scénario : l'effet se mesure sur le run
+   créé (`tags: context-gap-of:<run>`, `source_manifest.context_gap_of`).
+
+Corps : `{missing?, orbit_project?, credential_id?, snapshot?, retest?}`. Réponse : les manques utilisés, la
+requête ORBIT d'origine, la réponse d'ORBIT (nouveau snapshot, éléments ajoutés, manques restants) et, avec
+`retest`, `candidate_version_id` et `retest_run_id`. `422` : rien de manquant ou aucune requête ORBIT
+enregistrée ; `409` : ORBIT a refusé ou est injoignable.

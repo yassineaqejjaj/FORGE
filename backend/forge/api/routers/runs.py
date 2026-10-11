@@ -16,6 +16,8 @@ from forge.api.deps import RequireEditor, RequireViewer, SessionDep
 from forge.api.routers.meta import PageQuery, platform_errors
 from forge.api.schemas.common import Page
 from forge.api.schemas.runs import (
+    ContextGapIn,
+    ContextGapOut,
     ObservedRunIn,
     RunCreateIn,
     RunDetailOut,
@@ -25,7 +27,7 @@ from forge.api.schemas.runs import (
 )
 from forge.domain.enums import ExperimentArm, RunOrigin, RunStatus
 from forge.infra.models import EvaluationRun
-from forge.services import observed_runs
+from forge.services import context_gaps, observed_runs
 from forge.services import run_queries as service
 
 router = APIRouter(prefix="/runs", tags=["runs"])
@@ -228,3 +230,43 @@ async def retry_run(run_id: uuid.UUID, principal: RequireEditor, session: Sessio
         run = await service.retry_run(session, principal, principal, run_id, created_by=principal.user_id)
     await session.commit()
     return (await _summaries(session, principal, [run]))[0]
+
+
+@router.post(
+    "/{run_id}/context-gap",
+    response_model=ContextGapOut,
+    summary="Combler le manque de contexte d'un run via ORBIT",
+    description=(
+        "Demande à ORBIT de recomposer le contexte servi à ce run autour des informations manquantes "
+        "(`MISSING_INFORMATION` ou `missing`), enregistré comme nouvelle version du snapshot. Avec `retest`, "
+        "une version d'agent épinglée sur ce snapshot est créée et le même scénario est relancé."
+    ),
+)
+async def fill_context_gap(
+    run_id: uuid.UUID, body: ContextGapIn, principal: RequireEditor, session: SessionDep
+) -> ContextGapOut:
+    with platform_errors():
+        result = await context_gaps.fill_context_gap(
+            session,
+            principal,
+            principal,
+            run_id,
+            context_gaps.GapRequest(
+                missing=body.missing,
+                orbit_project=body.orbit_project,
+                credential_id=body.credential_id,
+                snapshot=body.snapshot,
+                retest=body.retest,
+            ),
+            created_by=principal.user_id,
+        )
+    await session.commit()
+    return ContextGapOut(
+        run_id=result.run_id,
+        missing=result.missing,
+        orbit_request_id=result.orbit_request_id,
+        orbit_project=result.orbit_project,
+        completion=result.completion,
+        candidate_version_id=result.candidate_version_id,
+        retest_run_id=result.retest_run_id,
+    )
