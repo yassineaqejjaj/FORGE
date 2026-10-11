@@ -323,3 +323,33 @@ class MultiExperimentReportOut(ApiModel):
     )
     winner: MultiCandidateOut | None = None
     reason: str
+
+
+class PublishLearningIn(BaseModel):
+    """Publier une expérience gagnante dans ORBIT comme apprentissage (proposé à la validation)."""
+
+    title: str | None = Field(
+        default=None, max_length=300, description="Défaut : « Amélioration validée : <candidate> »"
+    )
+    content: str | None = Field(
+        default=None,
+        max_length=20000,
+        description="Défaut : hypothèse, changelog de la candidate et synthèse",
+    )
+    applies_to: dict[str, list[str]] = Field(
+        default_factory=dict,
+        description="Champ d'application : task_types, agent_kinds, skills, tools, agent_versions",
+    )
+    orbit_project: str | None = Field(
+        default=None, max_length=120, description="Défaut : configuration de l'agent"
+    )
+    credential_id: uuid.UUID | None = None
+    classification: int | None = Field(default=None, ge=0, le=3)
+
+
+class PublishLearningOut(ApiModel):
+    experiment_id: uuid.UUID
+    orbit_item_id: str
+    orbit_project: str
+    created: bool = Field(description="Faux si l'expérience avait déjà été publiée")
+    learning: dict | None = Field(default=None, description="L'apprentissage tel qu'ORBIT l'a enregistré")

@@ -600,3 +600,13 @@ dans chaque expérience, d'où le plafond). `GET /api/v1/experiments/multi/{grou
 groupe : p-values corrigées pour le nombre de comparaisons (**Holm-Bonferroni**, α = 0,05), classement, et un
 **vainqueur** seulement s'il est significatif *après correction*, sans régression critique et recommandé par sa
 propre comparaison. Sinon on conserve la baseline. Chaque expérience garde sa comparaison et son gate.
+
+## Publier un apprentissage dans ORBIT (ORION)
+
+`POST /api/v1/experiments/{id}/publish-learning` envoie une expérience gagnante à ORBIT
+(`POST /projects/{slug}/learnings`) comme **apprentissage proposé** (validation humaine côté ORBIT). Conditions :
+expérience terminée, recommandée (`ship` / `ship_with_caution`), sans régression critique, comparaison complète
+(pas de scénarios masqués) et, dans une comparaison multiple, **vainqueur après correction**. Les preuves
+(`experiment_id`, benchmark, runs, score composite baseline → candidate) sont calculées par FORGE à partir de la
+comparaison ; l'appelant ne fournit que le titre, le texte, le champ d'application et le projet ORBIT. L'identifiant
+ORBIT est gardé en tag (`learning:<id>`) : publier deux fois renvoie le même apprentissage (`200`).
