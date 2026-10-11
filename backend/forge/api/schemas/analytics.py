@@ -326,3 +326,14 @@ class AgentHealthOut(ApiModel):
     recent: WindowStatsOut
     previous: WindowStatsOut
     alerts: list[HealthAlertOut]
+
+
+class ReleaseHealthOut(ApiModel):
+    release_id: str
+    baseline_release_id: str | None = Field(description="null : comparée aux runs sans release")
+    days: int
+    status: str = Field(description="healthy | degraded | insufficient_data")
+    reason: str
+    release: WindowStatsOut
+    baseline: WindowStatsOut
+    alerts: list[HealthAlertOut]

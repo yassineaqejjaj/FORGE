@@ -126,3 +126,36 @@ async def test_a_looping_run_is_high_risk_before_it_ends_and_a_finished_one_is_n
     finished = (await viewer.get(f"/api/v1/runs/{done.id}/risk")).json()
     assert finished["finished"] is True and finished["level"] == "low" and finished["score"] == 0.0
     assert (await viewer.get(f"/api/v1/runs/{uuid.uuid4()}/risk")).status_code == 404
+
+
+async def test_a_release_is_compared_with_its_baseline_on_observed_runs_only(client_as, db_session) -> None:
+    av = await create_agent_version(db_session)
+    sv = await create_scenario_version(db_session)
+    release_id, baseline_id = f"rel-{uuid.uuid4().hex[:6]}", f"rel-{uuid.uuid4().hex[:6]}"
+    await _runs(db_session, av, sv, 30, composite=90.0, release=baseline_id)
+    await _runs(db_session, av, sv, 15, composite=90.0, release=release_id)
+    await _runs(db_session, av, sv, 15, composite=30.0, release=release_id)
+    # An ad hoc capture is a re-execution under today's version: it must not count for a release.
+    await _runs(db_session, av, sv, 40, composite=10.0, release=release_id, origin=RunOrigin.adhoc)
+    thin = f"rel-{uuid.uuid4().hex[:6]}"
+    await _runs(db_session, av, sv, 3, composite=10.0, release=thin)
+    await db_session.commit()
+    viewer = await client_as(Role.viewer)
+    url = "/api/v1/analytics/releases/compare"
+
+    worse = (
+        await viewer.get(url, params={"release_id": release_id, "baseline_release_id": baseline_id})
+    ).json()
+    assert (
+        worse["status"] == "degraded"
+        and worse["release"]["n_runs"] == 30
+        and worse["baseline"]["n_runs"] == 30
+    )
+    assert worse["alerts"][0]["kind"] == "pass_rate_drop" and worse["alerts"][0]["recent"] == 0.5
+    same = (
+        await viewer.get(url, params={"release_id": baseline_id, "baseline_release_id": baseline_id})
+    ).json()
+    assert same["status"] == "healthy" and same["alerts"] == []
+    few = (await viewer.get(url, params={"release_id": thin, "baseline_release_id": baseline_id})).json()
+    assert few["status"] == "insufficient_data"
+    assert (await viewer.get(url, params={"baseline_release_id": baseline_id})).status_code == 422

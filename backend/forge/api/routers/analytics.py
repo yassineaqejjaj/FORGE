@@ -15,6 +15,7 @@ from forge.api.schemas.analytics import (
     AgentHealthOut,
     DashboardOut,
     ErrorsPageOut,
+    ReleaseHealthOut,
     ReleasesOverviewOut,
     ResultsOverviewOut,
     WorkerActivityOut,
@@ -139,3 +140,28 @@ async def get_agent_health(
             session, principal, agent_id, window_hours=window_hours, baseline_hours=baseline_hours
         )
     return AgentHealthOut.model_validate(data)
+
+
+@router.get(
+    "/analytics/releases/compare",
+    response_model=ReleaseHealthOut,
+    summary="Une release contre sa référence : dégradation significative ou non",
+    description=(
+        "Compare les runs **observés** d'une release à ceux d'une autre release (`baseline_release_id`) "
+        "ou, à défaut, aux runs sans release. Même règle que la santé d'un agent : baisse significative "
+        "du taux de réussite, hausse des échecs, du coût par réussite ou de la latence ; trop peu de runs "
+        "→ `insufficient_data`."
+    ),
+)
+async def compare_release(
+    session: SessionDep,
+    principal: RequireViewer,
+    release_id: Annotated[str, Query(min_length=1, max_length=200)],
+    baseline_release_id: Annotated[str | None, Query(max_length=200)] = None,
+    days: Annotated[int, Query(ge=1, le=90)] = 14,
+) -> ReleaseHealthOut:
+    return ReleaseHealthOut.model_validate(
+        await monitoring.release_health(
+            session, principal, release_id, baseline_release_id=baseline_release_id, days=days
+        )
+    )

@@ -36,6 +36,9 @@ from forge.services.run_summaries import load_run_summaries
 from forge.services.taxonomy import NotFoundError
 
 PRODUCTION_ORIGINS = (RunOrigin.observed, RunOrigin.adhoc)
+#: Release attribution only holds for runs that *are* what happened in production. An ad hoc capture is a
+#: re-execution under whatever version is active when FORGE runs it, so it says nothing about a release.
+RELEASE_ORIGINS = (RunOrigin.observed,)
 EVALUATED = (RunStatus.completed, RunStatus.failed)
 MAX_RUNS = 2000
 REFERENCE_RUNS = 100
@@ -45,12 +48,12 @@ NO_RELEASE = "(sans release)"
 async def releases_overview(
     session: AsyncSession, viewer: Viewer, *, days: int = 30, agent_id: uuid.UUID | None = None
 ) -> dict[str, Any]:
-    """Evaluated production-like runs of the window, grouped by the release that produced them."""
+    """Evaluated observed runs of the window, grouped by the release that produced them."""
     since = utcnow() - timedelta(days=days)
     conditions = [
         EvaluationRun.created_at >= since,
         EvaluationRun.status.in_(list(EVALUATED)),
-        EvaluationRun.origin.in_(list(PRODUCTION_ORIGINS)),
+        EvaluationRun.origin.in_(list(RELEASE_ORIGINS)),
     ]
     if agent_id is not None:
         conditions.append(EvaluationRun.agent_id == agent_id)
@@ -237,4 +240,45 @@ async def run_risk(session: AsyncSession, viewer: Viewer, run_id: uuid.UUID) -> 
             "elapsed_ms": round(elapsed),
         },
         "reference_runs": reference.n_runs,
+    }
+
+
+async def release_health(
+    session: AsyncSession,
+    viewer: Viewer,
+    release_id: str,
+    *,
+    baseline_release_id: str | None = None,
+    days: int = 14,
+) -> dict[str, Any]:
+    """A release against its baseline (another release, or the runs without any release): same rules as
+    agent health — a drop must be statistically significant *and* large enough, too few runs never alarm."""
+    since = utcnow() - timedelta(days=days)
+
+    async def stats(release: str | None) -> WindowStats:
+        condition = EvaluationRun.release_id == release if release else EvaluationRun.release_id.is_(None)
+        ids = list(
+            await session.scalars(
+                select(EvaluationRun.id)
+                .where(
+                    condition,
+                    EvaluationRun.origin.in_(list(RELEASE_ORIGINS)),
+                    EvaluationRun.status.in_(list(EVALUATED)),
+                    EvaluationRun.created_at >= since,
+                )
+                .limit(MAX_RUNS)
+            )
+        )
+        return summarize(await load_run_summaries(session, run_ids=ids, viewer=viewer) if ids else [])
+
+    health = health_verdict(await stats(release_id), await stats(baseline_release_id))
+    return {
+        "release_id": release_id,
+        "baseline_release_id": baseline_release_id,
+        "days": days,
+        "status": health.status,
+        "reason": health.reason,
+        "release": asdict(health.recent),
+        "baseline": asdict(health.previous),
+        "alerts": [asdict(a) for a in health.alerts],
     }

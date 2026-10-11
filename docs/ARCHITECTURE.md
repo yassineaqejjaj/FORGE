@@ -613,8 +613,9 @@ ORBIT est gardé en tag (`learning:<id>`) : publier deux fois renvoie le même a
 
 ## Surveillance en production (ORION)
 
-* `GET /api/v1/analytics/releases?days=` — runs de production (observés et captures, jamais benchmark ni
-  expérience) groupés par `release_id` : réussite, coût par réussite, latence p95, et écart avec les runs sans
+* `GET /api/v1/analytics/releases?days=` — runs **observés** (jamais benchmark, expérience ni capture ad hoc :
+  une capture est une ré-exécution sous la version active au moment du run, elle ne dit rien d'une release)
+  groupés par `release_id` : réussite, coût par réussite, latence p95, et écart avec les runs sans
   release. C'est la mesure de « l'amélioration est-elle conservée » après déploiement.
 * `GET /api/v1/agents/{id}/health?window_hours=&baseline_hours=` — fenêtre récente contre la période d'avant :
   baisse **significative** du taux de réussite (test z unilatéral, α = 0,05, et baisse ≥ 5 points), hausse des
@@ -624,3 +625,7 @@ ORBIT est gardé en tag (`learning:<id>`) : publier deux fois renvoie le même a
   d'outil répété (boucle), outils en échec, durée ou tokens bien au-delà des runs réussis de la même version
   (≥ 10 références), budget presque consommé. Score = `1 − Π(1 − poids)` ; `low` < 0,3 ≤ `medium` < 0,6 ≤ `high`.
   La réponse de `POST /runs/{id}/events` porte un résumé (`risk`) : l'agent est averti à chaque envoi d'étapes.
+* `GET /api/v1/analytics/releases/compare?release_id=&baseline_release_id=&days=` — une release contre sa
+  référence (une autre release, ou les runs sans release) sur les runs observés, avec la règle de la santé d'un
+  agent : seule une baisse **significative** et d'au moins 5 points déclenche une alerte ; moins de 10 runs par
+  côté → `insufficient_data`. NOVA s'en sert pour retirer automatiquement une release active qui se dégrade.
