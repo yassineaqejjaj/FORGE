@@ -35,6 +35,7 @@ from forge.domain.enums import (
 )
 from forge.domain.traces.costs import resolve_cost
 from forge.domain.traces.normalize import plan_events, truncate_payload, truncate_text
+from forge.domain.traces.protocol import parse_protocol_events
 from forge.domain.types import TokenUsage, TraceEventData
 from forge.infra.models import AgentVersion, EvaluationRun, ExecutionTrace, Scenario, ScenarioVersion
 from forge.services import access, audit, runs
@@ -67,6 +68,10 @@ class ObservedRunData:
     output_tokens: int = 0
     model_calls: int = 0
     tags: list[str] = field(default_factory=list)
+    context_snapshot_id: str | None = None
+    release_id: str | None = None
+    manifest: dict[str, Any] | None = None
+    events: list[dict[str, Any]] = field(default_factory=list)  # reported steps (Agent Protocol format)
 
     @property
     def failed(self) -> bool:
@@ -156,6 +161,9 @@ async def ingest_observed_run(
 
     run.started_at = data.started_at
     run.executed_at = data.completed_at
+    run.context_snapshot_id = data.context_snapshot_id or _snapshot_of(data.manifest)
+    run.release_id = data.release_id or _release_of(data.manifest)
+    run.source_manifest = data.manifest
     if data.failed:
         run.error = (data.error or DEFAULT_FAILURE_MESSAGE)[:4000]
         run.error_type = BuiltinErrorType.EXECUTION_ERROR.value
@@ -173,10 +181,59 @@ async def ingest_observed_run(
             "scenario_version_id": scenario_version.id,
             "evaluation_config_id": config.id,
             "execution_status": data.execution_status,
+            "context_snapshot_id": run.context_snapshot_id,
+            "release_id": run.release_id,
         },
     )
     await runs.mark_evaluating(session, run, enqueue=True)
     return run, True
+
+
+def _snapshot_of(manifest: dict[str, Any] | None) -> str | None:
+    """``context.snapshot_id`` of a reported run manifest (NOVA ``domain/manifest.py``), when present."""
+    context = (manifest or {}).get("context")
+    value = context.get("snapshot_id") if isinstance(context, dict) else None
+    return value if isinstance(value, str) and value else None
+
+
+def _release_of(manifest: dict[str, Any] | None) -> str | None:
+    value = (manifest or {}).get("release_id")
+    return value if isinstance(value, str) and value else None
+
+
+#: Written by FORGE around every observed run: a caller cannot add a second one.
+_RESERVED_EVENT_TYPES = frozenset(
+    {
+        TraceEventType.run_started,
+        TraceEventType.final_answer,
+        TraceEventType.run_completed,
+        TraceEventType.error,
+    }
+)
+
+
+def _reported_events(run: EvaluationRun, data: ObservedRunData) -> list[TraceEventData]:
+    """The steps the caller reported, plus a ``context_prepared`` event for the snapshot it used."""
+    events = [
+        e
+        for e in parse_protocol_events(
+            data.events, base_time=data.started_at, source=TraceEventSource.api, key_prefix="obs:"
+        )
+        if e.type not in _RESERVED_EVENT_TYPES
+    ]
+    if run.context_snapshot_id and not any(e.type == TraceEventType.context_prepared for e in events):
+        events.insert(
+            0,
+            TraceEventData(
+                type=TraceEventType.context_prepared,
+                name="Contexte préparé (rapporté)",
+                started_at=data.started_at,
+                key="context_prepared",
+                source=TraceEventSource.api,
+                attributes={"snapshot": run.context_snapshot_id, "reported": True},
+            ),
+        )
+    return events
 
 
 async def _persist_trace(session: AsyncSession, run: EvaluationRun, data: ObservedRunData) -> ExecutionTrace:
@@ -194,6 +251,10 @@ async def _persist_trace(session: AsyncSession, run: EvaluationRun, data: Observ
             attributes={"origin": RunOrigin.observed.value, "external_id": data.external_id},
         )
     ]
+    reported = _reported_events(run, data)
+    events.extend(reported)
+    tool_calls = sum(1 for e in reported if e.type == TraceEventType.tool_call)
+    model_calls = max(data.model_calls, sum(1 for e in reported if e.type == TraceEventType.llm_call))
     if data.failed:
         events.append(
             TraceEventData(
@@ -230,8 +291,8 @@ async def _persist_trace(session: AsyncSession, run: EvaluationRun, data: Observ
                 "total_tokens": usage.total_tokens,
                 "cost": cost,
                 "latency_ms": latency_ms,
-                "model_calls": data.model_calls,
-                "tool_calls": 0,
+                "model_calls": model_calls,
+                "tool_calls": tool_calls,
             },
             source=TraceEventSource.api,
         )
@@ -253,8 +314,8 @@ async def _persist_trace(session: AsyncSession, run: EvaluationRun, data: Observ
         output_tokens=usage.output_tokens,
         total_tokens=usage.total_tokens,
         estimated_cost=cost,
-        model_calls=data.model_calls,
-        tool_calls=0,
+        model_calls=model_calls,
+        tool_calls=tool_calls,
         event_count=len(planned),
         errors=(
             [{"type": run.error_type, "message": run.error, "at": data.completed_at.isoformat()}]

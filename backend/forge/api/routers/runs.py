@@ -102,6 +102,10 @@ async def create_observed_run(
                 model_calls=body.usage.model_calls,
                 tags=body.tags,
                 external_id=body.external_id,
+                context_snapshot_id=body.context_snapshot_id,
+                release_id=body.release_id,
+                manifest=body.manifest,
+                events=[e.model_dump(mode="json", exclude_none=True) for e in body.events],
             ),
             created_by=principal.user_id,
         )
@@ -135,6 +139,10 @@ async def list_runs(
     external_id: str | None = Query(
         default=None, max_length=200, description="Clé d'idempotence (runs observés)"
     ),
+    context_snapshot_id: str | None = Query(
+        default=None, max_length=300, description="Snapshot ORBIT (« nom@vN »)"
+    ),
+    release_id: str | None = Query(default=None, max_length=200),
     q: str | None = Query(default=None, max_length=200, description="Nom de scénario ou d'agent"),
     sort: str = Query(default="-created_at", description="-created_at, created_at, ±composite, ±latency"),
 ) -> Page[RunOut]:
@@ -156,6 +164,8 @@ async def list_runs(
         created_to=created_to,
         tag=tag,
         external_id=external_id,
+        context_snapshot_id=context_snapshot_id,
+        release_id=release_id,
         q=q,
     )
     with platform_errors():

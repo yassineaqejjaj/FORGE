@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import uuid
 from datetime import datetime
 from typing import Any, Literal, Self
@@ -9,6 +10,7 @@ from typing import Any, Literal, Self
 from pydantic import AwareDatetime, Field, field_validator, model_validator
 
 from forge.api.schemas.common import ApiModel
+from forge.api.schemas.traces import ProtocolEventIn
 from forge.domain.enums import ExperimentArm, RunOrigin, RunStatus
 
 
@@ -29,6 +31,9 @@ class ObservedUsageIn(ApiModel):
     input_tokens: int = Field(default=0, ge=0)
     output_tokens: int = Field(default=0, ge=0)
     model_calls: int = Field(default=0, ge=0)
+
+
+MAX_OBSERVED_EVENTS = 300
 
 
 class ObservedRunIn(ApiModel):
@@ -57,6 +62,35 @@ class ObservedRunIn(ApiModel):
         max_length=200,
         description="Clé d'idempotence (ex. « nova-sdlc:<uuid> ») : unique par agent",
     )
+    context_snapshot_id: str | None = Field(
+        default=None,
+        min_length=1,
+        max_length=300,
+        description="Snapshot ORBIT utilisé par l'agent (« nom@vN »). Déduit de `manifest` si absent",
+    )
+    release_id: str | None = Field(
+        default=None, min_length=1, max_length=200, description="Release de l'agent qui a produit ce run"
+    )
+    manifest: dict[str, Any] | None = Field(
+        default=None,
+        description="Manifeste du run côté système externe (NOVA : `run_manifest`), conservé tel quel",
+    )
+
+    events: list[ProtocolEventIn] = Field(
+        default_factory=list,
+        max_length=MAX_OBSERVED_EVENTS,
+        description=(
+            "Étapes du run (outils, modèle, récupérations de contexte…) au format Agent Protocol. "
+            "`run_started`, `final_answer`, `run_completed` et `error` sont écrits par FORGE et ignorés ici."
+        ),
+    )
+
+    @field_validator("manifest")
+    @classmethod
+    def _bound_manifest(cls, value: dict[str, Any] | None) -> dict[str, Any] | None:
+        if value is not None and len(json.dumps(value, default=str)) > 20_000:
+            raise ValueError("le manifeste dépasse 20 000 caractères")
+        return value
 
     @field_validator("external_id")
     @classmethod
@@ -84,6 +118,8 @@ class RunOut(ApiModel):
     repetition: int
     tags: list[str]
     external_id: str | None = Field(default=None, description="Clé d'idempotence (runs observés)")
+    context_snapshot_id: str | None = Field(default=None, description="Snapshot ORBIT (« nom@vN »)")
+    release_id: str | None = Field(default=None, description="Release de l'agent")
     scenario_id: uuid.UUID
     scenario_version_id: uuid.UUID
     scenario_slug: str
@@ -161,6 +197,9 @@ class RunDetailOut(ApiModel):
     repetition: int
     tags: list[str]
     external_id: str | None = None
+    context_snapshot_id: str | None = None
+    release_id: str | None = None
+    source_manifest: dict[str, Any] | None = None
     error: str | None = None
     error_type: str | None = None
     otel_trace_id: str
