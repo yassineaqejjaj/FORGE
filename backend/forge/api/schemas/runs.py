@@ -14,6 +14,12 @@ from forge.api.schemas.traces import ProtocolEventIn
 from forge.domain.enums import ExperimentArm, RunOrigin, RunStatus
 
 
+def _bounded_manifest(value: dict[str, Any] | None) -> dict[str, Any] | None:
+    if value is not None and len(json.dumps(value, default=str)) > 20_000:
+        raise ValueError("le manifeste dépasse 20 000 caractères")
+    return value
+
+
 class RunCreateIn(ApiModel):
     agent_version_id: uuid.UUID
     scenario_ids: list[uuid.UUID] = Field(
@@ -25,6 +31,21 @@ class RunCreateIn(ApiModel):
         default=None, description="Configuration par défaut si absente"
     )
     tags: list[str] = Field(default_factory=list, max_length=20)
+    context_snapshot_id: str | None = Field(
+        default=None,
+        min_length=1,
+        max_length=300,
+        description="Snapshot ORBIT de l'exécution d'origine (« nom@vN »)",
+    )
+    release_id: str | None = Field(default=None, min_length=1, max_length=200)
+    manifest: dict[str, Any] | None = Field(
+        default=None, description="Manifeste de l'exécution d'origine (NOVA : `run_manifest`), gardé tel quel"
+    )
+
+    @field_validator("manifest")
+    @classmethod
+    def _bound_manifest(cls, value: dict[str, Any] | None) -> dict[str, Any] | None:
+        return _bounded_manifest(value)
 
 
 class ObservedUsageIn(ApiModel):
@@ -88,9 +109,7 @@ class ObservedRunIn(ApiModel):
     @field_validator("manifest")
     @classmethod
     def _bound_manifest(cls, value: dict[str, Any] | None) -> dict[str, Any] | None:
-        if value is not None and len(json.dumps(value, default=str)) > 20_000:
-            raise ValueError("le manifeste dépasse 20 000 caractères")
-        return value
+        return _bounded_manifest(value)
 
     @field_validator("external_id")
     @classmethod

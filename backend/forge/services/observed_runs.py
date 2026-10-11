@@ -38,7 +38,7 @@ from forge.domain.traces.normalize import plan_events, truncate_payload, truncat
 from forge.domain.traces.protocol import parse_protocol_events
 from forge.domain.types import TokenUsage, TraceEventData
 from forge.infra.models import AgentVersion, EvaluationRun, ExecutionTrace, Scenario, ScenarioVersion
-from forge.services import access, audit, runs
+from forge.services import access, audit, run_links, runs
 from forge.services.access import Viewer
 from forge.services.audit import ActorLike
 from forge.services.execution import insert_events
@@ -161,9 +161,9 @@ async def ingest_observed_run(
 
     run.started_at = data.started_at
     run.executed_at = data.completed_at
-    run.context_snapshot_id = data.context_snapshot_id or _snapshot_of(data.manifest)
-    run.release_id = data.release_id or _release_of(data.manifest)
-    run.source_manifest = data.manifest
+    run_links.apply_links(
+        run, context_snapshot_id=data.context_snapshot_id, release_id=data.release_id, manifest=data.manifest
+    )
     if data.failed:
         run.error = (data.error or DEFAULT_FAILURE_MESSAGE)[:4000]
         run.error_type = BuiltinErrorType.EXECUTION_ERROR.value
@@ -187,18 +187,6 @@ async def ingest_observed_run(
     )
     await runs.mark_evaluating(session, run, enqueue=True)
     return run, True
-
-
-def _snapshot_of(manifest: dict[str, Any] | None) -> str | None:
-    """``context.snapshot_id`` of a reported run manifest (NOVA ``domain/manifest.py``), when present."""
-    context = (manifest or {}).get("context")
-    value = context.get("snapshot_id") if isinstance(context, dict) else None
-    return value if isinstance(value, str) and value else None
-
-
-def _release_of(manifest: dict[str, Any] | None) -> str | None:
-    value = (manifest or {}).get("release_id")
-    return value if isinstance(value, str) and value else None
 
 
 #: Written by FORGE around every observed run: a caller cannot add a second one.

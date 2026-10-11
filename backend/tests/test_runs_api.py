@@ -93,6 +93,38 @@ async def test_create_adhoc_runs(client_as, db_session) -> None:
     ).status_code == 403
 
 
+async def test_adhoc_runs_carry_the_orion_links_of_the_production_run(client_as, db_session) -> None:
+    av = await create_agent_version(db_session)
+    sv = await create_scenario_version(db_session)
+    await db_session.commit()
+    editor = await client_as(Role.editor)
+    manifest = {"run_id": "task-1", "context": {"snapshot_id": "launch@v4"}}
+    response = await editor.post(
+        "/api/v1/runs",
+        json={"agent_version_id": str(av.id), "scenario_ids": [str(sv.scenario_id)], "manifest": manifest},
+    )
+    assert response.status_code == 201, response.text
+    run = response.json()[0]
+    assert run["context_snapshot_id"] == "launch@v4" and run["release_id"] is None
+    detail = (await editor.get(f"/api/v1/runs/{run['id']}")).json()
+    assert detail["source_manifest"] == manifest
+    plain = (
+        await editor.post(
+            "/api/v1/runs", json={"agent_version_id": str(av.id), "scenario_ids": [str(sv.scenario_id)]}
+        )
+    ).json()[0]
+    assert plain["context_snapshot_id"] is None
+    huge = await editor.post(
+        "/api/v1/runs",
+        json={
+            "agent_version_id": str(av.id),
+            "scenario_ids": [str(sv.scenario_id)],
+            "manifest": {"x": "y" * 25_000},
+        },
+    )
+    assert huge.status_code == 422
+
+
 async def test_list_filters_and_sorting(client_as, db_session) -> None:
     tag = f"t-{uuid.uuid4().hex[:6]}"
     low, av, _ = await _scored_run(db_session, composite=40, latency=9000)

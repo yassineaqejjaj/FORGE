@@ -59,6 +59,9 @@ async def create_runs(body: RunCreateIn, principal: RequireEditor, session: Sess
                 repetitions=body.repetitions,
                 evaluation_config_id=body.evaluation_config_id,
                 tags=body.tags,
+                context_snapshot_id=body.context_snapshot_id,
+                release_id=body.release_id,
+                manifest=body.manifest,
             ),
             created_by=principal.user_id,
         )

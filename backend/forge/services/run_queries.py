@@ -49,7 +49,7 @@ from forge.infra.models import (
 )
 from forge.infra.models import Evaluation as EvaluationRow
 from forge.infra.queue import PRIORITY_INTERACTIVE
-from forge.services import access, audit, runs
+from forge.services import access, audit, run_links, runs
 from forge.services.access import Viewer
 from forge.services.audit import ActorLike
 from forge.services.taxonomy import ConflictError, InvalidError, NotFoundError
@@ -703,6 +703,9 @@ class RunRequest:
     repetitions: int = 1
     evaluation_config_id: uuid.UUID | None = None
     tags: Sequence[str] = field(default_factory=list)
+    context_snapshot_id: str | None = None
+    release_id: str | None = None
+    manifest: dict[str, Any] | None = None
 
 
 async def default_evaluation_config(session: AsyncSession) -> EvaluationConfig:
@@ -800,6 +803,13 @@ async def create_adhoc_runs(
         if "introuvable" in message:
             raise NotFoundError(message) from exc
         raise InvalidError(message) from exc
+    for run in created:
+        run_links.apply_links(
+            run,
+            context_snapshot_id=request.context_snapshot_id,
+            release_id=request.release_id,
+            manifest=request.manifest,
+        )
     await audit.record(
         session,
         actor,
