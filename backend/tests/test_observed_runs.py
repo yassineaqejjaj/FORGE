@@ -280,6 +280,108 @@ async def test_same_external_id_returns_the_existing_run(client_as, db_session) 
     assert len(jobs) == 1, "no second evaluation job"
 
 
+async def test_orion_links_are_stored_filterable_and_never_overwritten(client_as, db_session) -> None:
+    """The snapshot, the release and the reporter's manifest travel with the run; a replayed call keeps them."""
+    editor = await client_as(Role.editor)
+    scenario = await create_nova_scenario(editor)
+    av = await create_agent_version(db_session)
+    await db_session.commit()
+    manifest = {"run_id": "t1", "context": {"snapshot_id": "launch@v4", "items": 2}, "release_id": "rel-7"}
+    body = observed_body(av.id, scenario["id"], manifest=manifest)
+    first = await editor.post(URL, json=body)
+    assert first.status_code == 201, first.text
+    assert first.json()["context_snapshot_id"] == "launch@v4" and first.json()["release_id"] == "rel-7"
+    detail = (await editor.get(f"/api/v1/runs/{first.json()['id']}")).json()
+    assert detail["source_manifest"] == manifest
+    # Explicit fields win over the manifest; a replayed call returns the stored run untouched.
+    again = await editor.post(URL, json=body | {"context_snapshot_id": "other@v9", "release_id": "rel-8"})
+    assert again.status_code == 200 and again.json()["context_snapshot_id"] == "launch@v4"
+    # Filters
+    hit = await editor.get("/api/v1/runs", params={"context_snapshot_id": "launch@v4"})
+    assert [r["id"] for r in hit.json()["items"]] == [first.json()["id"]]
+    miss = await editor.get("/api/v1/runs", params={"release_id": "nope"})
+    assert miss.json()["items"] == []
+
+
+async def test_explicit_snapshot_and_oversized_manifest(client_as, db_session) -> None:
+    editor = await client_as(Role.editor)
+    scenario = await create_nova_scenario(editor)
+    av = await create_agent_version(db_session)
+    await db_session.commit()
+    ok = await editor.post(
+        URL, json=observed_body(av.id, scenario["id"], context_snapshot_id="s@v1", release_id="r1")
+    )
+    assert ok.status_code == 201 and ok.json()["context_snapshot_id"] == "s@v1"
+    plain = await editor.post(URL, json=observed_body(av.id, scenario["id"]))
+    assert plain.json()["context_snapshot_id"] is None and plain.json()["release_id"] is None
+    huge = await editor.post(URL, json=observed_body(av.id, scenario["id"], manifest={"x": "y" * 25_000}))
+    assert huge.status_code == 422
+
+
+async def test_reported_steps_become_trace_events_and_counters(client_as, db_session) -> None:
+    """Steps reported with the run are stored as trace events; FORGE keeps writing the framing events."""
+    editor = await client_as(Role.editor)
+    scenario = await create_nova_scenario(editor)
+    av = await create_agent_version(db_session)
+    await db_session.commit()
+    steps = [
+        {
+            "type": "retrieval",
+            "name": "ORBIT",
+            "offset_ms": 10,
+            "duration_ms": 40,
+            "attributes": {"items": 5},
+        },
+        {
+            "type": "llm_call",
+            "name": "plan",
+            "offset_ms": 60,
+            "duration_ms": 300,
+            "attributes": {"tokens": 900},
+        },
+        {
+            "type": "tool_call",
+            "name": "github.create_pr",
+            "offset_ms": 400,
+            "duration_ms": 80,
+            "input": {"repo": "x"},
+        },
+        {"type": "tool_call", "name": "ci.wait", "offset_ms": 500, "duration_ms": 100, "status": "error"},
+        {"type": "final_answer", "name": "caller tries to add its own"},
+        {"type": "run_completed", "name": "nor this"},
+    ]
+    body = observed_body(
+        av.id, scenario["id"], events=steps, context_snapshot_id="launch@v4", usage={"model_calls": 0}
+    )
+    response = await editor.post(URL, json=body)
+    assert response.status_code == 201, response.text
+    run_id = uuid.UUID(response.json()["id"])
+    events = list(
+        await db_session.scalars(
+            select(TraceEvent).where(TraceEvent.run_id == run_id).order_by(TraceEvent.seq)
+        )
+    )
+    types = [e.type for e in events]
+    assert types.count(TraceEventType.run_started) == 1 and types.count(TraceEventType.run_completed) == 1
+    assert types.count(TraceEventType.final_answer) == 1  # FORGE's own, not the caller's
+    assert types.count(TraceEventType.tool_call) == 2 and types.count(TraceEventType.llm_call) == 1
+    assert types.count(TraceEventType.retrieval) == 1
+    context = next(e for e in events if e.type == TraceEventType.context_prepared)
+    assert context.attributes["snapshot"] == "launch@v4"
+    trace = await db_session.scalar(select(ExecutionTrace).where(ExecutionTrace.run_id == run_id))
+    assert trace.tool_calls == 2 and trace.model_calls == 1 and trace.event_count == len(events)
+
+
+async def test_too_many_reported_steps_are_refused(client_as, db_session) -> None:
+    editor = await client_as(Role.editor)
+    scenario = await create_nova_scenario(editor)
+    av = await create_agent_version(db_session)
+    await db_session.commit()
+    steps = [{"type": "custom", "name": f"s{i}"} for i in range(301)]
+    response = await editor.post(URL, json=observed_body(av.id, scenario["id"], events=steps))
+    assert response.status_code == 422
+
+
 async def _agent_of(session, av):
     from forge.infra.models import Agent
 

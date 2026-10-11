@@ -71,6 +71,9 @@ def _slug_part(text: str) -> str:
     return re.sub(r"[^a-z0-9]+", "_", ascii_text).strip("_")
 
 
+slug_part = _slug_part
+
+
 def category_label(category: str) -> str:
     return SCENARIO_CATEGORIES.get(category, category)
 

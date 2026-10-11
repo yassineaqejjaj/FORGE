@@ -259,3 +259,97 @@ class GateOut(ApiModel):
     reasons: list[str]
     composite_delta: float | None = None
     regressions: int = 0
+
+
+class MultiExperimentCreateIn(BaseModel):
+    """Une baseline contre 2 à 5 candidates, sur les mêmes cas (une expérience appariée par candidate)."""
+
+    baseline_version_id: uuid.UUID
+    candidate_version_ids: list[uuid.UUID] = Field(min_length=2, max_length=5)
+    benchmark_id: str | None = Field(default=None, description="Identifiant ou slug du benchmark source")
+    scenario_ids: list[uuid.UUID] | None = None
+    scenario_version_ids: list[uuid.UUID] | None = None
+    evaluation_config_id: uuid.UUID | None = None
+    repetitions: int | None = Field(default=None, ge=1, le=20)
+    name: str | None = Field(default=None, max_length=180)
+    description: str = ""
+    hypothesis: str = ""
+    tags: list[str] = Field(default_factory=list)
+    trigger: str = Field(default="ui", max_length=40)
+
+    @model_validator(mode="after")
+    def _source(self) -> MultiExperimentCreateIn:
+        if not (self.benchmark_id or self.scenario_ids or self.scenario_version_ids):
+            raise ValueError("indiquez benchmark_id, scenario_ids ou scenario_version_ids")
+        return self
+
+
+class MultiExperimentCreatedOut(ApiModel):
+    group_id: uuid.UUID
+    experiments: list[ExperimentOut]
+
+
+class MultiCandidateOut(ApiModel):
+    experiment_id: uuid.UUID
+    candidate_version_id: uuid.UUID
+    candidate: str | None = None
+    status: str
+    n_pairs: int
+    delta: float | None = Field(description="Composite candidate − baseline, en points")
+    ci_low: float | None = None
+    ci_high: float | None = None
+    p_value: float | None = Field(description="p-value brute du test apparié")
+    p_adjusted: float = Field(description="p-value corrigée (Holm-Bonferroni) pour le nombre de candidates")
+    significant: bool = Field(description="Améliore la baseline après correction")
+    eligible: bool = Field(
+        description="Significative, sans régression critique et recommandée par sa comparaison"
+    )
+    verdict: str | None = None
+    recommendation: str | None = None
+    critical_regressions: int
+    cost: dict[str, float | str | None] | None = None
+    latency: dict[str, float | str | None] | None = None
+    provisional: bool
+
+
+class MultiExperimentReportOut(ApiModel):
+    group_id: uuid.UUID
+    complete: bool
+    alpha: float
+    correction: str
+    baseline_version_id: uuid.UUID
+    candidates: list[MultiCandidateOut] = Field(
+        description="Classées : éligibles d'abord, puis gain décroissant"
+    )
+    winner: MultiCandidateOut | None = None
+    reason: str
+
+
+class PublishLearningIn(BaseModel):
+    """Publier une expérience gagnante dans ORBIT comme apprentissage (proposé à la validation)."""
+
+    title: str | None = Field(
+        default=None, max_length=300, description="Défaut : « Amélioration validée : <candidate> »"
+    )
+    content: str | None = Field(
+        default=None,
+        max_length=20000,
+        description="Défaut : hypothèse, changelog de la candidate et synthèse",
+    )
+    applies_to: dict[str, list[str]] = Field(
+        default_factory=dict,
+        description="Champ d'application : task_types, agent_kinds, skills, tools, agent_versions",
+    )
+    orbit_project: str | None = Field(
+        default=None, max_length=120, description="Défaut : configuration de l'agent"
+    )
+    credential_id: uuid.UUID | None = None
+    classification: int | None = Field(default=None, ge=0, le=3)
+
+
+class PublishLearningOut(ApiModel):
+    experiment_id: uuid.UUID
+    orbit_item_id: str
+    orbit_project: str
+    created: bool = Field(description="Faux si l'expérience avait déjà été publiée")
+    learning: dict | None = Field(default=None, description="L'apprentissage tel qu'ORBIT l'a enregistré")

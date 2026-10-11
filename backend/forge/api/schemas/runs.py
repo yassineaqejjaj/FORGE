@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import uuid
 from datetime import datetime
 from typing import Any, Literal, Self
@@ -9,7 +10,14 @@ from typing import Any, Literal, Self
 from pydantic import AwareDatetime, Field, field_validator, model_validator
 
 from forge.api.schemas.common import ApiModel
+from forge.api.schemas.traces import ProtocolEventIn
 from forge.domain.enums import ExperimentArm, RunOrigin, RunStatus
+
+
+def _bounded_manifest(value: dict[str, Any] | None) -> dict[str, Any] | None:
+    if value is not None and len(json.dumps(value, default=str)) > 20_000:
+        raise ValueError("le manifeste dépasse 20 000 caractères")
+    return value
 
 
 class RunCreateIn(ApiModel):
@@ -23,12 +31,30 @@ class RunCreateIn(ApiModel):
         default=None, description="Configuration par défaut si absente"
     )
     tags: list[str] = Field(default_factory=list, max_length=20)
+    context_snapshot_id: str | None = Field(
+        default=None,
+        min_length=1,
+        max_length=300,
+        description="Snapshot ORBIT de l'exécution d'origine (« nom@vN »)",
+    )
+    release_id: str | None = Field(default=None, min_length=1, max_length=200)
+    manifest: dict[str, Any] | None = Field(
+        default=None, description="Manifeste de l'exécution d'origine (NOVA : `run_manifest`), gardé tel quel"
+    )
+
+    @field_validator("manifest")
+    @classmethod
+    def _bound_manifest(cls, value: dict[str, Any] | None) -> dict[str, Any] | None:
+        return _bounded_manifest(value)
 
 
 class ObservedUsageIn(ApiModel):
     input_tokens: int = Field(default=0, ge=0)
     output_tokens: int = Field(default=0, ge=0)
     model_calls: int = Field(default=0, ge=0)
+
+
+MAX_OBSERVED_EVENTS = 300
 
 
 class ObservedRunIn(ApiModel):
@@ -57,6 +83,33 @@ class ObservedRunIn(ApiModel):
         max_length=200,
         description="Clé d'idempotence (ex. « nova-sdlc:<uuid> ») : unique par agent",
     )
+    context_snapshot_id: str | None = Field(
+        default=None,
+        min_length=1,
+        max_length=300,
+        description="Snapshot ORBIT utilisé par l'agent (« nom@vN »). Déduit de `manifest` si absent",
+    )
+    release_id: str | None = Field(
+        default=None, min_length=1, max_length=200, description="Release de l'agent qui a produit ce run"
+    )
+    manifest: dict[str, Any] | None = Field(
+        default=None,
+        description="Manifeste du run côté système externe (NOVA : `run_manifest`), conservé tel quel",
+    )
+
+    events: list[ProtocolEventIn] = Field(
+        default_factory=list,
+        max_length=MAX_OBSERVED_EVENTS,
+        description=(
+            "Étapes du run (outils, modèle, récupérations de contexte…) au format Agent Protocol. "
+            "`run_started`, `final_answer`, `run_completed` et `error` sont écrits par FORGE et ignorés ici."
+        ),
+    )
+
+    @field_validator("manifest")
+    @classmethod
+    def _bound_manifest(cls, value: dict[str, Any] | None) -> dict[str, Any] | None:
+        return _bounded_manifest(value)
 
     @field_validator("external_id")
     @classmethod
@@ -84,6 +137,8 @@ class RunOut(ApiModel):
     repetition: int
     tags: list[str]
     external_id: str | None = Field(default=None, description="Clé d'idempotence (runs observés)")
+    context_snapshot_id: str | None = Field(default=None, description="Snapshot ORBIT (« nom@vN »)")
+    release_id: str | None = Field(default=None, description="Release de l'agent")
     scenario_id: uuid.UUID
     scenario_version_id: uuid.UUID
     scenario_slug: str
@@ -161,6 +216,9 @@ class RunDetailOut(ApiModel):
     repetition: int
     tags: list[str]
     external_id: str | None = None
+    context_snapshot_id: str | None = None
+    release_id: str | None = None
+    source_manifest: dict[str, Any] | None = None
     error: str | None = None
     error_type: str | None = None
     otel_trace_id: str
@@ -206,3 +264,76 @@ class RunManifestOut(ApiModel):
     manifest_hash: str
     redacted: bool
     manifest: dict[str, Any]
+
+
+class ContextGapIn(ApiModel):
+    """Combler le manque de contexte d'un run via ORBIT (docs/OBSERVED_RUNS.md §ORION)."""
+
+    missing: list[str] = Field(
+        default_factory=list,
+        max_length=10,
+        description="Informations manquantes (défaut : les erreurs MISSING_INFORMATION du run)",
+    )
+    orbit_project: str | None = Field(
+        default=None,
+        max_length=120,
+        description="Projet ORBIT, si ni la configuration de l'agent ni le run ne l'indiquent",
+    )
+    credential_id: uuid.UUID | None = Field(
+        default=None, description="Identifiants ORBIT (défaut : ceux de l'agent)"
+    )
+    snapshot: str | None = Field(
+        default=None,
+        max_length=120,
+        pattern=r"^[A-Za-z0-9][A-Za-z0-9._\-]*$",
+        description="Snapshot où ORBIT enregistre le résultat (défaut : version suivante de celui du run)",
+    )
+    retest: bool = Field(
+        default=False, description="Crée une version d'agent épinglée sur le nouveau snapshot et la relance"
+    )
+
+
+class ContextGapOut(ApiModel):
+    run_id: uuid.UUID
+    missing: list[str]
+    orbit_request_id: str
+    orbit_project: str
+    completion: dict[str, Any] = Field(
+        description="Réponse d'ORBIT : nouveau snapshot, éléments ajoutés, manques restants"
+    )
+    candidate_version_id: uuid.UUID | None = None
+    retest_run_id: uuid.UUID | None = None
+
+
+class PromoteRunIn(ApiModel):
+    label: str | None = Field(
+        default=None, max_length=60, description="Suffixe du scénario (défaut : regression-<id du run>)"
+    )
+
+
+class PromoteRunOut(ApiModel):
+    scenario_id: uuid.UUID
+    scenario_version_id: uuid.UUID
+    slug: str
+    created: bool = Field(description="Faux si ce run avait déjà été promu (même scénario renvoyé)")
+
+
+class RiskSignalOut(ApiModel):
+    kind: str = Field(
+        description="tool_loop, tool_errors, error_events, slow, token_overrun, *_budget, timeout"
+    )
+    message: str
+    weight: float
+
+
+class RunRiskOut(ApiModel):
+    run_id: uuid.UUID
+    run_status: str
+    level: str = Field(description="low | medium | high")
+    score: float = Field(description="0–1 ; combine les signaux indépendants")
+    finished: bool = Field(description="Le run est terminé : le risque ne concerne plus qu'un run en cours")
+    signals: list[RiskSignalOut]
+    observed: dict[str, int] = Field(
+        description="Ce qui a été observé : événements, appels d'outils, tokens, durée"
+    )
+    reference_runs: int = Field(description="Runs réussis de la même version servant de référence")

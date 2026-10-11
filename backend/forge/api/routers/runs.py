@@ -16,16 +16,21 @@ from forge.api.deps import RequireEditor, RequireViewer, SessionDep
 from forge.api.routers.meta import PageQuery, platform_errors
 from forge.api.schemas.common import Page
 from forge.api.schemas.runs import (
+    ContextGapIn,
+    ContextGapOut,
     ObservedRunIn,
+    PromoteRunIn,
+    PromoteRunOut,
     RunCreateIn,
     RunDetailOut,
     RunManifestOut,
     RunOut,
+    RunRiskOut,
     RunTraceOut,
 )
 from forge.domain.enums import ExperimentArm, RunOrigin, RunStatus
 from forge.infra.models import EvaluationRun
-from forge.services import observed_runs
+from forge.services import context_gaps, monitoring, observed_runs, regression
 from forge.services import run_queries as service
 
 router = APIRouter(prefix="/runs", tags=["runs"])
@@ -59,6 +64,9 @@ async def create_runs(body: RunCreateIn, principal: RequireEditor, session: Sess
                 repetitions=body.repetitions,
                 evaluation_config_id=body.evaluation_config_id,
                 tags=body.tags,
+                context_snapshot_id=body.context_snapshot_id,
+                release_id=body.release_id,
+                manifest=body.manifest,
             ),
             created_by=principal.user_id,
         )
@@ -102,6 +110,10 @@ async def create_observed_run(
                 model_calls=body.usage.model_calls,
                 tags=body.tags,
                 external_id=body.external_id,
+                context_snapshot_id=body.context_snapshot_id,
+                release_id=body.release_id,
+                manifest=body.manifest,
+                events=[e.model_dump(mode="json", exclude_none=True) for e in body.events],
             ),
             created_by=principal.user_id,
         )
@@ -135,6 +147,10 @@ async def list_runs(
     external_id: str | None = Query(
         default=None, max_length=200, description="Clé d'idempotence (runs observés)"
     ),
+    context_snapshot_id: str | None = Query(
+        default=None, max_length=300, description="Snapshot ORBIT (« nom@vN »)"
+    ),
+    release_id: str | None = Query(default=None, max_length=200),
     q: str | None = Query(default=None, max_length=200, description="Nom de scénario ou d'agent"),
     sort: str = Query(default="-created_at", description="-created_at, created_at, ±composite, ±latency"),
 ) -> Page[RunOut]:
@@ -156,6 +172,8 @@ async def list_runs(
         created_to=created_to,
         tag=tag,
         external_id=external_id,
+        context_snapshot_id=context_snapshot_id,
+        release_id=release_id,
         q=q,
     )
     with platform_errors():
@@ -215,3 +233,90 @@ async def retry_run(run_id: uuid.UUID, principal: RequireEditor, session: Sessio
         run = await service.retry_run(session, principal, principal, run_id, created_by=principal.user_id)
     await session.commit()
     return (await _summaries(session, principal, [run]))[0]
+
+
+@router.post(
+    "/{run_id}/context-gap",
+    response_model=ContextGapOut,
+    summary="Combler le manque de contexte d'un run via ORBIT",
+    description=(
+        "Demande à ORBIT de recomposer le contexte servi à ce run autour des informations manquantes "
+        "(`MISSING_INFORMATION` ou `missing`), enregistré comme nouvelle version du snapshot. Avec `retest`, "
+        "une version d'agent épinglée sur ce snapshot est créée et le même scénario est relancé."
+    ),
+)
+async def fill_context_gap(
+    run_id: uuid.UUID, body: ContextGapIn, principal: RequireEditor, session: SessionDep
+) -> ContextGapOut:
+    with platform_errors():
+        result = await context_gaps.fill_context_gap(
+            session,
+            principal,
+            principal,
+            run_id,
+            context_gaps.GapRequest(
+                missing=body.missing,
+                orbit_project=body.orbit_project,
+                credential_id=body.credential_id,
+                snapshot=body.snapshot,
+                retest=body.retest,
+            ),
+            created_by=principal.user_id,
+        )
+    await session.commit()
+    return ContextGapOut(
+        run_id=result.run_id,
+        missing=result.missing,
+        orbit_request_id=result.orbit_request_id,
+        orbit_project=result.orbit_project,
+        completion=result.completion,
+        candidate_version_id=result.candidate_version_id,
+        retest_run_id=result.retest_run_id,
+    )
+
+
+@router.post(
+    "/{run_id}/promote-to-scenario",
+    response_model=PromoteRunOut,
+    summary="Faire d'un run en échec un scénario de régression",
+    description=(
+        "Crée une variante du scénario du run avec l'entrée et le contexte réellement reçus, et les erreurs "
+        "constatées en contraintes. Idempotent : `201` à la création, `200` si le run était déjà promu."
+    ),
+    responses={200: {"model": PromoteRunOut, "description": "Run déjà promu"}},
+)
+async def promote_run(
+    run_id: uuid.UUID,
+    response: Response,
+    principal: RequireEditor,
+    session: SessionDep,
+    body: PromoteRunIn | None = None,
+) -> PromoteRunOut:
+    with platform_errors():
+        promotion = await regression.promote_run(
+            session, principal, principal, run_id, label=body.label if body else None
+        )
+    await session.commit()
+    response.status_code = status.HTTP_201_CREATED if promotion.created else status.HTTP_200_OK
+    return PromoteRunOut(
+        scenario_id=promotion.scenario_id,
+        scenario_version_id=promotion.scenario_version_id,
+        slug=promotion.slug,
+        created=promotion.created,
+    )
+
+
+@router.get(
+    "/{run_id}/risk",
+    response_model=RunRiskOut,
+    summary="Risque d'échec d'un run en cours, avant sa fin",
+    description=(
+        "Signes d'échec lus dans les étapes déjà rapportées : appel d'outil répété (boucle), outils en "
+        "échec, durée ou tokens très au-delà des runs réussis de la même version, budget presque consommé. "
+        "`level` : low, medium ou high."
+    ),
+)
+async def get_run_risk(run_id: uuid.UUID, principal: RequireViewer, session: SessionDep) -> RunRiskOut:
+    with platform_errors():
+        data = await monitoring.run_risk(session, principal, run_id)
+    return RunRiskOut.model_validate(data)

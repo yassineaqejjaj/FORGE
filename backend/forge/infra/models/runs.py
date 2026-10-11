@@ -54,6 +54,8 @@ class EvaluationRun(UUIDPkMixin, CreatedAtMixin, Base):
         Index("ix_evaluation_runs_agent_version_id_created_at", "agent_version_id", "created_at"),
         Index("ix_evaluation_runs_scenario_id", "scenario_id"),
         Index("ix_evaluation_runs_otel_trace_id", "otel_trace_id"),
+        Index("ix_evaluation_runs_context_snapshot_id", "context_snapshot_id"),
+        Index("ix_evaluation_runs_release_id", "release_id"),
         #: Idempotency of observed runs: one run per (agent, caller-supplied id).
         Index(
             "uq_evaluation_runs_agent_external_id",
@@ -111,6 +113,12 @@ class EvaluationRun(UUIDPkMixin, CreatedAtMixin, Base):
     tags: Mapped[list[str]] = mapped_column(JSONB, nullable=False, default=list, server_default=_JSON_LIST)
     #: Idempotency key given by the external system that executed an ``observed`` run (else ``NULL``).
     external_id: Mapped[str | None] = mapped_column(Text, nullable=True)
+    #: ORION links reported by the system that executed an ``observed`` run (else ``NULL``): the ORBIT
+    #: context snapshot the agent used (``name@vN``), the release that shipped it, and the caller's own
+    #: run manifest, kept as reported so the run can be replayed or joined later.
+    context_snapshot_id: Mapped[str | None] = mapped_column(Text, nullable=True)
+    release_id: Mapped[str | None] = mapped_column(Text, nullable=True)
+    source_manifest: Mapped[dict[str, Any] | None] = mapped_column(JSONB, nullable=True)
     created_by: Mapped[uuid.UUID | None] = mapped_column(
         UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"), nullable=True
     )

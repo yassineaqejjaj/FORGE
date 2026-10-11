@@ -273,3 +273,97 @@ class WorkerActivityOut(ApiModel):
     """Technical activity of the workers (Exécutions page, not the overview)."""
 
     queues: dict[str, QueueActivityOut]
+
+
+class WindowStatsOut(ApiModel):
+    n_runs: int
+    n_scored: int
+    n_failed: int
+    n_passed: int
+    composite_mean: float | None = None
+    pass_rate: float | None = None
+    failure_rate: float | None = None
+    error_rate: float | None = None
+    cost_mean: float | None = None
+    cost_per_success: float | None = None
+    latency_p95: float | None = None
+
+
+class ReleaseRowOut(WindowStatsOut):
+    release_id: str | None = Field(description="Identifiant de release (NOVA) ; null = runs sans release")
+    label: str
+    vs_no_release: dict[str, float | None] | None = Field(
+        default=None,
+        description="Écart avec les runs sans release : composite, taux de réussite, coût par réussite",
+    )
+
+
+class ReleasesOverviewOut(ApiModel):
+    days: int
+    since: datetime
+    n_runs: int
+    truncated: bool
+    releases: list[ReleaseRowOut]
+
+
+class HealthAlertOut(ApiModel):
+    kind: str = Field(
+        description="pass_rate_drop | failure_rate_rise | cost_per_success_rise | latency_p95_rise"
+    )
+    message: str
+    recent: float | None = None
+    previous: float | None = None
+    p_value: float | None = None
+
+
+class AgentHealthOut(ApiModel):
+    agent_id: uuid.UUID
+    agent: str
+    status: str = Field(description="healthy | degraded | insufficient_data")
+    reason: str
+    window_hours: int
+    baseline_hours: int
+    recent: WindowStatsOut
+    previous: WindowStatsOut
+    alerts: list[HealthAlertOut]
+
+
+class ReleaseHealthOut(ApiModel):
+    release_id: str
+    baseline_release_id: str | None = Field(description="null : comparée aux runs sans release")
+    days: int
+    status: str = Field(description="healthy | degraded | insufficient_data")
+    reason: str
+    release: WindowStatsOut
+    baseline: WindowStatsOut
+    alerts: list[HealthAlertOut]
+
+
+class ModelStatsOut(WindowStatsOut):
+    model: str
+
+
+class EfficiencyRecommendationOut(ApiModel):
+    kind: str
+    from_model: str
+    to_model: str
+    pass_rate_from: float
+    pass_rate_to: float
+    cost_per_success_from: float
+    cost_per_success_to: float
+    saving: float = Field(description="Économie relative par réussite (0,4 = 40 % moins cher)")
+    p_value: float | None = None
+    message: str
+
+
+class EfficiencyCategoryOut(ApiModel):
+    category: str
+    models: list[ModelStatsOut]
+    recommendations: list[EfficiencyRecommendationOut]
+
+
+class EfficiencyOut(ApiModel):
+    days: int
+    n_runs: int
+    truncated: bool
+    categories: list[EfficiencyCategoryOut]

@@ -66,7 +66,7 @@ export interface paths {
         put?: never;
         /**
          * Terminer la visite de bienvenue
-         * @description Idempotent: the first call stamps ``onboarded_at`` (finished or skipped), later calls change nothing.
+         * @description Idempotent: the first call stamps ``onboarded_at`` (finished or skipped), later calls are no-ops.
          */
         post: operations["complete_onboarding_api_v1_auth_onboarding_complete_post"];
         delete?: never;
@@ -762,6 +762,66 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/runs/{run_id}/context-gap": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Combler le manque de contexte d'un run via ORBIT
+         * @description Demande à ORBIT de recomposer le contexte servi à ce run autour des informations manquantes (`MISSING_INFORMATION` ou `missing`), enregistré comme nouvelle version du snapshot. Avec `retest`, une version d'agent épinglée sur ce snapshot est créée et le même scénario est relancé.
+         */
+        post: operations["fill_context_gap_api_v1_runs__run_id__context_gap_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/runs/{run_id}/promote-to-scenario": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Faire d'un run en échec un scénario de régression
+         * @description Crée une variante du scénario du run avec l'entrée et le contexte réellement reçus, et les erreurs constatées en contraintes. Idempotent : `201` à la création, `200` si le run était déjà promu.
+         */
+        post: operations["promote_run_api_v1_runs__run_id__promote_to_scenario_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/runs/{run_id}/risk": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Risque d'échec d'un run en cours, avant sa fin
+         * @description Signes d'échec lus dans les étapes déjà rapportées : appel d'outil répété (boucle), outils en échec, durée ou tokens très au-delà des runs réussis de la même version, budget presque consommé. `level` : low, medium ou high.
+         */
+        get: operations["get_run_risk_api_v1_runs__run_id__risk_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/runs/{run_id}/events": {
         parameters: {
             query?: never;
@@ -1211,6 +1271,43 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/experiments/multi": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Comparer plusieurs candidates à une même baseline
+         * @description Lance une expérience appariée par candidate (mêmes cas, même baseline, 2 à 5 candidates) et les regroupe. Rapport corrigé pour les comparaisons multiples : `GET /experiments/multi/{group_id}`.
+         */
+        post: operations["create_multi_experiment_api_v1_experiments_multi_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/experiments/multi/{group_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Rapport d'une comparaison multiple : p-values corrigées, classement, vainqueur */
+        get: operations["get_multi_report_api_v1_experiments_multi__group_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/experiments/{experiment_id}": {
         parameters: {
             query?: never;
@@ -1273,6 +1370,26 @@ export interface paths {
         put?: never;
         /** Annuler une expérience */
         post: operations["cancel_experiment_api_v1_experiments__experiment_id__cancel_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/experiments/{experiment_id}/publish-learning": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Publier une expérience gagnante dans ORBIT comme apprentissage
+         * @description Réservé aux expériences terminées, recommandées, sans régression critique et — dans une comparaison multiple — vainqueurs après correction. Les preuves sont calculées par FORGE. ORBIT enregistre un apprentissage **proposé** (validation humaine). `201` à la publication, `200` si déjà publiée.
+         */
+        post: operations["publish_learning_api_v1_experiments__experiment_id__publish_learning_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1356,6 +1473,83 @@ export interface paths {
         };
         /** Explorateur d'erreurs (filtres et agrégations) */
         get: operations["explore_errors_api_v1_errors_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/analytics/releases": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Résultats par release : réussite, coût par réussite, latence, écart avec les runs sans release */
+        get: operations["get_releases_overview_api_v1_analytics_releases_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/agents/{agent_id}/health": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Santé d'un agent en production : fenêtre récente contre la période précédente
+         * @description Compare les runs de production (observés et captures) de la fenêtre récente à ceux de la période d'avant : baisse significative du taux de réussite, hausse des échecs, du coût par réussite ou de la latence p95. Trop peu de runs → `insufficient_data` (jamais de fausse alerte).
+         */
+        get: operations["get_agent_health_api_v1_agents__agent_id__health_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/analytics/releases/compare": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Une release contre sa référence : dégradation significative ou non
+         * @description Compare les runs **observés** d'une release à ceux d'une autre release (`baseline_release_id`) ou, à défaut, aux runs sans release. Même règle que la santé d'un agent : baisse significative du taux de réussite, hausse des échecs, du coût par réussite ou de la latence ; trop peu de runs → `insufficient_data`.
+         */
+        get: operations["compare_release_api_v1_analytics_releases_compare_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/analytics/efficiency": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Efficacité des modèles : où un modèle moins cher fait aussi bien
+         * @description Par catégorie de scénario et par modèle : taux de réussite, coût par réussite, latence. Recommande un modèle moins cher quand il n'est pas significativement moins bon que le meilleur (écart toléré : 5 points) et économise au moins 15 % par réussite. Moins de 20 runs évalués par modèle : aucune recommandation.
+         */
+        get: operations["get_efficiency_api_v1_analytics_efficiency_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1551,6 +1745,31 @@ export interface components {
             metadata?: {
                 [key: string]: unknown;
             };
+        };
+        /** AgentHealthOut */
+        AgentHealthOut: {
+            /**
+             * Agent Id
+             * Format: uuid
+             */
+            agent_id: string;
+            /** Agent */
+            agent: string;
+            /**
+             * Status
+             * @description healthy | degraded | insufficient_data
+             */
+            status: string;
+            /** Reason */
+            reason: string;
+            /** Window Hours */
+            window_hours: number;
+            /** Baseline Hours */
+            baseline_hours: number;
+            recent: components["schemas"]["WindowStatsOut"];
+            previous: components["schemas"]["WindowStatsOut"];
+            /** Alerts */
+            alerts: components["schemas"]["HealthAlertOut"][];
         };
         /** AgentOut */
         AgentOut: {
@@ -2886,6 +3105,63 @@ export interface components {
              */
             created_at: string;
         };
+        /**
+         * ContextGapIn
+         * @description Combler le manque de contexte d'un run via ORBIT (docs/OBSERVED_RUNS.md §ORION).
+         */
+        ContextGapIn: {
+            /**
+             * Missing
+             * @description Informations manquantes (défaut : les erreurs MISSING_INFORMATION du run)
+             */
+            missing?: string[];
+            /**
+             * Orbit Project
+             * @description Projet ORBIT, si ni la configuration de l'agent ni le run ne l'indiquent
+             */
+            orbit_project?: string | null;
+            /**
+             * Credential Id
+             * @description Identifiants ORBIT (défaut : ceux de l'agent)
+             */
+            credential_id?: string | null;
+            /**
+             * Snapshot
+             * @description Snapshot où ORBIT enregistre le résultat (défaut : version suivante de celui du run)
+             */
+            snapshot?: string | null;
+            /**
+             * Retest
+             * @description Crée une version d'agent épinglée sur le nouveau snapshot et la relance
+             * @default false
+             */
+            retest: boolean;
+        };
+        /** ContextGapOut */
+        ContextGapOut: {
+            /**
+             * Run Id
+             * Format: uuid
+             */
+            run_id: string;
+            /** Missing */
+            missing: string[];
+            /** Orbit Request Id */
+            orbit_request_id: string;
+            /** Orbit Project */
+            orbit_project: string;
+            /**
+             * Completion
+             * @description Réponse d'ORBIT : nouveau snapshot, éléments ajoutés, manques restants
+             */
+            completion: {
+                [key: string]: unknown;
+            };
+            /** Candidate Version Id */
+            candidate_version_id?: string | null;
+            /** Retest Run Id */
+            retest_run_id?: string | null;
+        };
         /** CredentialCreateIn */
         CredentialCreateIn: {
             /** Name */
@@ -3356,6 +3632,52 @@ export interface components {
          * @enum {string}
          */
         Dimension: "quality" | "coherence" | "reasoning" | "safety" | "robustness" | "cost" | "latency" | "ux";
+        /** EfficiencyCategoryOut */
+        EfficiencyCategoryOut: {
+            /** Category */
+            category: string;
+            /** Models */
+            models: components["schemas"]["ModelStatsOut"][];
+            /** Recommendations */
+            recommendations: components["schemas"]["EfficiencyRecommendationOut"][];
+        };
+        /** EfficiencyOut */
+        EfficiencyOut: {
+            /** Days */
+            days: number;
+            /** N Runs */
+            n_runs: number;
+            /** Truncated */
+            truncated: boolean;
+            /** Categories */
+            categories: components["schemas"]["EfficiencyCategoryOut"][];
+        };
+        /** EfficiencyRecommendationOut */
+        EfficiencyRecommendationOut: {
+            /** Kind */
+            kind: string;
+            /** From Model */
+            from_model: string;
+            /** To Model */
+            to_model: string;
+            /** Pass Rate From */
+            pass_rate_from: number;
+            /** Pass Rate To */
+            pass_rate_to: number;
+            /** Cost Per Success From */
+            cost_per_success_from: number;
+            /** Cost Per Success To */
+            cost_per_success_to: number;
+            /**
+             * Saving
+             * @description Économie relative par réussite (0,4 = 40 % moins cher)
+             */
+            saving: number;
+            /** P Value */
+            p_value?: number | null;
+            /** Message */
+            message: string;
+        };
         /** EnumOption */
         EnumOption: {
             /** Value */
@@ -3764,6 +4086,10 @@ export interface components {
             first_seq?: number | null;
             /** Last Seq */
             last_seq?: number | null;
+            /** Risk */
+            risk?: {
+                [key: string]: unknown;
+            } | null;
         };
         /** ExecutionBriefOut */
         ExecutionBriefOut: {
@@ -4368,6 +4694,22 @@ export interface components {
              * @default 1.0.0
              */
             version: string;
+        };
+        /** HealthAlertOut */
+        HealthAlertOut: {
+            /**
+             * Kind
+             * @description pass_rate_drop | failure_rate_rise | cost_per_success_rise | latency_p95_rise
+             */
+            kind: string;
+            /** Message */
+            message: string;
+            /** Recent */
+            recent?: number | null;
+            /** Previous */
+            previous?: number | null;
+            /** P Value */
+            p_value?: number | null;
         };
         /** HumanEvaluationIn */
         HumanEvaluationIn: {
@@ -5027,6 +5369,179 @@ export interface components {
              */
             created_at: string;
         };
+        /** ModelStatsOut */
+        ModelStatsOut: {
+            /** N Runs */
+            n_runs: number;
+            /** N Scored */
+            n_scored: number;
+            /** N Failed */
+            n_failed: number;
+            /** N Passed */
+            n_passed: number;
+            /** Composite Mean */
+            composite_mean?: number | null;
+            /** Pass Rate */
+            pass_rate?: number | null;
+            /** Failure Rate */
+            failure_rate?: number | null;
+            /** Error Rate */
+            error_rate?: number | null;
+            /** Cost Mean */
+            cost_mean?: number | null;
+            /** Cost Per Success */
+            cost_per_success?: number | null;
+            /** Latency P95 */
+            latency_p95?: number | null;
+            /** Model */
+            model: string;
+        };
+        /** MultiCandidateOut */
+        MultiCandidateOut: {
+            /**
+             * Experiment Id
+             * Format: uuid
+             */
+            experiment_id: string;
+            /**
+             * Candidate Version Id
+             * Format: uuid
+             */
+            candidate_version_id: string;
+            /** Candidate */
+            candidate?: string | null;
+            /** Status */
+            status: string;
+            /** N Pairs */
+            n_pairs: number;
+            /**
+             * Delta
+             * @description Composite candidate − baseline, en points
+             */
+            delta: number | null;
+            /** Ci Low */
+            ci_low?: number | null;
+            /** Ci High */
+            ci_high?: number | null;
+            /**
+             * P Value
+             * @description p-value brute du test apparié
+             */
+            p_value: number | null;
+            /**
+             * P Adjusted
+             * @description p-value corrigée (Holm-Bonferroni) pour le nombre de candidates
+             */
+            p_adjusted: number;
+            /**
+             * Significant
+             * @description Améliore la baseline après correction
+             */
+            significant: boolean;
+            /**
+             * Eligible
+             * @description Significative, sans régression critique et recommandée par sa comparaison
+             */
+            eligible: boolean;
+            /** Verdict */
+            verdict?: string | null;
+            /** Recommendation */
+            recommendation?: string | null;
+            /** Critical Regressions */
+            critical_regressions: number;
+            /** Cost */
+            cost?: {
+                [key: string]: number | string | null;
+            } | null;
+            /** Latency */
+            latency?: {
+                [key: string]: number | string | null;
+            } | null;
+            /** Provisional */
+            provisional: boolean;
+        };
+        /**
+         * MultiExperimentCreateIn
+         * @description Une baseline contre 2 à 5 candidates, sur les mêmes cas (une expérience appariée par candidate).
+         */
+        MultiExperimentCreateIn: {
+            /**
+             * Baseline Version Id
+             * Format: uuid
+             */
+            baseline_version_id: string;
+            /** Candidate Version Ids */
+            candidate_version_ids: string[];
+            /**
+             * Benchmark Id
+             * @description Identifiant ou slug du benchmark source
+             */
+            benchmark_id?: string | null;
+            /** Scenario Ids */
+            scenario_ids?: string[] | null;
+            /** Scenario Version Ids */
+            scenario_version_ids?: string[] | null;
+            /** Evaluation Config Id */
+            evaluation_config_id?: string | null;
+            /** Repetitions */
+            repetitions?: number | null;
+            /** Name */
+            name?: string | null;
+            /**
+             * Description
+             * @default
+             */
+            description: string;
+            /**
+             * Hypothesis
+             * @default
+             */
+            hypothesis: string;
+            /** Tags */
+            tags?: string[];
+            /**
+             * Trigger
+             * @default ui
+             */
+            trigger: string;
+        };
+        /** MultiExperimentCreatedOut */
+        MultiExperimentCreatedOut: {
+            /**
+             * Group Id
+             * Format: uuid
+             */
+            group_id: string;
+            /** Experiments */
+            experiments: components["schemas"]["ExperimentOut"][];
+        };
+        /** MultiExperimentReportOut */
+        MultiExperimentReportOut: {
+            /**
+             * Group Id
+             * Format: uuid
+             */
+            group_id: string;
+            /** Complete */
+            complete: boolean;
+            /** Alpha */
+            alpha: number;
+            /** Correction */
+            correction: string;
+            /**
+             * Baseline Version Id
+             * Format: uuid
+             */
+            baseline_version_id: string;
+            /**
+             * Candidates
+             * @description Classées : éligibles d'abord, puis gain décroissant
+             */
+            candidates: components["schemas"]["MultiCandidateOut"][];
+            winner?: components["schemas"]["MultiCandidateOut"] | null;
+            /** Reason */
+            reason: string;
+        };
         /** NoiseInfoOut */
         NoiseInfoOut: {
             /** Pooled Std */
@@ -5106,6 +5621,28 @@ export interface components {
              * @description Clé d'idempotence (ex. « nova-sdlc:<uuid> ») : unique par agent
              */
             external_id: string;
+            /**
+             * Context Snapshot Id
+             * @description Snapshot ORBIT utilisé par l'agent (« nom@vN »). Déduit de `manifest` si absent
+             */
+            context_snapshot_id?: string | null;
+            /**
+             * Release Id
+             * @description Release de l'agent qui a produit ce run
+             */
+            release_id?: string | null;
+            /**
+             * Manifest
+             * @description Manifeste du run côté système externe (NOVA : `run_manifest`), conservé tel quel
+             */
+            manifest?: {
+                [key: string]: unknown;
+            } | null;
+            /**
+             * Events
+             * @description Étapes du run (outils, modèle, récupérations de contexte…) au format Agent Protocol. `run_started`, `final_answer`, `run_completed` et `error` sont écrits par FORGE et ignorés ici.
+             */
+            events?: components["schemas"]["ProtocolEventIn"][];
         };
         /** ObservedUsageIn */
         ObservedUsageIn: {
@@ -5479,6 +6016,34 @@ export interface components {
             /** Average Latency Ms */
             average_latency_ms?: number | null;
         };
+        /** PromoteRunIn */
+        PromoteRunIn: {
+            /**
+             * Label
+             * @description Suffixe du scénario (défaut : regression-<id du run>)
+             */
+            label?: string | null;
+        };
+        /** PromoteRunOut */
+        PromoteRunOut: {
+            /**
+             * Scenario Id
+             * Format: uuid
+             */
+            scenario_id: string;
+            /**
+             * Scenario Version Id
+             * Format: uuid
+             */
+            scenario_version_id: string;
+            /** Slug */
+            slug: string;
+            /**
+             * Created
+             * @description Faux si ce run avait déjà été promu (même scénario renvoyé)
+             */
+            created: boolean;
+        };
         /** PromptCreateIn */
         PromptCreateIn: {
             /**
@@ -5805,6 +6370,62 @@ export interface components {
          * @enum {string}
          */
         ProviderKind: "openai" | "anthropic" | "nova" | "orbit" | "http";
+        /**
+         * PublishLearningIn
+         * @description Publier une expérience gagnante dans ORBIT comme apprentissage (proposé à la validation).
+         */
+        PublishLearningIn: {
+            /**
+             * Title
+             * @description Défaut : « Amélioration validée : <candidate> »
+             */
+            title?: string | null;
+            /**
+             * Content
+             * @description Défaut : hypothèse, changelog de la candidate et synthèse
+             */
+            content?: string | null;
+            /**
+             * Applies To
+             * @description Champ d'application : task_types, agent_kinds, skills, tools, agent_versions
+             */
+            applies_to?: {
+                [key: string]: string[];
+            };
+            /**
+             * Orbit Project
+             * @description Défaut : configuration de l'agent
+             */
+            orbit_project?: string | null;
+            /** Credential Id */
+            credential_id?: string | null;
+            /** Classification */
+            classification?: number | null;
+        };
+        /** PublishLearningOut */
+        PublishLearningOut: {
+            /**
+             * Experiment Id
+             * Format: uuid
+             */
+            experiment_id: string;
+            /** Orbit Item Id */
+            orbit_item_id: string;
+            /** Orbit Project */
+            orbit_project: string;
+            /**
+             * Created
+             * @description Faux si l'expérience avait déjà été publiée
+             */
+            created: boolean;
+            /**
+             * Learning
+             * @description L'apprentissage tel qu'ORBIT l'a enregistré
+             */
+            learning?: {
+                [key: string]: unknown;
+            } | null;
+        };
         /** QueueActivityOut */
         QueueActivityOut: {
             /**
@@ -5950,6 +6571,84 @@ export interface components {
          * @enum {string}
          */
         RegressionSeverity: "minor" | "major" | "critical";
+        /** ReleaseHealthOut */
+        ReleaseHealthOut: {
+            /** Release Id */
+            release_id: string;
+            /**
+             * Baseline Release Id
+             * @description null : comparée aux runs sans release
+             */
+            baseline_release_id: string | null;
+            /** Days */
+            days: number;
+            /**
+             * Status
+             * @description healthy | degraded | insufficient_data
+             */
+            status: string;
+            /** Reason */
+            reason: string;
+            release: components["schemas"]["WindowStatsOut"];
+            baseline: components["schemas"]["WindowStatsOut"];
+            /** Alerts */
+            alerts: components["schemas"]["HealthAlertOut"][];
+        };
+        /** ReleaseRowOut */
+        ReleaseRowOut: {
+            /** N Runs */
+            n_runs: number;
+            /** N Scored */
+            n_scored: number;
+            /** N Failed */
+            n_failed: number;
+            /** N Passed */
+            n_passed: number;
+            /** Composite Mean */
+            composite_mean?: number | null;
+            /** Pass Rate */
+            pass_rate?: number | null;
+            /** Failure Rate */
+            failure_rate?: number | null;
+            /** Error Rate */
+            error_rate?: number | null;
+            /** Cost Mean */
+            cost_mean?: number | null;
+            /** Cost Per Success */
+            cost_per_success?: number | null;
+            /** Latency P95 */
+            latency_p95?: number | null;
+            /**
+             * Release Id
+             * @description Identifiant de release (NOVA) ; null = runs sans release
+             */
+            release_id: string | null;
+            /** Label */
+            label: string;
+            /**
+             * Vs No Release
+             * @description Écart avec les runs sans release : composite, taux de réussite, coût par réussite
+             */
+            vs_no_release?: {
+                [key: string]: number | null;
+            } | null;
+        };
+        /** ReleasesOverviewOut */
+        ReleasesOverviewOut: {
+            /** Days */
+            days: number;
+            /**
+             * Since
+             * Format: date-time
+             */
+            since: string;
+            /** N Runs */
+            n_runs: number;
+            /** Truncated */
+            truncated: boolean;
+            /** Releases */
+            releases: components["schemas"]["ReleaseRowOut"][];
+        };
         /** ResourceComparisonOut */
         ResourceComparisonOut: {
             /** Key */
@@ -6166,6 +6865,18 @@ export interface components {
             /** Criteria */
             criteria: components["schemas"]["ReviewCriterion"][];
         };
+        /** RiskSignalOut */
+        RiskSignalOut: {
+            /**
+             * Kind
+             * @description tool_loop, tool_errors, error_events, slow, token_overrun, *_budget, timeout
+             */
+            kind: string;
+            /** Message */
+            message: string;
+            /** Weight */
+            weight: number;
+        };
         /** RobustnessComparisonOut */
         RobustnessComparisonOut: {
             /** Baseline */
@@ -6274,6 +6985,20 @@ export interface components {
             evaluation_config_id?: string | null;
             /** Tags */
             tags?: string[];
+            /**
+             * Context Snapshot Id
+             * @description Snapshot ORBIT de l'exécution d'origine (« nom@vN »)
+             */
+            context_snapshot_id?: string | null;
+            /** Release Id */
+            release_id?: string | null;
+            /**
+             * Manifest
+             * @description Manifeste de l'exécution d'origine (NOVA : `run_manifest`), gardé tel quel
+             */
+            manifest?: {
+                [key: string]: unknown;
+            } | null;
         };
         /** RunDetailOut */
         RunDetailOut: {
@@ -6293,6 +7018,14 @@ export interface components {
             tags: string[];
             /** External Id */
             external_id?: string | null;
+            /** Context Snapshot Id */
+            context_snapshot_id?: string | null;
+            /** Release Id */
+            release_id?: string | null;
+            /** Source Manifest */
+            source_manifest?: {
+                [key: string]: unknown;
+            } | null;
             /** Error */
             error?: string | null;
             /** Error Type */
@@ -6462,6 +7195,16 @@ export interface components {
              */
             external_id?: string | null;
             /**
+             * Context Snapshot Id
+             * @description Snapshot ORBIT (« nom@vN »)
+             */
+            context_snapshot_id?: string | null;
+            /**
+             * Release Id
+             * @description Release de l'agent
+             */
+            release_id?: string | null;
+            /**
              * Scenario Id
              * Format: uuid
              */
@@ -6537,6 +7280,45 @@ export interface components {
             started_at?: string | null;
             /** Finished At */
             finished_at?: string | null;
+        };
+        /** RunRiskOut */
+        RunRiskOut: {
+            /**
+             * Run Id
+             * Format: uuid
+             */
+            run_id: string;
+            /** Run Status */
+            run_status: string;
+            /**
+             * Level
+             * @description low | medium | high
+             */
+            level: string;
+            /**
+             * Score
+             * @description 0–1 ; combine les signaux indépendants
+             */
+            score: number;
+            /**
+             * Finished
+             * @description Le run est terminé : le risque ne concerne plus qu'un run en cours
+             */
+            finished: boolean;
+            /** Signals */
+            signals: components["schemas"]["RiskSignalOut"][];
+            /**
+             * Observed
+             * @description Ce qui a été observé : événements, appels d'outils, tokens, durée
+             */
+            observed: {
+                [key: string]: number;
+            };
+            /**
+             * Reference Runs
+             * @description Runs réussis de la même version servant de référence
+             */
+            reference_runs: number;
         };
         /** RunScenarioOut */
         RunScenarioOut: {
@@ -7395,6 +8177,31 @@ export interface components {
          * @enum {string}
          */
         Verdict: "better" | "worse" | "equivalent" | "inconclusive";
+        /** WindowStatsOut */
+        WindowStatsOut: {
+            /** N Runs */
+            n_runs: number;
+            /** N Scored */
+            n_scored: number;
+            /** N Failed */
+            n_failed: number;
+            /** N Passed */
+            n_passed: number;
+            /** Composite Mean */
+            composite_mean?: number | null;
+            /** Pass Rate */
+            pass_rate?: number | null;
+            /** Failure Rate */
+            failure_rate?: number | null;
+            /** Error Rate */
+            error_rate?: number | null;
+            /** Cost Mean */
+            cost_mean?: number | null;
+            /** Cost Per Success */
+            cost_per_success?: number | null;
+            /** Latency P95 */
+            latency_p95?: number | null;
+        };
         /**
          * WorkerActivityOut
          * @description Technical activity of the workers (Exécutions page, not the overview).
@@ -9126,6 +9933,9 @@ export interface operations {
                 tag?: string | null;
                 /** @description Clé d'idempotence (runs observés) */
                 external_id?: string | null;
+                /** @description Snapshot ORBIT (« nom@vN ») */
+                context_snapshot_id?: string | null;
+                release_id?: string | null;
                 /** @description Nom de scénario ou d'agent */
                 q?: string | null;
                 /** @description -created_at, created_at, ±composite, ±latency */
@@ -9411,6 +10221,107 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["RunOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    fill_context_gap_api_v1_runs__run_id__context_gap_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                run_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ContextGapIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ContextGapOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    promote_run_api_v1_runs__run_id__promote_to_scenario_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                run_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": components["schemas"]["PromoteRunIn"] | null;
+            };
+        };
+        responses: {
+            /** @description Run déjà promu */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PromoteRunOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_run_risk_api_v1_runs__run_id__risk_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                run_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RunRiskOut"];
                 };
             };
             /** @description Validation Error */
@@ -10555,6 +11466,70 @@ export interface operations {
             };
         };
     };
+    create_multi_experiment_api_v1_experiments_multi_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MultiExperimentCreateIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MultiExperimentCreatedOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_multi_report_api_v1_experiments_multi__group_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                group_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MultiExperimentReportOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     get_experiment_api_v1_experiments__experiment_id__get: {
         parameters: {
             query?: never;
@@ -10669,6 +11644,41 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ExperimentDetailOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    publish_learning_api_v1_experiments__experiment_id__publish_learning_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                experiment_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PublishLearningIn"];
+            };
+        };
+        responses: {
+            /** @description Déjà publiée */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PublishLearningOut"];
                 };
             };
             /** @description Validation Error */
@@ -10834,6 +11844,138 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ErrorsPageOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_releases_overview_api_v1_analytics_releases_get: {
+        parameters: {
+            query?: {
+                /** @description Fenêtre en jours */
+                days?: number;
+                agent_id?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReleasesOverviewOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_agent_health_api_v1_agents__agent_id__health_get: {
+        parameters: {
+            query?: {
+                window_hours?: number;
+                baseline_hours?: number;
+            };
+            header?: never;
+            path: {
+                agent_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AgentHealthOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    compare_release_api_v1_analytics_releases_compare_get: {
+        parameters: {
+            query: {
+                release_id: string;
+                baseline_release_id?: string | null;
+                days?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReleaseHealthOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_efficiency_api_v1_analytics_efficiency_get: {
+        parameters: {
+            query?: {
+                days?: number;
+                agent_id?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EfficiencyOut"];
                 };
             };
             /** @description Validation Error */

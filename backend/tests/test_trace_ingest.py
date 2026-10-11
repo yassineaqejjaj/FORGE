@@ -158,6 +158,7 @@ async def test_json_events_endpoint_appends_with_next_seq(db_session, admin_clie
         "duplicates": 0,
         "first_seq": 1,
         "last_seq": 2,
+        "risk": {"level": "low", "score": 0.0, "signals": []},
     }
     second = await admin_client.post(f"/api/v1/runs/{run.id}/events",
                                      json={"events": [{"type": "unknown_kind", "name": "Étape libre"}]})  # fmt: skip
@@ -187,3 +188,13 @@ async def test_otlp_http_client_roundtrip_against_app(app, db_session) -> None:
     assert response.status_code == 200
     (event,) = await events_of(db_session, run)
     assert event.type == TraceEventType.decision
+
+
+async def test_the_ingestion_answer_warns_when_a_run_starts_to_loop(db_session, admin_client) -> None:
+    run = await new_run(db_session)
+    same = {"type": "tool_call", "name": "search", "input": {"q": "refund"}}
+    first = await admin_client.post(f"/api/v1/runs/{run.id}/events", json={"events": [same, same]})
+    assert first.json()["risk"]["level"] == "low"
+    third = await admin_client.post(f"/api/v1/runs/{run.id}/events", json={"events": [same]})
+    risk = third.json()["risk"]
+    assert risk["level"] == "medium" and risk["signals"] == ["tool_loop"] and risk["score"] == 0.5

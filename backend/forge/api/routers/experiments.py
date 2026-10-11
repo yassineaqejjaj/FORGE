@@ -5,7 +5,7 @@ from __future__ import annotations
 import uuid
 from typing import Annotated, Any
 
-from fastapi import APIRouter, Query, status
+from fastapi import APIRouter, Query, Response, status
 
 from forge.api.deps import RequireEditor, RequireViewer, SessionDep
 from forge.api.routers.benchmarks import Paging, analytics_errors
@@ -16,11 +16,17 @@ from forge.api.schemas.experiments import (
     ExperimentDetailOut,
     ExperimentOut,
     GateOut,
+    MultiExperimentCreatedOut,
+    MultiExperimentCreateIn,
+    MultiExperimentReportOut,
+    PublishLearningIn,
+    PublishLearningOut,
 )
 from forge.domain.enums import ExecutionStatus, Recommendation
 from forge.domain.experiments import RECOMMENDATION_LABELS
 from forge.infra.models import Experiment
 from forge.services import experiments as service
+from forge.services import learnings, multi_experiments
 
 router = APIRouter(prefix="/experiments", tags=["experiments"])
 
@@ -142,6 +148,57 @@ async def create_experiment(
     return await _detail(session, principal, experiment)
 
 
+@router.post(
+    "/multi",
+    response_model=MultiExperimentCreatedOut,
+    status_code=status.HTTP_201_CREATED,
+    summary="Comparer plusieurs candidates à une même baseline",
+    description=(
+        "Lance une expérience appariée par candidate (mêmes cas, même baseline, 2 à 5 candidates) et les "
+        "regroupe. Rapport corrigé pour les comparaisons multiples : `GET /experiments/multi/{group_id}`."
+    ),
+)
+async def create_multi_experiment(
+    body: MultiExperimentCreateIn, session: SessionDep, principal: RequireEditor
+) -> MultiExperimentCreatedOut:
+    with analytics_errors():
+        group_id, experiments = await multi_experiments.create_multi_experiment(
+            session,
+            principal,
+            principal,
+            baseline_version_id=body.baseline_version_id,
+            candidate_version_ids=body.candidate_version_ids,
+            benchmark_id=body.benchmark_id,
+            scenario_ids=body.scenario_ids,
+            scenario_version_ids=body.scenario_version_ids,
+            evaluation_config_id=body.evaluation_config_id,
+            repetitions=body.repetitions,
+            name=body.name,
+            description=body.description,
+            hypothesis=body.hypothesis,
+            tags=body.tags,
+            trigger=body.trigger,
+        )
+    await session.commit()
+    listings = [await service.experiment_listing(session, e) for e in experiments]
+    return MultiExperimentCreatedOut(
+        group_id=group_id, experiments=[ExperimentOut(**_experiment(i)) for i in listings]
+    )
+
+
+@router.get(
+    "/multi/{group_id}",
+    response_model=MultiExperimentReportOut,
+    summary="Rapport d'une comparaison multiple : p-values corrigées, classement, vainqueur",
+)
+async def get_multi_report(
+    group_id: uuid.UUID, session: SessionDep, principal: RequireViewer
+) -> MultiExperimentReportOut:
+    with analytics_errors():
+        data = await multi_experiments.multi_report(session, principal, group_id)
+    return MultiExperimentReportOut.model_validate(data)
+
+
 @router.get("/{experiment_id}", response_model=ExperimentDetailOut, summary="Détail d'une expérience")
 async def get_experiment(
     experiment_id: uuid.UUID, session: SessionDep, principal: RequireViewer
@@ -191,3 +248,47 @@ async def cancel_experiment(
         await service.cancel_experiment(session, principal, experiment)
     await session.commit()
     return await _detail(session, principal, experiment)
+
+
+@router.post(
+    "/{experiment_id}/publish-learning",
+    response_model=PublishLearningOut,
+    summary="Publier une expérience gagnante dans ORBIT comme apprentissage",
+    description=(
+        "Réservé aux expériences terminées, recommandées, sans régression critique et — dans une comparaison "
+        "multiple — vainqueurs après correction. Les preuves sont calculées par FORGE. ORBIT enregistre un "
+        "apprentissage **proposé** (validation humaine). `201` à la publication, `200` si déjà publiée."
+    ),
+    responses={200: {"model": PublishLearningOut, "description": "Déjà publiée"}},
+)
+async def publish_learning(
+    experiment_id: uuid.UUID,
+    body: PublishLearningIn,
+    response: Response,
+    session: SessionDep,
+    principal: RequireEditor,
+) -> PublishLearningOut:
+    with analytics_errors():
+        result = await learnings.publish_learning(
+            session,
+            principal,
+            principal,
+            experiment_id,
+            learnings.PublishRequest(
+                title=body.title,
+                content=body.content,
+                applies_to=body.applies_to,
+                orbit_project=body.orbit_project,
+                credential_id=body.credential_id,
+                classification=body.classification,
+            ),
+        )
+    await session.commit()
+    response.status_code = status.HTTP_201_CREATED if result.created else status.HTTP_200_OK
+    return PublishLearningOut(
+        experiment_id=result.experiment_id,
+        orbit_item_id=result.orbit_item_id,
+        orbit_project=result.orbit_project,
+        created=result.created,
+        learning=result.learning,
+    )

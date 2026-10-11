@@ -228,3 +228,206 @@ async def test_hidden_scenarios_are_excluded_for_low_clearance(client_as) -> Non
     assert str(secret) not in str(restricted)
     gate = (await low.get(f"/api/v1/experiments/{created['id']}/gate")).json()
     assert "habilitation" in gate["reasons"][-1]
+
+
+# --- Several candidates against one baseline ---------------------------------------------------------
+
+
+async def _multi(client, baseline, candidates, scenario_ids, **extra):
+    return await client.post(
+        "/api/v1/experiments/multi",
+        json={
+            "baseline_version_id": str(baseline),
+            "candidate_version_ids": [str(c) for c in candidates],
+            "scenario_ids": [str(s) for s in scenario_ids],
+            "repetitions": 1,
+            **extra,
+        },
+    )
+
+
+async def test_multi_experiment_validation_and_atomicity(client_as) -> None:
+    scenario_ids, (v1, v2, v3) = await make_catalog(n_scenarios=3, n_agents=3)
+    editor = await client_as(Role.editor)
+    viewer = await client_as(Role.viewer)
+    assert (await _multi(viewer, v1, [v2, v3], scenario_ids)).status_code == 403
+    assert (await _multi(editor, v1, [v2], scenario_ids)).status_code == 422  # at least two candidates
+    assert (await _multi(editor, v1, [v2, v2], scenario_ids)).status_code == 422  # duplicates collapse to one
+    too_many = [uuid.uuid4() for _ in range(6)]
+    assert (await _multi(editor, v1, too_many, scenario_ids)).status_code == 422
+    before = len((await editor.get("/api/v1/experiments")).json()["items"])
+    bad = await _multi(editor, v1, [v2, uuid.uuid4()], scenario_ids)
+    assert bad.status_code == 422  # one unknown candidate cancels the whole group
+    assert len((await editor.get("/api/v1/experiments")).json()["items"]) == before
+    unknown = await editor.get(f"/api/v1/experiments/multi/{uuid.uuid4()}")
+    assert unknown.status_code == 404
+
+
+async def test_multi_experiment_picks_a_winner_only_after_correction(client_as) -> None:
+    scenario_ids, (base, good, flat, worse) = await make_catalog(n_scenarios=8, n_agents=4)
+    editor = await client_as(Role.editor)
+    created = await _multi(editor, base, [good, flat, worse], scenario_ids, name="Trois variantes")
+    assert created.status_code == 201, created.text
+    body = created.json()
+    group_id, experiments = body["group_id"], body["experiments"]
+    assert len(experiments) == 3 and all(e["status"] == "running" for e in experiments)
+
+    pending = (await editor.get(f"/api/v1/experiments/multi/{group_id}")).json()
+    assert pending["complete"] is False and pending["winner"] is None and "pas terminées" in pending["reason"]
+
+    gain = {good: 9.0, flat: 0.0, worse: -6.0}
+
+    def scorer(run):
+        idx = scenario_index(run, scenario_ids)
+        value = 60.0 + 3 * idx
+        if run.arm == ExperimentArm.candidate:
+            # "flat" only wobbles around zero (+0.5 / -0.5): no real effect.
+            wobble = (0.5 if idx % 2 else -0.5) if run.agent_version_id == flat else 0.0
+            value += gain[run.agent_version_id] + wobble + (idx % 2) * 0.1
+        return value, {"dimensions": {"quality": value / 100, "safety": 1.0}}
+
+    for experiment in experiments:
+        await complete_runs(scorer, experiment_id=uuid.UUID(experiment["id"]))
+
+    report = (await editor.get(f"/api/v1/experiments/multi/{group_id}")).json()
+    assert report["complete"] is True and report["correction"] == "holm_bonferroni"
+    by_candidate = {c["candidate_version_id"]: c for c in report["candidates"]}
+    best, neutral, bad = by_candidate[str(good)], by_candidate[str(flat)], by_candidate[str(worse)]
+    assert best["delta"] > 8 and best["significant"] is True and best["eligible"] is True
+    assert best["p_adjusted"] >= best["p_value"]  # correction never lowers a p-value
+    assert neutral["significant"] is False and neutral["eligible"] is False
+    assert bad["delta"] < 0 and bad["significant"] is False and bad["eligible"] is False
+    assert report["winner"]["candidate_version_id"] == str(good)
+    assert report["candidates"][0]["candidate_version_id"] == str(good)  # ranked first
+    assert "p corrigée" in report["reason"]
+    # Each pairwise experiment keeps its own gate: the group does not replace it.
+    gate = (await editor.get(f"/api/v1/experiments/{experiments[2]['id']}/gate")).json()
+    assert gate["passed"] is False
+
+
+async def test_multi_experiment_without_a_real_gain_keeps_the_baseline(client_as) -> None:
+    scenario_ids, (base, a, b) = await make_catalog(n_scenarios=8, n_agents=3)
+    editor = await client_as(Role.editor)
+    created = (await _multi(editor, base, [a, b], scenario_ids)).json()
+
+    def scorer(run):
+        idx = scenario_index(run, scenario_ids)
+        wobble = (0.4 if idx % 2 else -0.4) if run.arm == ExperimentArm.candidate else 0.0
+        value = 60.0 + 3 * idx + wobble
+        return value, {"dimensions": {"quality": value / 100, "safety": 1.0}}
+
+    for experiment in created["experiments"]:
+        await complete_runs(scorer, experiment_id=uuid.UUID(experiment["id"]))
+    report = (await editor.get(f"/api/v1/experiments/multi/{created['group_id']}")).json()
+    assert report["complete"] is True and report["winner"] is None
+    assert not any(c["eligible"] for c in report["candidates"])
+    assert "on conserve la baseline" in report["reason"] or "aucun n'est livrable" in report["reason"]
+
+
+# --- FORGE → ORBIT: publish a winning experiment as a learning ---------------------------------------
+
+
+async def _orbit_credential(session) -> uuid.UUID:
+    from forge.domain.enums import ProviderKind
+    from forge.services.credentials import create_credential
+
+    credential = await create_credential(
+        session, name=f"orbit-{uuid.uuid4().hex[:6]}", kind=ProviderKind.orbit, secret="orbit-key-9",
+        base_url="https://orbit.example",
+    )  # fmt: skip
+    await session.commit()
+    return credential.id
+
+
+def _winning_scorer(scenario_ids, gain):
+    def scorer(run):
+        idx = scenario_index(run, scenario_ids)
+        value = 60.0 + 3 * idx
+        if run.arm == ExperimentArm.candidate:
+            value += gain + (idx % 2) * 0.1
+        return value, {"dimensions": {"quality": value / 100, "safety": 1.0}}
+
+    return scorer
+
+
+@pytest.mark.usefixtures("respx_mock")
+async def test_winning_experiment_is_published_to_orbit_once(client_as) -> None:
+    import json
+
+    import httpx
+    import respx
+
+    from forge.infra.db import get_sessionmaker
+
+    scenario_ids, (v1, v2) = await make_catalog(n_scenarios=8)
+    editor = await client_as(Role.editor)
+    created = await _experiment(
+        editor, v1, v2, scenario_ids, repetitions=2, hypothesis="Citer la règle métier"
+    )
+    await complete_runs(_winning_scorer(scenario_ids, 9.0), experiment_id=uuid.UUID(created["id"]))
+    async with get_sessionmaker()() as session:
+        credential = await _orbit_credential(session)
+    orbit_answer = {"id": "5b5b5b5b-0000-4000-8000-000000000001", "kind": "learning", "status": "proposed"}
+    with respx.mock(assert_all_called=False) as router:
+        route = router.post("https://orbit.example/api/v1/projects/atlas/learnings").mock(
+            return_value=httpx.Response(201, json=orbit_answer)
+        )
+        url = f"/api/v1/experiments/{created['id']}/publish-learning"
+        body = {
+            "orbit_project": "atlas",
+            "credential_id": str(credential),
+            "applies_to": {"task_types": ["specification"], "skills": ["prd"]},
+        }
+        first = await editor.post(url, json=body)
+        assert first.status_code == 201, first.text
+        assert first.json()["orbit_item_id"] == orbit_answer["id"] and first.json()["created"] is True
+        sent = json.loads(route.calls.last.request.content)
+        assert route.calls.last.request.headers["authorization"] == "Bearer orbit-key-9"
+        assert sent["applies_to"] == body["applies_to"] and "Citer la règle métier" in sent["content"]
+        evidence = sent["evidence"]
+        assert evidence["source"] == "forge" and evidence["experiment_id"] == created["id"]
+        assert evidence["metric"] == "composite" and evidence["runs"] == 16  # 8 scenarios × 2 repetitions
+        assert evidence["candidate"] > evidence["baseline"] + 8 and len(evidence["run_ids"]) == 16
+        again = await editor.post(url, json=body)
+        assert again.status_code == 200 and again.json()["created"] is False
+        assert again.json()["orbit_item_id"] == orbit_answer["id"] and route.call_count == 1
+
+
+async def test_publication_is_refused_unless_the_improvement_holds(client_as) -> None:
+    scenario_ids, (v1, v2) = await make_catalog(n_scenarios=8)
+    editor = await client_as(Role.editor)
+    viewer = await client_as(Role.viewer)
+    running = await _experiment(editor, v1, v2, scenario_ids, repetitions=1)
+    url = f"/api/v1/experiments/{running['id']}/publish-learning"
+    body = {"orbit_project": "atlas"}
+    assert (await viewer.post(url, json=body)).status_code == 403
+    assert (await editor.post(url, json=body)).status_code == 409  # not finished
+    await complete_runs(_winning_scorer(scenario_ids, -6.0), experiment_id=uuid.UUID(running["id"]))
+    worse = await editor.post(url, json=body)
+    assert worse.status_code == 422 and "recommandée" in worse.json()["detail"]
+    assert (
+        await editor.post(f"/api/v1/experiments/{uuid.uuid4()}/publish-learning", json=body)
+    ).status_code == 404
+
+
+async def test_only_the_group_winner_of_a_multi_experiment_can_be_published(client_as) -> None:
+    scenario_ids, (base, good, flat) = await make_catalog(n_scenarios=8, n_agents=3)
+    editor = await client_as(Role.editor)
+    created = (await _multi(editor, base, [good, flat], scenario_ids)).json()
+    gains = {good: 9.0, flat: 0.0}
+
+    def scorer(run):
+        idx = scenario_index(run, scenario_ids)
+        value = 60.0 + 3 * idx
+        if run.arm == ExperimentArm.candidate:
+            wobble = (0.5 if idx % 2 else -0.5) if run.agent_version_id == flat else 0.0
+            value += gains[run.agent_version_id] + wobble + (idx % 2) * 0.1
+        return value, {"dimensions": {"quality": value / 100, "safety": 1.0}}
+
+    for experiment in created["experiments"]:
+        await complete_runs(scorer, experiment_id=uuid.UUID(experiment["id"]))
+    loser = next(e for e in created["experiments"] if e["candidate_version_id"] == str(flat))
+    refused = await editor.post(
+        f"/api/v1/experiments/{loser['id']}/publish-learning", json={"orbit_project": "atlas"}
+    )
+    assert refused.status_code == 422, refused.text

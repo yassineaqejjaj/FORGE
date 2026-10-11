@@ -49,7 +49,7 @@ from forge.infra.models import (
 )
 from forge.infra.models import Evaluation as EvaluationRow
 from forge.infra.queue import PRIORITY_INTERACTIVE
-from forge.services import access, audit, runs
+from forge.services import access, audit, run_links, runs
 from forge.services.access import Viewer
 from forge.services.audit import ActorLike
 from forge.services.taxonomy import ConflictError, InvalidError, NotFoundError
@@ -129,6 +129,8 @@ class RunFilters:
     created_to: datetime | None = None
     tag: str | None = None
     external_id: str | None = None
+    context_snapshot_id: str | None = None
+    release_id: str | None = None
     q: str | None = None
 
 
@@ -173,6 +175,10 @@ def _conditions(viewer: Viewer, f: RunFilters) -> list[Any]:
         c.append(EvaluationRun.tags.contains([f.tag]))
     if f.external_id:
         c.append(EvaluationRun.external_id == f.external_id)
+    if f.context_snapshot_id:
+        c.append(EvaluationRun.context_snapshot_id == f.context_snapshot_id)
+    if f.release_id:
+        c.append(EvaluationRun.release_id == f.release_id)
     if f.q and f.q.strip():
         pattern = f"%{f.q.strip()}%"
         c.append(or_(SCENARIO_NAME.ilike(pattern), SCENARIO_SLUG.ilike(pattern), AGENT_NAME.ilike(pattern)))
@@ -239,6 +245,8 @@ def run_summary(row: RunRow) -> dict[str, Any]:
         "repetition": run.repetition,
         "tags": list(run.tags or []),
         "external_id": run.external_id,
+        "context_snapshot_id": run.context_snapshot_id,
+        "release_id": run.release_id,
         "scenario_id": run.scenario_id,
         "scenario_version_id": run.scenario_version_id,
         "scenario_slug": s.get("slug") or scenario.slug,
@@ -419,6 +427,9 @@ async def run_detail(session: AsyncSession, viewer: Viewer, run_id: uuid.UUID) -
         "repetition": run.repetition,
         "tags": list(run.tags or []),
         "external_id": run.external_id,
+        "context_snapshot_id": run.context_snapshot_id,
+        "release_id": run.release_id,
+        "source_manifest": run.source_manifest,
         "error": (REDACTED_TEXT if redact and run.error else run.error),
         "error_type": run.error_type,
         "otel_trace_id": run.otel_trace_id,
@@ -692,6 +703,9 @@ class RunRequest:
     repetitions: int = 1
     evaluation_config_id: uuid.UUID | None = None
     tags: Sequence[str] = field(default_factory=list)
+    context_snapshot_id: str | None = None
+    release_id: str | None = None
+    manifest: dict[str, Any] | None = None
 
 
 async def default_evaluation_config(session: AsyncSession) -> EvaluationConfig:
@@ -789,6 +803,13 @@ async def create_adhoc_runs(
         if "introuvable" in message:
             raise NotFoundError(message) from exc
         raise InvalidError(message) from exc
+    for run in created:
+        run_links.apply_links(
+            run,
+            context_snapshot_id=request.context_snapshot_id,
+            release_id=request.release_id,
+            manifest=request.manifest,
+        )
     await audit.record(
         session,
         actor,

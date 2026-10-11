@@ -32,6 +32,10 @@ acceptée). Un scénario au-dessus de l'habilitation de l'appelant n'est pas ré
 | `usage` | `{input_tokens, output_tokens, model_calls}` | entiers ≥ 0 (défaut 0) ; le coût est estimé avec le tarif du modèle de la version d'agent s'il existe |
 | `tags` | liste de textes | 20 maximum, dédoublonnés |
 | `external_id` | texte (1–200) | **clé d'idempotence**, unique **par agent** (toutes versions confondues) |
+| `context_snapshot_id` | texte (1–300) \| null | snapshot de contexte ORBIT utilisé par l'agent (`nom@vN`) ; déduit de `manifest.context.snapshot_id` s'il est absent |
+| `release_id` | texte (1–200) \| null | release de l'agent qui a produit le run ; déduit de `manifest.release_id` s'il est absent |
+| `manifest` | objet \| null | manifeste du run côté système externe (NOVA : `run_manifest`), 20 000 caractères maximum ; conservé tel quel dans `source_manifest` |
+| `events` | liste d'événements Agent Protocol | 300 maximum : étapes du run (`llm_call`, `tool_call`, `retrieval`…), stockées comme événements de trace ; `run_started`, `final_answer`, `run_completed` et `error` sont écrits par FORGE et ignorés. Les compteurs `tool_calls` / `model_calls` en sont déduits |
 
 <!-- example: request -->
 ```json
@@ -91,6 +95,8 @@ acceptée). Un scénario au-dessus de l'habilitation de l'appelant n'est pas ré
   "repetition": 0,
   "tags": ["nova", "sdlc"],
   "external_id": "nova-sdlc:6f1c2a8e-3b7d-4c55-9a43-0d2f6e1b9c10",
+  "context_snapshot_id": null,
+  "release_id": null,
   "scenario_id": "22222222-2222-4222-8222-222222222222",
   "scenario_version_id": "7a1b2c3d-0000-4000-8000-000000000001",
   "scenario_slug": "nova-sdlc-delivery",
@@ -321,7 +327,7 @@ revue sans correction (1) = 7/9 ≈ 0,778 en qualité ; autonomie 2 intervention
      `used_in_composite`) ; les critères `cost.*` / `latency.total` sont des métriques informatives ;
    * `GET /api/v1/runs/{id}/errors` : règles en échec classées (`INSTRUCTION_FAILURE`…) et erreur
      d'exécution éventuelle ; `GET /api/v1/runs/{id}/feedback` : rapport de feedback.
-4. Filtres de liste utiles : `?origin=observed`, `?external_id=…`, `?tag=…`, `?agent_version_id=…`,
+4. Filtres de liste utiles : `?origin=observed`, `?external_id=…`, `?context_snapshot_id=…`, `?release_id=…`, `?tag=…`, `?agent_version_id=…`,
    `?status=completed`, `?passed=true`, `?min_composite=…`.
 
 ---
@@ -335,3 +341,24 @@ revue sans correction (1) = 7/9 ≈ 0,778 en qualité ; autonomie 2 intervention
 * La trace d'un run observé ne contient pas d'étapes détaillées (`stages` reste dans `output_json`) ;
   les règles `tool_called` / `max_tool_calls` n'ont donc rien à mesurer.
 * Revenir en arrière sur la migration `0002` supprime les runs observés existants.
+
+---
+
+## Combler un manque de contexte (`POST /api/v1/runs/{id}/context-gap`)
+
+Quand un run échoue faute d'information (erreurs `MISSING_INFORMATION`, ou manque connu de l'appelant),
+FORGE demande à ORBIT de recomposer le contexte **servi à ce run** autour de ce qui manquait :
+
+1. les manques viennent de `missing` (corps) ou, à défaut, des erreurs `MISSING_INFORMATION` du run ;
+2. la requête ORBIT à compléter est lue sur la trace (runs exécutés par FORGE : `orbit_request_id`) ou dans
+   le manifeste rapporté (`manifest.context.retrieval_id` et `manifest.context.project_slug`, que NOVA envoie) ;
+3. FORGE appelle `POST /projects/{slug}/context/requests/{id}/complete` d'ORBIT, qui enregistre le résultat
+   comme **version suivante du snapshot** (rien n'est écrasé) ;
+4. avec `"retest": true`, FORGE crée une version d'agent dérivée, épinglée sur le nouveau snapshot
+   (`context_config.source = orbit_snapshot`), et relance le même scénario : l'effet se mesure sur le run
+   créé (`tags: context-gap-of:<run>`, `source_manifest.context_gap_of`).
+
+Corps : `{missing?, orbit_project?, credential_id?, snapshot?, retest?}`. Réponse : les manques utilisés, la
+requête ORBIT d'origine, la réponse d'ORBIT (nouveau snapshot, éléments ajoutés, manques restants) et, avec
+`retest`, `candidate_version_id` et `retest_run_id`. `422` : rien de manquant ou aucune requête ORBIT
+enregistrée ; `409` : ORBIT a refusé ou est injoignable.
