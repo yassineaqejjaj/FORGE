@@ -5452,6 +5452,24 @@ export interface components {
             latency_p95?: number | null;
             /** Model */
             model: string;
+            /**
+             * Usable
+             * @description Assez de runs évalués et un coût connu pour être comparé
+             * @default false
+             */
+            usable: boolean;
+            /**
+             * Pareto
+             * @description Aucun autre modèle ne fait mieux à la fois en réussite et en coût
+             * @default false
+             */
+            pareto: boolean;
+            /**
+             * Best Value
+             * @description Le moins cher par réussite parmi les modèles quasi aussi bons
+             * @default false
+             */
+            best_value: boolean;
         };
         /** MultiCandidateOut */
         MultiCandidateOut: {

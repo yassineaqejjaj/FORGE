@@ -341,6 +341,15 @@ class ReleaseHealthOut(ApiModel):
 
 class ModelStatsOut(WindowStatsOut):
     model: str
+    usable: bool = Field(
+        default=False, description="Assez de runs évalués et un coût connu pour être comparé"
+    )
+    pareto: bool = Field(
+        default=False, description="Aucun autre modèle ne fait mieux à la fois en réussite et en coût"
+    )
+    best_value: bool = Field(
+        default=False, description="Le moins cher par réussite parmi les modèles quasi aussi bons"
+    )
 
 
 class EfficiencyRecommendationOut(ApiModel):

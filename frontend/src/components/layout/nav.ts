@@ -198,6 +198,13 @@ export const NAV_SECTIONS: NavSection[] = [
             description: "Explorateur des erreurs par type, gravité, agent et scénario",
             keywords: ["erreurs", "taxonomie", "hallucination", "gravité"],
           },
+          {
+            href: "/arena",
+            label: "Arène des modèles",
+            icon: BarChart3,
+            description: "Quel modèle pour quel travail : réussite, coût par réussite et frontière de Pareto",
+            keywords: ["modèles", "coût", "pareto", "classement", "efficacité", "moins cher", "arène"],
+          },
         ],
       },
       {
