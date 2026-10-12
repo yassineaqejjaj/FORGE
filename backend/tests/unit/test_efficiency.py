@@ -55,3 +55,35 @@ def test_when_the_best_model_is_also_the_cheapest_the_others_are_dominated():
         ("dominated", "big", "small", 0.6)
     ]
     assert recommend({"a": stats(100, 90, 0.20), "b": stats(100, 90, 0.20)}) == []  # nothing to gain
+
+
+def test_the_pareto_front_keeps_only_models_nothing_beats_on_both_success_and_cost():
+    from forge.domain.efficiency import pareto_front
+
+    front = pareto_front(
+        {
+            "big": stats(100, 95, 0.60),  # best success, priciest: on the frontier
+            "mid": stats(100, 90, 0.20),  # cheaper, a bit less reliable: on the frontier
+            "small": stats(100, 70, 0.05),  # cheapest: on the frontier
+            "wasteful": stats(100, 85, 0.50),  # beaten by mid on both: dominated
+        }
+    )
+    assert front == {"big", "mid", "small"}
+
+
+def test_models_that_cannot_be_compared_are_never_on_the_frontier_and_ties_do_not_dominate():
+    from forge.domain.efficiency import pareto_front
+
+    assert pareto_front({"few": stats(5, 5, 0.01), "unknown": stats(100, 90, None)}) == set()
+    assert pareto_front({"a": stats(100, 90, 0.20), "b": stats(100, 90, 0.20)}) == {"a", "b"}
+
+
+def test_best_value_is_the_cheapest_among_the_nearly_best_and_needs_something_to_compare():
+    from forge.domain.efficiency import best_value
+
+    assert (
+        best_value({"big": stats(100, 95, 0.60), "mid": stats(100, 92, 0.20), "small": stats(100, 60, 0.02)})
+        == "mid"
+    )
+    assert best_value({"big": stats(100, 95, 0.60)}) is None
+    assert best_value({"big": stats(100, 95, 0.60), "few": stats(5, 5, 0.01)}) is None

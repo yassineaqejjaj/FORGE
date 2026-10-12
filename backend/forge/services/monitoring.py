@@ -290,7 +290,7 @@ async def efficiency_report(
     """Per scenario category and model: success rate, cost per success, latency — and where a cheaper model
     is as good (``forge.domain.efficiency``). Any origin counts: the same work run by different models is
     exactly what the comparison needs."""
-    from forge.domain.efficiency import recommend
+    from forge.domain.efficiency import _usable, best_value, pareto_front, recommend
 
     since = utcnow() - timedelta(days=days)
     conditions = [EvaluationRun.created_at >= since, EvaluationRun.status.in_(list(EVALUATED))]
@@ -311,11 +311,18 @@ async def efficiency_report(
     categories = []
     for category in sorted(groups):
         stats = {model: summarize(runs) for model, runs in groups[category].items()}
+        front, value = pareto_front(stats), best_value(stats)
         categories.append(
             {
                 "category": category,
                 "models": [
-                    {"model": model, **asdict(s)}
+                    {
+                        "model": model,
+                        **asdict(s),
+                        "usable": _usable(s),
+                        "pareto": model in front,
+                        "best_value": model == value,
+                    }
                     for model, s in sorted(stats.items(), key=lambda kv: -kv[1].n_runs)
                 ],
                 "recommendations": [asdict(r) for r in recommend(stats)],

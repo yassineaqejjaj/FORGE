@@ -634,3 +634,7 @@ ORBIT est gardé en tag (`learning:<id>`) : publier deux fois renvoie le même a
   que le meilleur — écart toléré 5 points, test unilatéral — et au moins 15 % moins cher par réussite) ou
   `dominated` (le meilleur modèle est aussi le moins cher : les autres sont inutilement chers). Moins de 20 runs
   évalués par modèle : aucune recommandation. À appliquer côté NOVA avec `NOVA_LLM_SKILL_MODELS`.
+  Chaque modèle porte aussi `usable` (assez de runs et un coût connu), `pareto` (aucun autre modèle ne fait mieux à
+  la fois en réussite et en coût par réussite — la frontière) et `best_value` (le moins cher par réussite parmi les
+  modèles à moins de 5 points du meilleur ; dit seulement s'il y a deux modèles comparables). L'interface
+  **Analyser › Arène des modèles** (`/arena`) les montre : nuage coût/réussite, frontière, recommandations.

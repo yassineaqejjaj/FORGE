@@ -100,3 +100,40 @@ def recommend(models: Mapping[str, WindowStats]) -> list[Recommendation]:
             )
         )
     return sorted(found, key=lambda r: -r.saving)
+
+
+def pareto_front(models: Mapping[str, WindowStats]) -> set[str]:
+    """Models no other beats on both success rate and cost per success (enough runs, known cost).
+
+    A model is *dominated* when another succeeds at least as often for no more per success, and is strictly
+    better on one of the two. What remains is the frontier: each point is the best choice for some budget.
+    """
+    usable = {m: s for m, s in models.items() if _usable(s)}
+    front: set[str] = set()
+    for model, stats in usable.items():
+        assert stats.pass_rate is not None and stats.cost_per_success is not None
+        dominated = any(
+            other.pass_rate is not None
+            and other.cost_per_success is not None
+            and other.pass_rate >= stats.pass_rate
+            and other.cost_per_success <= stats.cost_per_success
+            and (other.pass_rate > stats.pass_rate or other.cost_per_success < stats.cost_per_success)
+            for name, other in usable.items()
+            if name != model
+        )
+        if not dominated:
+            front.add(model)
+    return front
+
+
+def best_value(models: Mapping[str, WindowStats]) -> str | None:
+    """The cheapest model per success among those within the tolerated shortfall of the best success rate.
+
+    Only said when there is something to compare (two usable models): a lone model is not "best value".
+    """
+    usable = {m: s for m, s in models.items() if _usable(s)}
+    if len(usable) < 2:
+        return None
+    top = max(s.pass_rate or 0.0 for s in usable.values())
+    near = {m: s for m, s in usable.items() if (s.pass_rate or 0.0) >= top - MAX_PASS_RATE_SHORTFALL}
+    return min(near, key=lambda m: (near[m].cost_per_success or 0.0, -(near[m].pass_rate or 0.0), m))
