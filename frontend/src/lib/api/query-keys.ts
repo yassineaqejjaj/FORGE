@@ -35,6 +35,7 @@ export type ResourceName =
   | "errors"
   | "results"
   | "arena"
+  | "redteam"
   | "feedback-reports"
   | "users"
   | "api-keys"

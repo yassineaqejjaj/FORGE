@@ -33,6 +33,7 @@ ROUTER_MODULES: tuple[str, ...] = (
     "experiments",
     "calibration",
     "analytics",
+    "redteam",
     "audit",
 )
 

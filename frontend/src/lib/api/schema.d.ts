@@ -1558,6 +1558,63 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/redteam/catalog": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Catalogue des attaques */
+        get: operations["catalog_api_v1_redteam_catalog_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/redteam/runs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Lancer le catalogue d'attaques contre une version d'agent
+         * @description Installe les scénarios d'attaque manquants puis lance un run par attaque et par répétition.
+         */
+        post: operations["launch_api_v1_redteam_runs_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/redteam/report": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Résistance d'une version d'agent aux attaques
+         * @description Pour chaque famille d'attaque : part des runs évalués où aucun détecteur n'a déclenché. Les détecteurs sont des règles déterministes (aucun juge LLM).
+         */
+        get: operations["report_api_v1_redteam_report_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/audit": {
         parameters: {
             query?: never;
@@ -6583,6 +6640,86 @@ export interface components {
             summary: string;
             /** Reasons */
             reasons: string[];
+        };
+        /** RedTeamAttackOut */
+        RedTeamAttackOut: {
+            /** Key */
+            key: string;
+            /** Label */
+            label: string;
+            /** Summary */
+            summary: string;
+            /** Prompt */
+            prompt: string;
+            /** Expected Behavior */
+            expected_behavior: string;
+            /**
+             * Scenario Id
+             * @description null tant que le catalogue n'a pas été installé
+             */
+            scenario_id?: string | null;
+        };
+        /** RedTeamFamilyOut */
+        RedTeamFamilyOut: {
+            /** Key */
+            key: string;
+            /** Label */
+            label: string;
+            /** Summary */
+            summary: string;
+            /** Runs */
+            runs: number;
+            /** Resisted */
+            resisted: number;
+            /** Resistance */
+            resistance: number | null;
+            /**
+             * Status
+             * @description solid | fragile | weak | not_run
+             */
+            status: string;
+            /** Failed Run Ids */
+            failed_run_ids: string[];
+            /** Error Types */
+            error_types: {
+                [key: string]: number;
+            };
+        };
+        /** RedTeamLaunchIn */
+        RedTeamLaunchIn: {
+            /**
+             * Agent Version Id
+             * Format: uuid
+             */
+            agent_version_id: string;
+            /**
+             * Repetitions
+             * @default 1
+             */
+            repetitions: number;
+        };
+        /** RedTeamLaunchOut */
+        RedTeamLaunchOut: {
+            /** Run Ids */
+            run_ids: string[];
+            /** Attacks */
+            attacks: number;
+        };
+        /** RedTeamReportOut */
+        RedTeamReportOut: {
+            /** Agent Version Id */
+            agent_version_id: string;
+            /** Days */
+            days: number;
+            /** Resistance */
+            resistance: number | null;
+            /**
+             * Status
+             * @description solid | fragile | vulnerable | not_run
+             */
+            status: string;
+            /** Families */
+            families: components["schemas"]["RedTeamFamilyOut"][];
         };
         /**
          * RegressionSeverity
@@ -11994,6 +12131,91 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["EfficiencyOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    catalog_api_v1_redteam_catalog_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RedTeamAttackOut"][];
+                };
+            };
+        };
+    };
+    launch_api_v1_redteam_runs_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RedTeamLaunchIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RedTeamLaunchOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    report_api_v1_redteam_report_get: {
+        parameters: {
+            query: {
+                agent_version_id: string;
+                days?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RedTeamReportOut"];
                 };
             };
             /** @description Validation Error */

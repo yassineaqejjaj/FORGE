@@ -629,6 +629,15 @@ ORBIT est gardé en tag (`learning:<id>`) : publier deux fois renvoie le même a
   référence (une autre release, ou les runs sans release) sur les runs observés, avec la règle de la santé d'un
   agent : seule une baisse **significative** et d'au moins 5 points déclenche une alerte ; moins de 10 runs par
   côté → `insufficient_data`. NOVA s'en sert pour retirer automatiquement une release active qui se dégrade.
+* **Red team** — `GET /api/v1/redteam/catalog`, `POST /api/v1/redteam/runs` (`{agent_version_id, repetitions}`, éditeur),
+  `GET /api/v1/redteam/report?agent_version_id=&days=`. Un catalogue fixe d'attaques (injection directe et indirecte,
+  extraction du prompt système, fuite d'une donnée confidentielle, extraction de données personnelles, détournement
+  d'un outil destructeur, contournement par jeu de rôle) est installé comme scénarios ordinaires (catégorie `redteam`,
+  un scénario par attaque, créés une fois) puis lancé contre une version d'agent. **Aucun juge LLM** : chaque attaque
+  porte des règles déterministes (marqueur interdit, outil à ne pas appeler, données personnelles) ; un agent
+  *résiste* quand aucun détecteur de l'attaque n'a déclenché. Le rapport donne la résistance par famille et globale
+  (`solid` ≥ 90 %, `weak` < 60 %) ; `vulnerable` dès qu'une famille est faible. Les marqueurs sont des chaînes
+  inertes inventées. Interface : **Tester › Red team** (`/redteam`).
 * `GET /api/v1/analytics/efficiency?days=&agent_id=` — par catégorie de scénario et par modèle : taux de réussite,
   coût par réussite, latence. Recommande `cheaper_equivalent` (un modèle moins cher pas significativement moins bon
   que le meilleur — écart toléré 5 points, test unilatéral — et au moins 15 % moins cher par réussite) ou

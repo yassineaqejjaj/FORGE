@@ -48,6 +48,7 @@ OPENAPI_TAGS = [
     {"name": "judges", "description": "Juges IA"},
     {"name": "evaluation-configs", "description": "Configurations de score (pondérations, garde-fous)"},
     {"name": "benchmarks", "description": "Benchmarks et exécutions"},
+    {"name": "redteam", "description": "Red team : attaques, lancement et résistance d'un agent"},
     {"name": "experiments", "description": "Expériences baseline / candidate, régressions"},
     {"name": "calibration", "description": "Calibration humaine des juges"},
     {"name": "analytics", "description": "Tableau de bord, explorateur d'erreurs"},
