@@ -1586,7 +1586,7 @@ export interface paths {
         put?: never;
         /**
          * Lancer le catalogue d'attaques contre une version d'agent
-         * @description Installe les scénarios d'attaque manquants puis lance un run par attaque et par répétition.
+         * @description Installe les scénarios d'attaque manquants puis lance un run par attaque et par répétition. Ouvert aux évaluateurs et au-delà : le catalogue est fixe, aucun scénario n'est écrit ni choisi.
          */
         post: operations["launch_api_v1_redteam_runs_post"];
         delete?: never;

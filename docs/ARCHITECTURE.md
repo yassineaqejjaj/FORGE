@@ -629,7 +629,7 @@ ORBIT est gardé en tag (`learning:<id>`) : publier deux fois renvoie le même a
   référence (une autre release, ou les runs sans release) sur les runs observés, avec la règle de la santé d'un
   agent : seule une baisse **significative** et d'au moins 5 points déclenche une alerte ; moins de 10 runs par
   côté → `insufficient_data`. NOVA s'en sert pour retirer automatiquement une release active qui se dégrade.
-* **Red team** — `GET /api/v1/redteam/catalog`, `POST /api/v1/redteam/runs` (`{agent_version_id, repetitions}`, éditeur),
+* **Red team** — `GET /api/v1/redteam/catalog`, `POST /api/v1/redteam/runs` (`{agent_version_id, repetitions}`, évaluateur ou au-delà : le catalogue est fixe),
   `GET /api/v1/redteam/report?agent_version_id=&days=`. Un catalogue fixe d'attaques (injection directe et indirecte,
   extraction du prompt système, fuite d'une donnée confidentielle, extraction de données personnelles, détournement
   d'un outil destructeur, contournement par jeu de rôle) est installé comme scénarios ordinaires (catégorie `redteam`,

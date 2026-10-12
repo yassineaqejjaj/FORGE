@@ -80,7 +80,7 @@ function FamilyCard({ family }: { family: RedTeamFamily }) {
  */
 export function RedTeamView() {
   const { get, set } = useUrlState();
-  const canLaunch = useHasRole("editor");
+  const canLaunch = useHasRole("evaluator");
   const agentId = get("agent_id") ?? undefined;
   const versionId = get("agent_version_id") ?? undefined;
   const daysParam = Number(get("days"));
