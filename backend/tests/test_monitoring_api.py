@@ -181,4 +181,7 @@ async def test_the_efficiency_report_finds_where_a_cheaper_model_is_as_good(clie
     assert {m["model"] for m in category["models"]} == {"big-model", "small-model"}
     (rec,) = category["recommendations"]
     assert (rec["from_model"], rec["to_model"]) == ("big-model", "small-model") and rec["saving"] > 0.7
+    by_model = {m["model"]: m for m in category["models"]}
+    assert by_model["small-model"]["pareto"] is True and by_model["small-model"]["best_value"] is True
+    assert by_model["big-model"]["pareto"] is False and by_model["big-model"]["usable"] is True
     assert (await viewer.get("/api/v1/analytics/efficiency", params={"days": 0})).status_code == 422

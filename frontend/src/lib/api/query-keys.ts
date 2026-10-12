@@ -34,6 +34,7 @@ export type ResourceName =
   | "dashboard"
   | "errors"
   | "results"
+  | "arena"
   | "feedback-reports"
   | "users"
   | "api-keys"
