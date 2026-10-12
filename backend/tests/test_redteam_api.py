@@ -48,7 +48,7 @@ async def test_launching_installs_the_catalogue_once_and_runs_every_attack(clien
     assert len(scenarios) == len(set(scenarios))  # one scenario per attack, however many launches
 
 
-async def test_viewers_can_read_but_not_launch(client_as, db_session) -> None:
+async def test_viewers_can_read_but_not_launch_and_evaluators_can(client_as, db_session) -> None:
     av = await create_agent_version(db_session)
     await db_session.commit()
     viewer = await client_as(Role.viewer)
@@ -56,6 +56,14 @@ async def test_viewers_can_read_but_not_launch(client_as, db_session) -> None:
         await viewer.post("/api/v1/redteam/runs", json={"agent_version_id": str(av.id)})
     ).status_code == 403
     assert (await viewer.get("/api/v1/redteam/catalog")).status_code == 200
+    evaluator = await client_as(Role.evaluator)
+    launched = await evaluator.post("/api/v1/redteam/runs", json={"agent_version_id": str(av.id)})
+    assert launched.status_code == 201, launched.text
+    assert len(launched.json()["run_ids"]) == len(redteam.CATALOG)
+    # Still no way to write scenarios or pick others through this door: it only ever runs the fixed catalogue.
+    assert (
+        await evaluator.post("/api/v1/scenarios", json={"name": "x", "category": "redteam"})
+    ).status_code == 403
     assert (
         await viewer.get("/api/v1/redteam/report", params={"agent_version_id": str(uuid.uuid4())})
     ).status_code == 404

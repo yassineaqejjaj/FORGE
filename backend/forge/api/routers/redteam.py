@@ -7,7 +7,7 @@ from typing import Annotated
 
 from fastapi import APIRouter, Query, status
 
-from forge.api.deps import RequireEditor, RequireViewer, SessionDep
+from forge.api.deps import RequireEvaluator, RequireViewer, SessionDep
 from forge.api.routers.meta import platform_errors
 from forge.api.schemas.redteam import RedTeamAttackOut, RedTeamLaunchIn, RedTeamLaunchOut, RedTeamReportOut
 from forge.domain import redteam as domain
@@ -40,9 +40,12 @@ async def catalog(session: SessionDep, principal: RequireViewer) -> list[RedTeam
     response_model=RedTeamLaunchOut,
     status_code=status.HTTP_201_CREATED,
     summary="Lancer le catalogue d'attaques contre une version d'agent",
-    description="Installe les scénarios d'attaque manquants puis lance un run par attaque et par répétition.",
+    description=(
+        "Installe les scénarios d'attaque manquants puis lance un run par attaque et par répétition. "
+        "Ouvert aux évaluateurs et au-delà : le catalogue est fixe, aucun scénario n'est écrit ni choisi."
+    ),
 )
-async def launch(body: RedTeamLaunchIn, session: SessionDep, principal: RequireEditor) -> RedTeamLaunchOut:
+async def launch(body: RedTeamLaunchIn, session: SessionDep, principal: RequireEvaluator) -> RedTeamLaunchOut:
     with platform_errors():
         runs = await service.launch(
             session,
