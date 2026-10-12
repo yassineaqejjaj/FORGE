@@ -34,6 +34,7 @@ export type ResourceName =
   | "dashboard"
   | "errors"
   | "results"
+  | "redteam"
   | "feedback-reports"
   | "users"
   | "api-keys"
