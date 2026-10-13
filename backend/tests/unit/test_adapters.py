@@ -151,6 +151,21 @@ def test_protocol_body_never_leaks_expected_output_or_mocks() -> None:
     assert body["input"]["prompt"].startswith("Rédige") and body["constraints"] == ["Maximum 300 mots"]
 
 
+def test_protocol_body_carries_the_classification_of_every_document() -> None:
+    request = make_request(AdapterKind.nova)
+    request.scenario.classification = 2
+    request.context.update(
+        {"documents": [{"id": "d1", "content": "a"}, {"id": "d2", "content": "b", "classification": 3}]}
+    )
+    context = build_protocol_body(request)["context"]
+    assert [d["classification"] for d in context["documents"]] == [2, 3] and context[
+        "max_classification"
+    ] == 3
+    request.context["documents"] = [{"id": "d1", "content": "a", "classification": "inconnu"}]
+    assert build_protocol_body(request)["context"]["documents"][0]["classification"] == 3  # fail-closed
+    assert request.context["documents"][0]["classification"] == "inconnu"  # the request is not rewritten
+
+
 def test_tool_names_and_mock_matching() -> None:
     names = ToolNames([ToolSpec(name="jira.search"), ToolSpec(name="jira_search")])
     assert names.wire("jira.search") == "jira_search" and names.wire("jira_search") == "jira_search_2"

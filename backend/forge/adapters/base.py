@@ -11,6 +11,7 @@ from datetime import datetime
 from typing import Any
 
 from forge.config import settings
+from forge.domain.classification import with_levels
 from forge.domain.enums import BuiltinErrorType, TraceEventSource, TraceEventType
 from forge.domain.traces.protocol import FAP_VERSION, parse_protocol_events, parse_usage, usage_from_events
 from forge.domain.traces.recorder import import_events
@@ -91,7 +92,8 @@ def build_protocol_body(request: AgentRequest) -> dict[str, Any]:
         "attempt": attempt_of(request),
         "scenario_version_id": view["scenario_version_id"],
         "input": view["input"],
-        "context": request.context,
+        # Every document carries its level (scenario's when ORBIT gave none, C3 when unreadable).
+        "context": with_levels(request.context, request.scenario.classification),
         "constraints": view["constraints"],
         "agent": {
             "name": agent.agent_name,

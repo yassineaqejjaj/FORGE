@@ -384,6 +384,7 @@ async def test_winning_experiment_is_published_to_orbit_once(client_as) -> None:
         sent = json.loads(route.calls.last.request.content)
         assert route.calls.last.request.headers["authorization"] == "Bearer orbit-key-9"
         assert sent["applies_to"] == body["applies_to"] and "Citer la règle métier" in sent["content"]
+        assert sent["classification"] == 1  # the scenarios' level, never ORBIT's default
         evidence = sent["evidence"]
         assert evidence["source"] == "forge" and evidence["experiment_id"] == created["id"]
         assert evidence["metric"] == "composite" and evidence["runs"] == 16  # 8 scenarios × 2 repetitions
@@ -391,6 +392,38 @@ async def test_winning_experiment_is_published_to_orbit_once(client_as) -> None:
         again = await editor.post(url, json=body)
         assert again.status_code == 200 and again.json()["created"] is False
         assert again.json()["orbit_item_id"] == orbit_answer["id"] and route.call_count == 1
+
+
+async def test_learning_classification_defaults_to_the_highest_scenario_level(client_as) -> None:
+    import json
+
+    import httpx
+    import respx
+
+    from forge.infra.db import get_sessionmaker
+    from forge.infra.models import Scenario
+
+    scenario_ids, (v1, v2) = await make_catalog(n_scenarios=8, classification=2)
+    async with get_sessionmaker()() as session:
+        one = await session.get(Scenario, scenario_ids[0])
+        one.classification = 3
+        await session.commit()
+        credential = await _orbit_credential(session)
+    editor = await client_as(Role.editor, clearance=3)
+    created = await _experiment(editor, v1, v2, scenario_ids, repetitions=2, hypothesis="Citer la règle")
+    await complete_runs(_winning_scorer(scenario_ids, 9.0), experiment_id=uuid.UUID(created["id"]))
+    url = f"/api/v1/experiments/{created['id']}/publish-learning"
+    body = {"orbit_project": "atlas", "credential_id": str(credential)}
+    with respx.mock(assert_all_called=False) as router:
+        route = router.post("https://orbit.example/api/v1/projects/atlas/learnings").mock(
+            return_value=httpx.Response(201, json={"id": "5b5b5b5b-0000-4000-8000-000000000002"})
+        )
+        lower = await editor.post(url, json={**body, "classification": 2})
+        assert lower.status_code == 422 and "Classification" in lower.json()["detail"]
+        assert route.call_count == 0
+        published = await editor.post(url, json=body)
+        assert published.status_code == 201, published.text
+        assert json.loads(route.calls.last.request.content)["classification"] == 3
 
 
 async def test_publication_is_refused_unless_the_improvement_holds(client_as) -> None:
