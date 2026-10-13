@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import uuid
+from pathlib import Path
 
 import httpx
 import respx
@@ -15,6 +16,7 @@ from forge.services.credentials import create_credential
 from tests.factories import create_agent_version, create_run, create_scenario_version
 
 ORBIT = "https://orbit.example"
+SNAPSHOT = json.loads((Path(__file__).parent / "fixtures" / "orbit" / "snapshot.json").read_text("utf-8"))
 REQUEST_ID = "5d0f9c3e-0a3c-4c43-a1a0-2f6f4f0b7a11"
 COMPLETION = {
     "request_id": "9a9a9a9a-0000-4000-8000-000000000001",
@@ -148,3 +150,40 @@ async def test_refusals(client_as, db_session) -> None:
     viewer = await client_as(Role.viewer)
     assert (await viewer.post(f"/api/v1/runs/{unreachable.id}/context-gap", json={})).status_code == 403
     assert (await editor.post(f"/api/v1/runs/{uuid.uuid4()}/context-gap", json={})).status_code == 404
+
+
+@respx.mock
+async def test_gap_of_an_orbit_snapshot_run_finds_the_request(client_as, db_session) -> None:
+    """The ORBIT request id of a snapshot (real ``Snapshot`` shape) is traced, so the gap can be filled."""
+    from tests.test_execution import orbit_credential, reload, run_execution_jobs, start_run
+
+    editor = await client_as(Role.editor)
+    credential_id = await orbit_credential(db_session)
+    respx.get(f"{ORBIT}/api/v1/projects/atlas/snapshots/discovery/latest").mock(
+        return_value=httpx.Response(200, json=SNAPSHOT)
+    )
+    config = {"source": "orbit_snapshot", "orbit": {"project": "atlas", "snapshot": "discovery",
+                                                    "credential_id": str(credential_id)}}  # fmt: skip
+    run = await start_run(db_session, script={"output": "ok"}, context_config=config)
+    await run_execution_jobs()
+    await reload(db_session, run)
+    route = respx.post(
+        f"{ORBIT}/api/v1/projects/atlas/context/requests/{SNAPSHOT['request_id']}/complete"
+    ).mock(return_value=httpx.Response(200, json=COMPLETION))
+    response = await editor.post(
+        f"/api/v1/runs/{run.id}/context-gap", json={"missing": ["Délai de rétractation"]}
+    )
+    assert response.status_code == 200, response.text
+    assert response.json()["orbit_request_id"] == SNAPSHOT["request_id"] and route.called
+
+
+@respx.mock
+async def test_gap_snapshot_name_follows_the_orbit_pattern(client_as, db_session) -> None:
+    editor = await client_as(Role.editor)
+    run = await _failed_run(db_session, manifest=MANIFEST, with_error=False)
+    for name in ("-debut", "avec espace", "slash/nom", "é" * 3, "a" * 121):
+        response = await editor.post(
+            f"/api/v1/runs/{run.id}/context-gap",
+            json={"missing": ["Délai de rétractation"], "snapshot": name},
+        )
+        assert response.status_code == 422, name
