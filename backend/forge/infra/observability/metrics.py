@@ -24,6 +24,11 @@ JUDGE_CALLS_TOTAL = Counter(
     "forge_judge_calls_total", "LLM judge calls by provider and outcome.", ["provider", "outcome"]
 )
 JUDGE_COST_TOTAL = Counter("forge_judge_cost_total", "Estimated cost of LLM judge calls.", ["provider"])
+LLM_GUARDRAIL_SKIPS_TOTAL = Counter(
+    "forge_llm_guardrail_skips_total",
+    "LLM calls refused or downgraded by the classification guardrail.",
+    ["reason"],
+)
 ERRORS_DETECTED_TOTAL = Counter(
     "forge_errors_detected_total", "Errors detected on runs by taxonomy code.", ["type", "severity"]
 )
@@ -47,6 +52,11 @@ def record_judge_call(provider: str, outcome: str, cost: float | None = None) ->
     JUDGE_CALLS_TOTAL.labels(provider=provider, outcome=outcome).inc()
     if cost:
         JUDGE_COST_TOTAL.labels(provider=provider).inc(max(cost, 0.0))
+
+
+def record_llm_guardrail_skip(reason: str) -> None:
+    """``reason`` ∈ {classification}: content above the ceiling was kept from an LLM."""
+    LLM_GUARDRAIL_SKIPS_TOTAL.labels(reason=reason).inc()
 
 
 def record_error_detected(error_type: str, severity: str) -> None:

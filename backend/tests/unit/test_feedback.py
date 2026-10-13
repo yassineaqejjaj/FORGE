@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 
 import httpx
+import pytest
 import respx
 
 from forge.domain.enums import Dimension, ErrorSeverity, Priority, RecommendationCategory
@@ -160,13 +161,35 @@ async def test_optional_llm_synthesis_rewrites_text_only(monkeypatch) -> None:
             200, json={"model": "gpt-4.1-mini", "choices": [{"message": {"content": content}}], "usage": {}}
         )
     )
-    enriched = await feedback_service._llm_enrich(report)
+    enriched = await feedback_service._llm_enrich(report, 1)
     assert enriched.generator == "llm:gpt-4.1-mini" and enriched.summary == "Synthèse LLM."
     rec = enriched.recommendations[0]
     assert rec.title == "Titre LLM" and rec.category == RecommendationCategory.retrieval
     assert rec.evidence[0].excerpt == "x"  # evidence never comes from the LLM
     respx.post("https://fb.test/v1/chat/completions").mock(return_value=httpx.Response(500))
     fallback = await feedback_service._llm_enrich(
-        build_feedback(FeedbackInput(score=40, errors=[err("HALLUCINATION")]))
+        build_feedback(FeedbackInput(score=40, errors=[err("HALLUCINATION")])), 1
     )
     assert fallback.generator == "deterministic"
+
+
+@respx.mock
+@pytest.mark.parametrize("level", [2, 3])
+async def test_classified_feedback_is_never_sent_to_the_synthesis_llm(monkeypatch, level) -> None:
+    from forge.config import settings
+    from forge.services import feedback as feedback_service
+
+    monkeypatch.setattr(settings, "feedback_llm_base_url", "https://fb.test/v1")
+    monkeypatch.setattr(settings, "feedback_llm_model", "gpt-4.1-mini")
+    monkeypatch.setattr(settings, "llm_max_classification", 1)
+    monkeypatch.setattr(settings, "llm_local", False)
+    answer = {"model": "gpt-4.1-mini", "choices": [{"message": {"content": "{}"}}], "usage": {}}
+    route = respx.post("https://fb.test/v1/chat/completions").mock(
+        return_value=httpx.Response(200, json=answer)
+    )
+    report = build_feedback(FeedbackInput(score=40, errors=[err("HALLUCINATION")]))
+    enriched = await feedback_service._llm_enrich(report, level)
+    assert route.call_count == 0 and enriched.generator == "deterministic"
+    monkeypatch.setattr(settings, "llm_local", True)
+    await feedback_service._llm_enrich(report, level)
+    assert route.call_count == 1

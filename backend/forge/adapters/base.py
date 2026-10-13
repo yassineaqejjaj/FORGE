@@ -11,7 +11,7 @@ from datetime import datetime
 from typing import Any
 
 from forge.config import settings
-from forge.domain.classification import with_levels
+from forge.domain.classification import context_level, with_levels
 from forge.domain.enums import BuiltinErrorType, TraceEventSource, TraceEventType
 from forge.domain.traces.protocol import FAP_VERSION, parse_protocol_events, parse_usage, usage_from_events
 from forge.domain.traces.recorder import import_events
@@ -23,6 +23,7 @@ from forge.domain.types import (
     TraceEventData,
     to_dict,
 )
+from forge.infra import llm_guardrail
 
 HEADER_RUN_ID = "X-Forge-Run-Id"
 HEADER_SCENARIO_VERSION = "X-Forge-Scenario-Version"
@@ -75,6 +76,14 @@ def credential_headers(credentials: dict[str, str]) -> dict[str, str]:
 def propagation_headers(request: AgentRequest) -> dict[str, str]:
     """W3C ``traceparent`` + FORGE correlation headers (docs §8 step 5)."""
     return {k: str(v) for k, v in request.trace_headers.items() if v is not None}
+
+
+def ensure_llm_allowed(request: AgentRequest) -> None:
+    """Refuse to send content above the LLM ceiling to a provider (scenario + context the agent gets)."""
+    level = context_level(request.context, request.scenario.classification)
+    if not llm_guardrail.allows(level):
+        llm_guardrail.record_skip()
+        raise AgentExecutionError(llm_guardrail.skip_message(level, "Appel LLM de l'agent refusé"))
 
 
 # --- Request ----------------------------------------------------------------------------------------

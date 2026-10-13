@@ -25,6 +25,7 @@ from forge.domain.types import CriterionSpec, to_dict
 from forge.domain.versioning import judge_hash
 from forge.infra.cache import throttle
 from forge.infra.llm import client_from_credentials, estimate_cost
+from forge.infra.llm_guardrail import judge_or_heuristic
 from forge.infra.models import EvaluationRun, Judge, ProviderCredential
 from forge.services import audit
 from forge.services.credentials import resolve_credentials
@@ -356,7 +357,7 @@ async def test_judge(
     trace = await load_trace(session, run.id)
     events = await load_events(session, run.id)
     ctx = build_context(run, specs, specs.config, trace, events)
-    spec = judge_spec(judge)
+    spec, skipped = judge_or_heuristic(judge_spec(judge), ctx.classification)
     catalog = await load_criteria_catalog(session)
     criteria: list[CriterionSpec] = criteria_for_judge(
         spec, judged_criteria(specs.scenario, specs.config, catalog)
@@ -411,7 +412,7 @@ async def test_judge(
             for r in outcome.results
         ],
         missing=list(outcome.parsed.missing),
-        warnings=list(outcome.warnings),
+        warnings=[*([skipped] if skipped else []), *outcome.warnings],
         error=outcome.error,
         model=outcome.model,
         input_tokens=outcome.input_tokens,

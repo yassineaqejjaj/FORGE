@@ -472,6 +472,13 @@ class EvaluationContext:
     estimated_cost: float | None = None
     latency_ms: float | None = None
     run_error: str | None = None
+    #: Highest classification of the context the agent actually received (ORBIT documents included).
+    context_classification: int = 0
+
+    @property
+    def classification(self) -> int:
+        """What an outgoing LLM call about this run may expose: the highest of scenario and context."""
+        return max(int(self.scenario.classification), int(self.context_classification))
 
 
 @dataclass(slots=True)

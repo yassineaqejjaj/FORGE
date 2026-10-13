@@ -78,6 +78,12 @@ class Settings(BaseSettings):
     feedback_llm_model: str = ""
     feedback_llm_api_key: str = ""
 
+    #: LLM guardrail: highest classification (0-3) that may leave FORGE for an LLM (judges, feedback
+    #: synthesis, OpenAI/Anthropic agent adapters). Same policy and default (C1) as ORBIT.
+    llm_max_classification: int = Field(default=1, ge=0, le=3)
+    #: True when every LLM is self-hosted: lifts the ceiling (same as ORBIT's ``ORBIT_LLM_LOCAL``).
+    llm_local: bool = False
+
     # --- Analytics (benchmarks, experiments) -----------------------------------------------------
     #: Bootstrap resamples of the confidence intervals (seeded, docs §9.3).
     analytics_bootstrap_resamples: int = Field(default=10_000, ge=100, le=100_000)

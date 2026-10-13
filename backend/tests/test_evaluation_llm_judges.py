@@ -10,9 +10,18 @@ import pytest
 import respx
 from sqlalchemy import select, update
 
+from forge.config import settings
 from forge.domain.enums import EvaluatorKind, ProviderKind, RunStatus, ScoreSource
 from forge.infra.llm import base as llm_base
-from forge.infra.models import AuditEvent, Evaluation, Judge, JudgeCacheEntry, Score
+from forge.infra.models import (
+    AuditEvent,
+    Evaluation,
+    ExecutionTrace,
+    Judge,
+    JudgeCacheEntry,
+    Scenario,
+    Score,
+)
 from forge.services import credentials as credential_service
 from forge.services import evaluation_configs as config_service
 from forge.services import judges as judge_service
@@ -199,3 +208,96 @@ async def test_invalid_answer_gets_one_correction_retry(db_session) -> None:
         )
     )
     assert any(e and e[0]["type"] == "HALLUCINATION" for e in errors)
+
+
+# --- Classification guardrail (nothing above the ceiling reaches an external LLM) ---------------------
+
+
+async def _classified_run(db_session, level: int, *, documents=None):
+    config, av, sv, _ = await _setup(db_session)
+    scenario = await db_session.get(Scenario, sv.scenario_id)
+    scenario.classification = level
+    sv.context = {
+        "documents": documents or [{"id": "d1", "title": "Contrat", "content": "REMISE SECRETE 35 %"}]
+    }
+    await db_session.commit()
+    return await _run(db_session, config, av, sv)
+
+
+@pytest.fixture
+def default_guardrail(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(settings, "llm_max_classification", 1)
+    monkeypatch.setattr(settings, "llm_local", False)
+
+
+@respx.mock
+@pytest.mark.usefixtures("default_guardrail")
+@pytest.mark.parametrize("level", [2, 3])
+async def test_classified_scenario_never_reaches_an_external_judge(db_session, level) -> None:
+    route = respx.post(LLM_URL).mock(
+        return_value=completion({"quality.accuracy": 4, "quality.completeness": 4})
+    )
+    run = await _classified_run(db_session, level)
+    await run_jobs()
+    await db_session.refresh(run)
+    assert route.call_count == 0  # no outgoing request at all
+    assert run.status == RunStatus.completed, run.status_detail
+    rows = list(await db_session.scalars(select(Evaluation).where(Evaluation.run_id == run.id)))
+    assert any(r.evaluator_kind == EvaluatorKind.llm_judge for r in rows)  # the heuristic judge still scored
+    audit = await db_session.scalar(
+        select(AuditEvent).where(AuditEvent.action == "run.evaluate", AuditEvent.target_id == str(run.id))
+    )
+    assert all(j["provider"] == "heuristic" for j in audit.details["judges"])
+    assert any("plafond LLM" in w for w in audit.details["warnings"])
+
+
+@respx.mock
+@pytest.mark.usefixtures("default_guardrail")
+async def test_classified_prepared_context_counts_even_when_the_scenario_is_c1(db_session) -> None:
+    """An ORBIT document C3 in the context the agent received keeps the judge local."""
+    route = respx.post(LLM_URL).mock(
+        return_value=completion({"quality.accuracy": 4, "quality.completeness": 4})
+    )
+    config, av, sv, _ = await _setup(db_session)
+    run = await _run(db_session, config, av, sv)
+    trace = await db_session.scalar(select(ExecutionTrace).where(ExecutionTrace.run_id == run.id))
+    trace.input = {
+        "prompt": "x",
+        "context": {"documents": [{"id": "o1", "content": "texte", "classification": 3}]},
+    }
+    await db_session.commit()
+    await run_jobs()
+    assert route.call_count == 0
+
+
+@respx.mock
+async def test_guardrail_lets_c1_through_and_local_models_lift_the_ceiling(db_session, monkeypatch) -> None:
+    route = respx.post(LLM_URL).mock(
+        return_value=completion({"quality.accuracy": 4, "quality.completeness": 4})
+    )
+    monkeypatch.setattr(settings, "llm_max_classification", 1)
+    monkeypatch.setattr(settings, "llm_local", False)
+    await _classified_run(db_session, 1)
+    await run_jobs()
+    assert route.call_count == 1
+    monkeypatch.setattr(settings, "llm_local", True)
+    await _classified_run(db_session, 3)
+    await run_jobs()
+    assert route.call_count == 2
+
+
+@respx.mock
+@pytest.mark.usefixtures("default_guardrail")
+async def test_judge_test_endpoint_keeps_classified_runs_local(db_session) -> None:
+    route = respx.post(LLM_URL).mock(
+        return_value=completion({"quality.accuracy": 4, "quality.completeness": 4})
+    )
+    run = await _classified_run(db_session, 3)
+    judge = (
+        await db_session.scalars(
+            select(Judge).where(Judge.provider == "openai").order_by(Judge.created_at.desc())
+        )
+    ).first()
+    result = await judge_service.test_judge(db_session, judge, run)
+    assert route.call_count == 0 and result.status in {"ok", "partial"}
+    assert any("plafond LLM" in w for w in result.warnings)
