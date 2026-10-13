@@ -241,6 +241,14 @@ def test_gate() -> None:
     assert evaluate_gate(status="completed", recommendation="inconclusive").passed is True
     assert evaluate_gate(status="completed", recommendation="inconclusive", strict=True).passed is False
     assert evaluate_gate(status="completed", recommendation="ship", strict=True).passed is True
+    blocked = evaluate_gate(
+        status="completed", recommendation="ship", blocking=["Juge j@v1 non calibré"], notices=["Autre"]
+    )
+    assert blocked.passed is False and blocked.recommendation == "ship"
+    assert any("Promotion bloquée : Juge j@v1 non calibré" in r for r in blocked.reasons)
+    assert any("Avertissement : Autre" in r for r in blocked.reasons)
+    noted = evaluate_gate(status="completed", recommendation="ship", notices=["Autre"])
+    assert noted.passed is True and any("Avertissement : Autre" in r for r in noted.reasons)
     running = evaluate_gate(status="running", recommendation=None)
     assert running.passed is False and "en cours" in running.reasons[0]
     assert evaluate_gate(status="completed", recommendation=None).passed is False

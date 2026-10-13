@@ -84,6 +84,15 @@ class Settings(BaseSettings):
     #: True when every LLM is self-hosted: lifts the ceiling (same as ORBIT's ``ORBIT_LLM_LOCAL``).
     llm_local: bool = False
 
+    # --- Promotion policy ------------------------------------------------------------------------
+    #: ``strict`` (default): an experiment cannot start, pass the CI gate or be published as a learning
+    #: unless its judges are calibrated on a gold set, its agent versions are free of contamination and
+    #: the regression cases of the agent are replayed (the gate then passes on ``ship`` only).
+    #: ``warn``: the same findings are reported as warnings and block nothing.
+    promotion_policy: Literal["strict", "warn"] = "strict"
+    #: Minimum weighted kappa of a judge against human scores on gold datasets (strict policy).
+    calibration_min_kappa: float = Field(default=0.6, ge=0.0, le=1.0)
+
     # --- Analytics (benchmarks, experiments) -----------------------------------------------------
     #: Bootstrap resamples of the confidence intervals (seeded, docs §9.3).
     analytics_bootstrap_resamples: int = Field(default=10_000, ge=100, le=100_000)

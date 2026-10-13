@@ -62,8 +62,18 @@ async def calibration_report(
     judge_id: uuid.UUID | None = None,
     criterion_key: str | None = None,
     dataset_id: uuid.UUID | None = None,
+    gold_only: bool = False,
 ) -> dict[str, Any]:
+    """``gold_only`` keeps the runs of any gold dataset (the reference set for promotion decisions)."""
     conditions: list[ColumnElement[bool]] = [access.classification_condition(viewer)]
+    if gold_only:
+        conditions.append(
+            EvaluationRun.id.in_(
+                select(DatasetItem.run_id)
+                .join(Dataset, Dataset.id == DatasetItem.dataset_id)
+                .where(Dataset.kind == DatasetKind.gold, DatasetItem.run_id.is_not(None))
+            )
+        )
     judge: Judge | None = None
     if judge_id is not None:
         judge = await session.get(Judge, judge_id)

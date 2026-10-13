@@ -854,6 +854,7 @@ class Seeder:
             tags=tags,
             source_feedback_report_id=source_feedback_report_id,
             trigger="seed",
+            policy="warn",  # demo data: the gold set that calibrates the judges is built after this step
         )
         self.report.experiment_ids[name] = experiment.id
         self._created("experiment")
