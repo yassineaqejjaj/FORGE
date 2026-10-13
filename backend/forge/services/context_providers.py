@@ -9,7 +9,7 @@
 
 * ``scenario`` (default) — the scenario's own context;
 * ``orbit_snapshot`` — ``GET {base}/api/v1/projects/{project}/snapshots/{name}/{version}``: pinned,
-  reproducible context; the resolved version and content hash are recorded;
+  reproducible context; the resolved version, content hash and originating ORBIT request id are recorded;
 * ``orbit_live`` — ``POST {base}/api/v1/projects/{project}/context`` with ``{"task": …}``: live
   assembly; the ORBIT request id is recorded;
 * ``none`` — no context at all.
@@ -22,6 +22,7 @@ and a warning is traced).
 from __future__ import annotations
 
 import logging
+import re
 from dataclasses import dataclass, field
 from typing import Any
 from urllib.parse import quote
@@ -39,7 +40,19 @@ from forge.services.credentials import resolve_credentials
 logger = logging.getLogger("forge.context")
 
 ORBIT_TARGET = "ORBIT"
+SNAPSHOT_NAME_PATTERN = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._\-]{0,119}$")  # ORBIT's own rule
 DEFAULT_TIMEOUT_SECONDS = 20.0
+# ORBIT item fields kept on FORGE documents (none is required).
+PROVENANCE_FIELDS = (
+    "classification",
+    "citation",
+    "version",
+    "uri",
+    "document_id",
+    "memory_item_id",
+    "memory_kind",
+    "pii_redacted",
+)
 
 
 @dataclass(slots=True)
@@ -196,6 +209,8 @@ async def _from_snapshot(orbit: OrbitConfig, base: dict[str, Any], *, run_id: st
         raise ContextPreparationError(
             "Contexte ORBIT : snapshot non configuré (context_config.orbit.snapshot)"
         )
+    if not SNAPSHOT_NAME_PATTERN.fullmatch(orbit.snapshot):
+        raise ContextPreparationError(f"Contexte ORBIT : nom de snapshot invalide : « {orbit.snapshot} »")
     path = (
         f"/api/v1/projects/{quote(orbit.project, safe='')}/snapshots/"
         f"{quote(orbit.snapshot, safe='')}/{quote(orbit.version, safe='')}"
@@ -204,7 +219,8 @@ async def _from_snapshot(orbit: OrbitConfig, base: dict[str, Any], *, run_id: st
     snapshot = data.get("snapshot") if isinstance(data.get("snapshot"), dict) else data
     documents = orbit_documents(snapshot)
     resolved_version = snapshot.get("version") or snapshot.get("snapshot_version") or orbit.version
-    digest = snapshot.get("content_hash") or snapshot.get("hash") or content_hash(documents)
+    digest = snapshot.get("content_hash") or snapshot.get("hash") or orbit_context_hash(documents, snapshot)
+    request_id = snapshot.get("request_id")
     context = _merge(base, documents, snapshot, merge=orbit.merge)
     return PreparedContext(
         context=context,
@@ -215,7 +231,9 @@ async def _from_snapshot(orbit: OrbitConfig, base: dict[str, Any], *, run_id: st
             "snapshot_requested_version": orbit.version,
             "snapshot_version": str(resolved_version),
             "snapshot_hash": str(digest),
+            "orbit_request_id": str(request_id) if request_id else None,
             "orbit_documents": len(documents),
+            "orbit_context_hash": orbit_context_hash(documents, snapshot),
         },
     )
 
@@ -237,7 +255,7 @@ async def _from_live(
             "orbit_project": orbit.project,
             "orbit_request_id": str(request_id) if request_id else None,
             "orbit_documents": len(documents),
-            "orbit_context_hash": content_hash(documents),
+            "orbit_context_hash": orbit_context_hash(documents, data),
         },
     )
 
@@ -250,7 +268,12 @@ def _header(headers: dict[str, str], name: str) -> str | None:
 
 
 def orbit_documents(data: dict[str, Any]) -> list[dict[str, Any]]:
-    """Normalise ORBIT items (``documents`` / ``items`` / ``context.documents``) to FORGE documents."""
+    """Normalise ORBIT items (``documents`` / ``items`` / ``context.documents``) to FORGE documents.
+
+    ORBIT serves passages in ``excerpt`` (``ContextItem``, ``SnapshotItem``); ``content`` / ``text`` /
+    ``body`` are the older shapes. Items ORBIT marks ``forgotten`` are never injected. Provenance fields
+    (citation, version, uri, ids, classification) are kept when present: nothing is invented here.
+    """
     raw = data.get("documents") or data.get("items")
     if raw is None and isinstance(data.get("context"), dict):
         raw = data["context"].get("documents")
@@ -258,19 +281,34 @@ def orbit_documents(data: dict[str, Any]) -> list[dict[str, Any]]:
     for index, item in enumerate(raw or []):
         if isinstance(item, str):
             item = {"content": item}
-        if not isinstance(item, dict):
+        if not isinstance(item, dict) or item.get("forgotten"):
             continue
         doc_id = item.get("id") or item.get("document_id") or item.get("key") or f"orbit-{index + 1}"
+        text = item.get("excerpt") or item.get("content") or item.get("text") or item.get("body") or ""
         documents.append(
             {
                 "id": str(doc_id),
                 "title": str(item.get("title") or item.get("name") or doc_id),
-                "content": str(item.get("content") or item.get("text") or item.get("body") or ""),
-                "source": str(item.get("source") or "orbit"),
-                **({"classification": item["classification"]} if "classification" in item else {}),
+                "content": str(text),
+                "source": str(item.get("source") or item.get("source_kind") or "orbit"),
+                **{key: item[key] for key in PROVENANCE_FIELDS if item.get(key) is not None},
             }
         )
     return documents
+
+
+def orbit_context_hash(documents: list[dict[str, Any]], data: dict[str, Any]) -> str:
+    """Hash of the context ORBIT actually served (documents + global text), not of its envelope."""
+    return content_hash({"documents": documents, "text": _context_text(data)})
+
+
+def _context_text(data: dict[str, Any]) -> str | None:
+    """Global ORBIT text: ``context`` of a live package, ``content`` of a snapshot, else ``text``."""
+    for key in ("context", "content", "text"):
+        value = data.get(key)
+        if isinstance(value, str) and value.strip():
+            return value
+    return None
 
 
 def _merge(
@@ -283,7 +321,7 @@ def _merge(
     facts = data.get("facts") or data.get("memory")
     if isinstance(facts, list) and facts:
         context["facts"] = list(context.get("facts") or []) + [str(f) for f in facts]
-    text = data.get("context") if isinstance(data.get("context"), str) else data.get("text")
-    if isinstance(text, str) and text.strip():
+    text = _context_text(data)
+    if text:
         context["orbit_context"] = text
     return context

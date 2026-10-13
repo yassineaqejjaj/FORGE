@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+import json
 import uuid
+from pathlib import Path
 from typing import Any
 
 import httpx
@@ -31,6 +33,8 @@ from forge.services.credentials import create_credential
 from forge.services.execution import execute_run_job, invoke_adhoc
 from forge.workers.worker import Worker
 from tests.factories import create_agent_version, create_run, create_scenario_version
+
+ORBIT_FIXTURES = Path(__file__).resolve().parent / "fixtures" / "orbit"
 
 DOCS = [
     {
@@ -309,11 +313,55 @@ async def test_orbit_live_records_request_id(db_session) -> None:
     run = await start_run(db_session, script={"output": "ok"}, context_config=config)
     await run_execution_jobs()
     _, trace, _ = await reload(db_session, run)
-    import json
-
     assert json.loads(route.calls.last.request.content)["task"].startswith("Rédige un PRD")
     assert trace.metadata_["context"]["orbit_request_id"] == "req-42"
     assert [d["id"] for d in trace.input["context"]["documents"]] == ["m1"]
+
+
+@respx.mock
+async def test_real_orbit_snapshot_shape_gives_a_usable_context(db_session) -> None:
+    snapshot = json.loads((ORBIT_FIXTURES / "snapshot.json").read_text(encoding="utf-8"))
+    respx.get("https://orbit.example/api/v1/projects/acme/snapshots/discovery/latest").mock(
+        return_value=httpx.Response(200, json=snapshot)
+    )
+    config = {"source": "orbit_snapshot", "orbit": {"project": "acme", "snapshot": "discovery",
+                                                    "credential_id": str(await orbit_credential(db_session))}}  # fmt: skip
+    run = await start_run(db_session, script={"output": "ok"}, context_config=config)
+    await run_execution_jobs()
+    _, trace, _ = await reload(db_session, run)
+    context = trace.input["context"]
+    assert context["orbit_context"] == snapshot["content"]
+    assert [d["id"] for d in context["documents"]] == ["d1", "c1", "m1"]  # the forgotten item is not injected
+    assert all(d["content"] for d in context["documents"])
+    metadata = trace.metadata_["context"]
+    assert metadata["orbit_request_id"] == snapshot["request_id"] and metadata["snapshot_version"] == "7"
+    assert metadata["snapshot_hash"] == snapshot["content_hash"] and metadata["orbit_documents"] == 2
+
+
+@respx.mock
+async def test_real_orbit_context_package_keeps_excerpt_and_classification(db_session) -> None:
+    package = json.loads((ORBIT_FIXTURES / "context_package.json").read_text(encoding="utf-8"))
+    respx.post("https://orbit.example/api/v1/projects/acme/context").mock(
+        return_value=httpx.Response(200, json=package)
+    )
+    config = {"source": "orbit_live", "orbit": {"project": "acme", "merge": False,
+                                                "credential_id": str(await orbit_credential(db_session))}}  # fmt: skip
+    run = await start_run(db_session, script={"output": "ok"}, context_config=config)
+    await run_execution_jobs()
+    _, trace, _ = await reload(db_session, run)
+    documents = trace.input["context"]["documents"]
+    assert [d["content"] for d in documents] == [i["excerpt"] for i in package["items"]]
+    assert [d["classification"] for d in documents] == [1, 2, 3]
+    assert trace.metadata_["context"]["orbit_request_id"] == package["request_id"]
+
+
+async def test_invalid_snapshot_name_is_refused_before_calling_orbit(db_session) -> None:
+    config = {"source": "orbit_snapshot", "orbit": {"project": "acme", "snapshot": "../autre",
+                                                    "credential_id": str(await orbit_credential(db_session))}}  # fmt: skip
+    run = await start_run(db_session, script={"output": "ok"}, context_config=config)
+    await run_execution_jobs()  # no respx mock: a call to ORBIT would fail the test
+    run_row, _, _ = await reload(db_session, run)
+    assert "nom de snapshot invalide" in run_row.error
 
 
 @respx.mock
