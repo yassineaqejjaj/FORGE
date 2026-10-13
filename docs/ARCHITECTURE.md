@@ -160,6 +160,16 @@ Un scénario (et ses runs) au-dessus de l'habilitation de l'appelant **n'est pas
 absent des listes : `access.classification_condition`). L'UI affiche un bandeau
 d'avertissement dès qu'un contenu C2/C3 est affiché.
 
+**Garde-fou LLM** (`infra/llm_guardrail.py`, même politique qu'ORBIT) : rien au-dessus de
+`FORGE_LLM_MAX_CLASSIFICATION` (défaut C1) ne part vers un LLM ; `FORGE_LLM_LOCAL=true`
+(modèles auto-hébergés uniquement) lève le plafond. Classification effective d'un appel = max
+(scénario, documents du contexte reçu par l'agent). Au-delà du plafond : un juge LLM est
+remplacé par le juge `heuristic` avec un avertissement dans l'évaluation, la synthèse LLM du
+feedback est omise (rapport déterministe), les adaptateurs `openai`/`anthropic` refusent
+l'appel (le run échoue, rien n'est envoyé). Chaque refus incrémente
+`forge_llm_guardrail_skips_total{reason="classification"}`. Limite connue : le juge ne voit que
+`scenario.context`, pas le contexte préparé par ORBIT (défaut d'ancrage distinct, à tracer).
+
 ---
 
 ## 4. Énumérations

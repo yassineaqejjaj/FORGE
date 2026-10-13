@@ -295,6 +295,24 @@ async def test_nova_requires_agent_id() -> None:
         await get_adapter("nova").invoke(make_request(AdapterKind.nova), InMemoryTraceRecorder())
 
 
+@respx.mock
+@pytest.mark.parametrize("kind", [AdapterKind.openai, AdapterKind.anthropic])
+async def test_llm_adapters_refuse_classified_content_above_the_ceiling(kind, monkeypatch) -> None:
+    from forge.config import settings
+
+    monkeypatch.setattr(settings, "llm_max_classification", 1)
+    monkeypatch.setattr(settings, "llm_local", False)
+    route = respx.post(url__regex=r"https://llm\.example/.*").mock(return_value=httpx.Response(500))
+    config = {"base_url": "https://llm.example"}
+    for scenario_level, documents in ((2, []), (1, [{"id": "d", "content": "x", "classification": 3}])):
+        request = make_request(kind, adapter_config=config, model=MODEL, credentials={"api_key": SECRET})
+        request.scenario.classification = scenario_level
+        request.context = {"documents": documents}
+        with pytest.raises(AgentExecutionError, match="plafond LLM"):
+            await get_adapter(kind.value).invoke(request, InMemoryTraceRecorder())
+    assert route.call_count == 0
+
+
 # --- OpenAI / Anthropic loops -------------------------------------------------------------------------
 
 MODEL = ModelSpec(provider="openai", model="gpt-test", input_cost_per_mtok=1.0, output_cost_per_mtok=2.0)
