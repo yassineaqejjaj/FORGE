@@ -1,9 +1,6 @@
-import { Montserrat } from "next/font/google";
+import { authFont } from "@/lib/fonts";
 
-/** Brand pages use Montserrat (design system); the app keeps Geist. */
-const montserrat = Montserrat({ subsets: ["latin"], weight: ["400", "500", "600", "700"], display: "swap" });
-
-/** Unauthenticated routes (login): no app shell. */
+/** Unauthenticated routes (login): no app shell, brand typography (Montserrat, self-hosted). */
 export default function AuthLayout({ children }: { children: React.ReactNode }) {
-  return <div className={`min-h-dvh bg-background ${montserrat.className}`}>{children}</div>;
+  return <div className={`min-h-dvh bg-background ${authFont.className}`}>{children}</div>;
 }
