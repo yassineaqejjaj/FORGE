@@ -231,7 +231,10 @@ async def get_gate(
     experiment_id: uuid.UUID,
     session: SessionDep,
     principal: RequireViewer,
-    strict: Annotated[bool, Query(description="Seule la recommandation « ship » passe")] = False,
+    strict: Annotated[
+        bool,
+        Query(description="Seule la recommandation « ship » passe (toujours vrai en politique stricte)"),
+    ] = False,
 ) -> GateOut:
     with analytics_errors():
         experiment = await service.get_experiment(session, experiment_id)
