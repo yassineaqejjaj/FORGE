@@ -14,11 +14,12 @@ from dataclasses import dataclass, field
 from typing import Any
 from urllib.parse import quote
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from forge.domain.classification import MAX_LEVEL
 from forge.domain.enums import ExecutionStatus, ExperimentArm, Recommendation
-from forge.infra.models import AgentVersion, EvaluationRun, Experiment
+from forge.infra.models import AgentVersion, EvaluationRun, Experiment, Scenario, ScenarioVersion
 from forge.services import audit, multi_experiments
 from forge.services import experiments as experiment_service
 from forge.services.access import Viewer
@@ -68,6 +69,18 @@ async def _require_winner(session: AsyncSession, viewer: Viewer, experiment: Exp
                 raise AnalyticsInvalid(
                     "Cette candidate n'est pas le vainqueur de sa comparaison multiple (après correction)"
                 )
+
+
+async def _scenarios_level(session: AsyncSession, experiment: Experiment) -> int:
+    """Highest classification among the scenarios the experiment ran (C3 when none is found)."""
+    level = await session.scalar(
+        select(func.max(Scenario.classification))
+        .select_from(EvaluationRun)
+        .join(ScenarioVersion, ScenarioVersion.id == EvaluationRun.scenario_version_id)
+        .join(Scenario, Scenario.id == ScenarioVersion.scenario_id)
+        .where(EvaluationRun.experiment_id == experiment.id)
+    )
+    return int(level) if level is not None else MAX_LEVEL
 
 
 def _default_content(experiment: Experiment, candidate: AgentVersion | None, summary: str | None) -> str:
@@ -139,8 +152,14 @@ async def publish_learning(
         "applies_to": request.applies_to,
         "evidence": {k: v for k, v in evidence.items() if v is not None},
     }
-    if request.classification is not None:
-        payload["classification"] = request.classification
+    # The text comes from hypotheses, changelogs and summaries of scenarios that may be C2/C3: ORBIT must
+    # never apply its own default, and the level can only be raised by the caller.
+    floor = await _scenarios_level(session, experiment)
+    if request.classification is not None and request.classification < floor:
+        raise AnalyticsInvalid(
+            f"Classification inférieure à celle des scénarios (C{floor}) : publication refusée"
+        )
+    payload["classification"] = request.classification if request.classification is not None else floor
 
     agent_context = {}
     if candidate is not None:
