@@ -88,6 +88,20 @@ class Settings(BaseSettings):
     #: True when every LLM is self-hosted: lifts the ceiling (same as ORBIT's ``ORBIT_LLM_LOCAL``).
     llm_local: bool = False
 
+    # --- Retention (docs/OPERATIONS.md) -------------------------------------------------------------
+    #: Days after which the *text* FORGE copied is emptied (0 keeps it forever). Scores, errors, costs,
+    #: latencies and the timeline structure are never purged: they are the measurement.
+    retention_trace_days: int = Field(default=180, ge=0)  # execution traces + trace event payloads
+    retention_evaluation_days: int = Field(default=180, ge=0)  # judge prompts / answers (raw_response)
+    retention_judge_cache_days: int = Field(default=90, ge=0)  # judge cache rows (deleted)
+    retention_feedback_days: int = Field(default=365, ge=0)  # evidence / examples of feedback reports
+    #: Hours between two scheduled purges run by the workers (0 disables the schedule).
+    retention_interval_hours: float = Field(default=24.0, ge=0.0)
+    #: Scheduled purge only counts what it would purge (the CLI ``--dry-run`` does the same on demand).
+    retention_dry_run: bool = False
+    #: Shared secret of the signed ORBIT webhook (``POST /api/v1/webhooks/orbit``); empty = refused.
+    orbit_webhook_secret: str = ""
+
     # --- Promotion policy ------------------------------------------------------------------------
     #: ``strict`` (default): an experiment cannot start, pass the CI gate or be published as a learning
     #: unless its judges are calibrated on a gold set, its agent versions are free of contamination and

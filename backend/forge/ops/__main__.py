@@ -4,7 +4,9 @@
   reading them with the previous key given in ``FORGE_SECRETS_KEY_OLD``;
 * ``check-secrets`` — verify that every stored secret can be decrypted with the current key;
 * ``purge-payloads --older-than-days N`` — drop trace event payloads (input/output) of old runs,
-  keeping the timeline structure, scores and explanations (storage retention).
+  keeping the timeline structure, scores and explanations (storage retention);
+* ``retention [--dry-run]`` — apply every ``FORGE_RETENTION_*_DAYS`` rule now (traces, judge prompts and
+  answers, judge cache, feedback evidence), or only count what would be purged.
 """
 
 from __future__ import annotations
@@ -89,6 +91,23 @@ async def purge_payloads(days: int) -> int:
     return 0
 
 
+async def retention_pass(dry_run: bool) -> int:
+    from forge.services import retention
+
+    async with session_scope() as session:
+        report = await retention.purge(session, dry_run=dry_run, trigger="cli")
+    if report.skipped:
+        print("Une purge est déjà en cours (verrou pris par un autre processus).", file=sys.stderr)
+        return 1
+    verb = "seraient purgés" if dry_run else "purgés"
+    print(
+        f"Rétention : {report.traces} trace(s), {report.trace_events} événement(s), "
+        f"{report.evaluations} évaluation(s), {report.judge_cache} entrée(s) de cache, "
+        f"{report.feedback_reports} rapport(s) de feedback {verb}."
+    )
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="python -m forge.ops", description="Commandes d'exploitation FORGE")
     sub = parser.add_subparsers(dest="command", required=True)
@@ -96,6 +115,8 @@ def main(argv: list[str] | None = None) -> int:
     sub.add_parser("check-secrets", help="Vérifier que tous les secrets sont déchiffrables")
     purge = sub.add_parser("purge-payloads", help="Supprimer les payloads de trace des anciens runs")
     purge.add_argument("--older-than-days", type=int, required=True)
+    retention_cmd = sub.add_parser("retention", help="Appliquer les règles de rétention (FORGE_RETENTION_*)")
+    retention_cmd.add_argument("--dry-run", action="store_true", help="compter sans rien purger")
     args = parser.parse_args(argv)
 
     async def run() -> int:
@@ -104,6 +125,8 @@ def main(argv: list[str] | None = None) -> int:
                 return await rotate_secrets()
             if args.command == "check-secrets":
                 return await check_secrets()
+            if args.command == "retention":
+                return await retention_pass(args.dry_run)
             return await purge_payloads(max(1, args.older_than_days))
         finally:
             await dispose_engine()

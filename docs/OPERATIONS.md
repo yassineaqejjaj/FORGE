@@ -91,12 +91,36 @@ Rotation de la clé de chiffrement des secrets :
 docker compose exec -T -e FORGE_SECRETS_KEY_OLD="$OLD_KEY" api python -m forge.ops rotate-secrets
 ```
 
-Rétention : supprimer les payloads de trace (entrées/sorties des étapes) des runs terminés depuis
-plus de N jours, en conservant timeline, scores, justifications et erreurs :
+### Rétention et oubli
 
-```bash
-docker compose exec -T api python -m forge.ops purge-payloads --older-than-days 180
-```
+FORGE copie du contenu (contexte ORBIT reçu par l'agent, sorties, prompts et réponses de juge, cache de
+juges, preuves des rapports de feedback, manifestes de run, contexte copié des scénarios promus). Deux
+mécanismes **vident ces textes sans toucher aux mesures** (scores, erreurs, tokens, coûts, latences,
+structure de la timeline). Cadrage technique, pas une conclusion juridique.
+
+* **Purge planifiée** : chaque worker lance, toutes les `FORGE_RETENTION_INTERVAL_HOURS` heures (24 ; 0
+  désactive), une passe protégée par un verrou Postgres (une seule à la fois). Règles par type, en jours
+  après la fin du run ou la création (0 = conserver) : `FORGE_RETENTION_TRACE_DAYS` (180 : entrées,
+  sorties, messages de `ExecutionTrace` et payloads des événements), `FORGE_RETENTION_EVALUATION_DAYS` (180 :
+  `Evaluation.raw_response`, prompts et réponses des juges), `FORGE_RETENTION_JUDGE_CACHE_DAYS` (90 : lignes
+  supprimées), `FORGE_RETENTION_FEEDBACK_DAYS` (365 : exemples et extraits des rapports).
+  `FORGE_RETENTION_DRY_RUN=true` ne fait que compter. Métrique `forge_retention_purged_total{kind,trigger}` ;
+  chaque passe est journalisée (audit `retention.purge`). À la demande :
+  `python -m forge.ops retention [--dry-run]` (l'ancienne commande `purge-payloads` reste disponible).
+* **Oubli ciblé** : `POST /api/v1/forget` (rôle admin : donnez à NOVA / ORBIT une clé d'API admin dédiée)
+  avec `document_ids`, `memory_item_ids`, `lineage_ids` et/ou `task_ids` (observés : `external_id` en
+  « …:<task_id> »). Tout run ayant reçu un document concerné perd **tous** ses payloads (sa sortie peut le
+  citer), ainsi que les prompts et réponses de juge, les preuves des rapports, le contexte copié des
+  scénarios promus et des manifestes ; le cache de juges, sans lien avec les runs, est vidé en entier.
+  Idempotent ; l'accusé décrit ce qui a été touché ; audit `forget.apply`.
+* **Webhook ORBIT** : `POST /api/v1/webhooks/orbit`, signé comme les webhooks ORBIT
+  (`X-Orbit-Signature: sha256=<HMAC-SHA256(secret, corps)>`). Définir `FORGE_ORBIT_WEBHOOK_SECRET` (vide :
+  503) puis créer côté ORBIT un webhook vers cette URL pour `memory.forgotten` et `document.forgotten` avec
+  le même secret ; les autres événements sont acquittés et ignorés.
+* **Limites connues** : les éléments d'un snapshot ORBIT n'exposent pas leur `document_id` (ils ne sont
+  retrouvés que par `id`/`key`) ; les événements ORBIT restreints (C2+ ou ACL) n'exposent pas
+  `lineage_id`, les anciennes versions d'une mémoire oubliée peuvent donc subsister ; les explications de
+  score et la table `run_errors` ne sont pas purgées.
 
 Rotation du secret JWT (`FORGE_JWT_SECRET`) : redémarrer l'API ; toutes les sessions sont
 invalidées (les clés d'API `fgk_…` ne sont pas affectées).

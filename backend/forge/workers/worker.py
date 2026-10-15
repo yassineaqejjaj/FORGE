@@ -41,6 +41,7 @@ logger = logging.getLogger("forge.worker")
 
 STALE_CHECK_INTERVAL_SECONDS = 60.0
 ERROR_BACKOFF_SECONDS = 5.0
+RETENTION_FIRST_DELAY_SECONDS = 120.0
 
 
 @dataclass
@@ -90,6 +91,7 @@ class Worker:
         background = [
             asyncio.create_task(self._heartbeat(), name="heartbeat"),
             asyncio.create_task(self._stale_requeue_loop(), name="stale-requeue"),
+            asyncio.create_task(self._retention_loop(), name="retention"),
         ]
         await self.stop_event.wait()
         _done, pending = await asyncio.wait(slots, timeout=settings.worker_shutdown_grace_seconds)
@@ -254,6 +256,28 @@ class Worker:
             except Exception as exc:
                 logger.warning("Stale job check failed: %s", exc)
             await self._sleep(STALE_CHECK_INTERVAL_SECONDS)
+
+    async def run_retention_once(self) -> None:
+        """One scheduled retention pass (``FORGE_RETENTION_*``); another worker may hold the lock."""
+        from forge.services import retention
+
+        async with get_sessionmaker()() as session:
+            report = await retention.purge(session, dry_run=settings.retention_dry_run, trigger="schedule")
+            await session.commit()
+        if report.skipped:
+            logger.debug("Retention skipped: another worker is purging")
+
+    async def _retention_loop(self) -> None:
+        interval = settings.retention_interval_hours * 3600
+        if interval <= 0:
+            return
+        await self._sleep(RETENTION_FIRST_DELAY_SECONDS)
+        while not self.stop_event.is_set():
+            try:
+                await self.run_retention_once()
+            except Exception:
+                logger.exception("Scheduled retention failed")
+            await self._sleep(interval)
 
 
 async def _on_job_exhausted(session: object, job: Job, error: BaseException) -> None:
