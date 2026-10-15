@@ -34,13 +34,16 @@ Kubernetes, chaque service compose correspond à un `Deployment` (mêmes images,
 ## 3. Observabilité
 
 * Santé : `GET /health` (vivant), `GET /ready` (Postgres requis, Valkey informatif, profondeur des
-  files). Le web expose `GET /healthz`.
-* Métriques Prometheus : `api:8000/metrics`, workers `:9464/metrics`.
-  Alertes suggérées :
-  * `rate(forge_runs_total{status="failed"}[15m]) / rate(forge_runs_total[15m]) > 0.2` ;
-  * file `execution` ou `evaluation` > 500 jobs pendant 30 min ;
-  * `rate(forge_judge_calls_total{outcome!="ok"}[15m]) > 0.1` (fournisseur LLM dégradé) ;
-  * `forge_otlp_spans_total{outcome="orphan"}` en hausse (agents mal corrélés).
+  files). Les deux exposent `version` et `git_sha` (commit déployé : `FORGE_GIT_SHA`, sinon l'argument
+  de build `GIT_SHA`, sinon `RAILWAY_GIT_COMMIT_SHA` ; vide hors build). Le web expose `GET /healthz`.
+* Métriques Prometheus : `api:8000/metrics`, workers `:9464/metrics`. L'API ajoute, lus en base à chaque
+  scrape, `forge_queue_depth{queue}`, `forge_oldest_job_age_seconds{queue}` (plus ancien job exécutable en
+  attente) et `forge_observed_pending_evaluations` (captures observées non encore évaluées) ; les workers
+  exposent `forge_worker_inflight_jobs`. Ne scrapez ces trois jauges que sur l'API.
+* Règles d'alerte : `deploy/alerts.yml` (échecs de runs, files, âge du plus ancien job, échecs de juges,
+  spans orphelins, captures en attente). Un test vérifie que chaque métrique citée existe dans le code.
+  Attention : `forge_judge_calls_total{outcome}` vaut `success`, `failure` ou `cached` (jamais `ok`) ;
+  l'alerte juge est un **ratio d'échecs** `outcome="failure"` / `outcome=~"success|failure"`.
 * Traces de FORGE lui-même : `FORGE_OTLP_ENDPOINT` (collecteur OTel, Tempo, Jaeger…).
 * Journaux : une ligne par événement avec `rid=<request id>` (en-tête `X-Request-ID`).
 * Audit fonctionnel : *Paramètres → Audit* ou `GET /api/v1/audit`.
