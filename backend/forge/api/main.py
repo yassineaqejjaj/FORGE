@@ -54,6 +54,7 @@ OPENAPI_TAGS = [
     {"name": "calibration", "description": "Calibration humaine des juges"},
     {"name": "analytics", "description": "Tableau de bord, explorateur d'erreurs"},
     {"name": "audit", "description": "Journal d'audit"},
+    {"name": "forget", "description": "Oubli de contenu copié (rétention, webhook ORBIT)"},
     {"name": "system", "description": "Santé et disponibilité"},
 ]
 

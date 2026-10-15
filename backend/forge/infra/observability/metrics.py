@@ -31,6 +31,14 @@ LLM_GUARDRAIL_SKIPS_TOTAL = Counter(
     "LLM calls refused or downgraded by the classification guardrail.",
     ["reason"],
 )
+RETENTION_PURGED_TOTAL = Counter(
+    "forge_retention_purged_total",
+    "Rows emptied or deleted by retention (kind) or by a forget request; dry runs are not counted.",
+    ["kind", "trigger"],
+)
+FORGET_REQUESTS_TOTAL = Counter(
+    "forge_forget_requests_total", "Forget requests processed, by source (api, orbit_webhook).", ["source"]
+)
 ERRORS_DETECTED_TOTAL = Counter(
     "forge_errors_detected_total", "Errors detected on runs by taxonomy code.", ["type", "severity"]
 )

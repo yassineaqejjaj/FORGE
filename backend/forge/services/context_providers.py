@@ -44,6 +44,7 @@ SNAPSHOT_NAME_PATTERN = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._\-]{0,119}$")  # OR
 DEFAULT_TIMEOUT_SECONDS = 20.0
 # ORBIT item fields kept on FORGE documents (none is required).
 PROVENANCE_FIELDS = (
+    "key",  # snapshot items: "chunk:<id>" | "memory:<lineage_id>" (needed to honour a memory being forgotten)
     "classification",
     "citation",
     "version",
