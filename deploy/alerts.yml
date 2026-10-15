@@ -1,0 +1,44 @@
+# Prometheus alert rules for FORGE (docs/OPERATIONS.md §3). Metric names are checked against the code by
+# backend/tests/test_observability.py. Scrape api:8000/metrics (queue and pending-capture gauges are read
+# from the database there) and the workers' :9464/metrics (forge_worker_inflight_jobs).
+groups:
+  - name: forge
+    rules:
+      - alert: ForgeRunFailureRatioHigh
+        expr: sum(rate(forge_runs_total{status="failed"}[15m])) / sum(rate(forge_runs_total[15m])) > 0.2
+        for: 15m
+        labels: {severity: warning}
+        annotations:
+          summary: "More than 20 % of the runs fail"
+      - alert: ForgeQueueBacklog
+        expr: forge_queue_depth > 500
+        for: 30m
+        labels: {severity: warning}
+        annotations:
+          summary: "Queue {{ $labels.queue }} holds more than 500 jobs for 30 minutes"
+      - alert: ForgeOldestJobTooOld
+        expr: forge_oldest_job_age_seconds > 900
+        for: 10m
+        labels: {severity: critical}
+        annotations:
+          summary: "Oldest runnable job of queue {{ $labels.queue }} waits for more than 15 minutes (workers down?)"
+      - alert: ForgeJudgeFailureRatioHigh
+        expr: >-
+          sum(rate(forge_judge_calls_total{outcome="failure"}[15m]))
+          / sum(rate(forge_judge_calls_total{outcome=~"success|failure"}[15m])) > 0.1
+        for: 15m
+        labels: {severity: warning}
+        annotations:
+          summary: "More than 10 % of the LLM judge calls fail (provider degraded?)"
+      - alert: ForgeOtlpOrphanSpans
+        expr: increase(forge_otlp_spans_total{outcome="orphan"}[30m]) > 0
+        for: 30m
+        labels: {severity: warning}
+        annotations:
+          summary: "Orphan OTLP spans keep arriving (agents badly correlated)"
+      - alert: ForgeObservedEvaluationsStuck
+        expr: forge_observed_pending_evaluations > 100
+        for: 30m
+        labels: {severity: warning}
+        annotations:
+          summary: "More than 100 observed captures wait for evaluation"

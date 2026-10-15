@@ -20,6 +20,8 @@ RUN_EVALUATION_SECONDS = Histogram(
     "Evaluation latency (rules + judges + scoring) per run.",
     buckets=(0.05, 0.1, 0.5, 1, 2, 5, 10, 20, 60, 120),
 )
+#: ``outcome`` values of ``forge_judge_calls_total`` (alert expressions must select among these).
+JUDGE_OUTCOMES = ("success", "failure", "cached")
 JUDGE_CALLS_TOTAL = Counter(
     "forge_judge_calls_total", "LLM judge calls by provider and outcome.", ["provider", "outcome"]
 )
@@ -36,6 +38,13 @@ OTLP_SPANS_TOTAL = Counter(
     "forge_otlp_spans_total", "OTLP spans received by outcome (attached, orphan, rejected).", ["outcome"]
 )
 JOBS_TOTAL = Counter("forge_jobs_total", "Jobs by kind and outcome.", ["kind", "outcome"])
+QUEUE_DEPTH = Gauge("forge_queue_depth", "Queued jobs per queue (refreshed at each scrape).", ["queue"])
+OLDEST_JOB_AGE = Gauge(
+    "forge_oldest_job_age_seconds", "Age of the oldest runnable queued job per queue (0 if none).", ["queue"]
+)
+OBSERVED_PENDING = Gauge(
+    "forge_observed_pending_evaluations", "Observed captures ingested and not yet evaluated."
+)
 WORKER_INFLIGHT = Gauge("forge_worker_inflight_jobs", "Jobs currently processed by this worker.", ["queue"])
 
 
@@ -49,9 +58,17 @@ def record_job(kind: str, outcome: str) -> None:
 
 
 def record_judge_call(provider: str, outcome: str, cost: float | None = None) -> None:
+    """``outcome`` ∈ :data:`JUDGE_OUTCOMES`."""
     JUDGE_CALLS_TOTAL.labels(provider=provider, outcome=outcome).inc()
     if cost:
         JUDGE_COST_TOTAL.labels(provider=provider).inc(max(cost, 0.0))
+
+
+def record_queue_snapshot(depth: dict[str, int], oldest_age: dict[str, float], observed_pending: int) -> None:
+    for queue, count in depth.items():
+        QUEUE_DEPTH.labels(queue=queue).set(count)
+        OLDEST_JOB_AGE.labels(queue=queue).set(oldest_age.get(queue, 0.0))
+    OBSERVED_PENDING.set(observed_pending)
 
 
 def record_llm_guardrail_skip(reason: str) -> None:

@@ -8,6 +8,10 @@ FROM ghcr.io/astral-sh/uv:0.12.17 AS uv
 
 FROM python:${PYTHON_VERSION}-slim AS runtime
 
+# Deployed commit (shown by /health and /ready). On Railway RAILWAY_GIT_COMMIT_SHA is used when empty.
+ARG GIT_SHA=
+ENV GIT_SHA=${GIT_SHA}
+
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     UV_COMPILE_BYTECODE=1 \

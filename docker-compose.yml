@@ -13,6 +13,8 @@ x-backend-env: &backend-env
 x-backend: &backend
   build:
     context: ./backend
+    args:
+      GIT_SHA: ${GIT_SHA:-}
   image: forge-backend:latest
   env_file:
     - path: .env

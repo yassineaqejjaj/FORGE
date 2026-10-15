@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import base64
 import hashlib
+import os
 from functools import lru_cache
 from pathlib import Path
 from typing import Literal
@@ -33,6 +34,9 @@ class Settings(BaseSettings):
     env: Literal["development", "production", "test"] = "development"
     log_level: str = "INFO"
     app_version: str = __version__
+    #: Commit deployed (``/health``, ``/ready``): ``FORGE_GIT_SHA``, else the ``GIT_SHA`` build argument,
+    #: else Railway's ``RAILWAY_GIT_COMMIT_SHA`` (first non-empty).
+    git_sha: str = ""
     #: Public URL of the API (shown in the UI for OTLP / CI snippets).
     public_base_url: str = "http://localhost:8100"
 
@@ -151,6 +155,15 @@ class Settings(BaseSettings):
     @classmethod
     def _strip_trailing_slash(cls, value: str) -> str:
         return value.strip().rstrip("/")
+
+    @model_validator(mode="after")
+    def _resolve_git_sha(self) -> Settings:
+        self.git_sha = (
+            self.git_sha.strip()
+            or os.environ.get("GIT_SHA", "").strip()
+            or os.environ.get("RAILWAY_GIT_COMMIT_SHA", "").strip()
+        )
+        return self
 
     @model_validator(mode="after")
     def _check_production_secrets(self) -> Settings:
