@@ -169,3 +169,18 @@ async def test_an_optional_orbit_context_falls_back_to_the_scenario_context() ->
     )
     assert prepared.source.value == "scenario" and prepared.warnings
     assert [d["id"] for d in prepared.context["documents"]] == ["s1"]
+
+
+# --- Additive field of ORBIT NOV-106 ------------------------------------------------------------------------------------
+
+ORBIT_PROJECT_ID = "0a0b0c0d-0000-4000-8000-000000000106"  # synthetic ``orion_project_id`` of the fixtures
+
+
+def test_the_orion_project_id_is_an_additive_field_forge_tolerates_and_does_not_forward() -> None:
+    """ORBIT NOV-106 adds ``orion_project_id`` to every contract answer; nothing FORGE reads changes."""
+    for name in ("context_package.json", "context_package_limited_rights.json", "snapshot.json"):
+        assert load(ORBIT_DIR, name)["orion_project_id"] == ORBIT_PROJECT_ID, name
+    for name in generate.SCENARIOS:
+        assert ORBIT_PROJECT_ID not in json.dumps(body(name)), (
+            name
+        )  # not part of FAP v1: not sent to the agent

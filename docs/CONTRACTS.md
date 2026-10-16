@@ -42,6 +42,8 @@ uv run python scripts/generate_fap_fixtures.py          # --check pour vérifier
 Ordre complet après un changement de contrat ORBIT : ORBIT `export_contract_fixtures.py` → FORGE `--orbit` puis
 `generate_fap_fixtures.py` → NOVA `--orbit --fap-request` puis régénération de ses réponses → FORGE `--fap-response`.
 
+Champ additif `orion_project_id` (ORBIT NOV-106, valeur synthétique `0a0b0c0d-0000-4000-8000-000000000106` dans les fixtures) : FORGE le tolère et ne le transmet pas à NOVA (non prévu par FAP v1).
+
 Limites : une CI ne voit que son dépôt, donc la comparaison copie ↔ source se fait localement ou dans le job de chaîne
 manuel ; les contenus sont synthétiques (C2/C3 fictifs) ; le vrai FORGE n'est pas démarré par ces tests (voir NOVA
 `tests/cross_instance`, opt-in).

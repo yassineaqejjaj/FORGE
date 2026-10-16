@@ -3,7 +3,7 @@
  "protocol": "forge-agent-protocol/v1",
  "source": "FORGE backend/scripts/generate_fap_fixtures.py (real code, synthetic data)",
  "derived_from": {
-  "orbit_manifest_sha256": "c7d757f3c32d8e0a4555ef1542b979005dfc3d2e854b3fcb642f1c89203b85a5",
+  "orbit_manifest_sha256": "2543894291e05d39aa3cde09bf850a23039545e9647b46eb7ded556c6c0d2f06",
   "orbit_schema_version": 2,
   "scenarios": {
    "request_orbit_live.json": "context_package.json",
