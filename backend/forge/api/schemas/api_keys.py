@@ -21,6 +21,18 @@ class ApiKeyCreateIn(ApiModel):
         description='Vide = accès complet selon le rôle ; ["traces:write"] = envoi de traces uniquement',
     )
     expires_at: datetime | None = None
+    project_id: uuid.UUID | None = Field(
+        default=None, description="Projet de l'espace auquel rattacher la clé (sinon : clé d'espace)"
+    )
+
+
+class ApiKeyRotateIn(ApiModel):
+    grace_hours: int = Field(
+        default=24,
+        ge=0,
+        le=168,
+        description="Heures pendant lesquelles l'ancienne clé reste valide (0 = révoquée)",
+    )
 
 
 class ApiKeyOut(ApiModel):

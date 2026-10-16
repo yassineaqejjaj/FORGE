@@ -15,11 +15,22 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from forge.infra.models import (
     ORION_DEFAULT_WORKSPACE_ID,
+    Agent,
+    Benchmark,
+    Dataset,
+    EvaluationConfig,
+    EvaluationRun,
+    Experiment,
+    Judge,
     Project,
+    ProviderCredential,
+    Scenario,
     User,
     Workspace,
     WorkspaceMember,
 )
+from forge.services import api_keys, audit
+from forge.services.audit import ActorLike
 from forge.services.taxonomy import ConflictError, InvalidError, NotFoundError
 
 SLUG_PATTERN = re.compile(r"^[a-z0-9]+(?:[-_][a-z0-9]+)*$")
@@ -113,3 +124,49 @@ async def set_membership(session: AsyncSession, user: User, workspace: Workspace
         member.workspace_id = workspace.id
     await session.flush()
     return member
+
+
+#: Resource tables that carry ``project_id`` (a project holding any of them cannot change workspace).
+PROJECT_RESOURCES = (
+    Agent,
+    Scenario,
+    Dataset,
+    Benchmark,
+    Experiment,
+    EvaluationRun,
+    Judge,
+    EvaluationConfig,
+    ProviderCredential,
+)
+
+
+async def move_project(session: AsyncSession, actor: ActorLike, project: Project, target: Workspace) -> int:
+    """Move a project to another workspace; returns the number of API keys revoked (flush, caller commits).
+
+    A project's keys never follow it: they are revoked (ADR §7). A project that still holds resources is
+    refused (those rows belong to the old workspace: they must be moved or deleted first).
+    """
+    if project.workspace_id == target.id:
+        raise ConflictError("Le projet est déjà dans cet espace")
+    for model in PROJECT_RESOURCES:
+        used = await session.scalar(select(model.id).where(model.project_id == project.id).limit(1))  # type: ignore[attr-defined]
+        if used is not None:
+            raise ConflictError(
+                f"Le projet porte encore des ressources ({model.__tablename__}) : déplacement refusé"
+            )
+    previous = project.workspace_id
+    project.workspace_id = target.id
+    await session.flush()
+    revoked = await api_keys.revoke_keys_of_project(
+        session, actor, project.id, reason="le projet a quitté l'espace de la clé"
+    )
+    await audit.record(
+        session,
+        actor,
+        "project.move",
+        "project",
+        project.id,
+        summary=f"Projet « {project.slug} » déplacé vers l'espace « {target.slug} »",
+        details={"from": previous, "to": target.id, "revoked_keys": revoked},
+    )
+    return revoked

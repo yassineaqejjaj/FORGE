@@ -95,6 +95,22 @@ class Settings(BaseSettings):
     #: ``True``: an administrator authenticated by SSO needs ``amr`` ∋ ``mfa`` for admin operations.
     require_mfa_for_admin: bool = False
 
+    # --- Service accounts and API keys (NOV-112, docs/SERVICE_KEYS.md) — all off by default ------------
+    #: ``True``: creating a key requires an explicit ``role`` and ``clearance`` (no silent defaults).
+    api_key_require_explicit: bool = False
+    #: Longest life of a new key in days (0 = no limit). When set, a key needs an ``expires_at`` within it.
+    api_key_max_days: int = Field(default=0, ge=0, le=3650)
+    #: How FORGE authenticates to NOVA: ``token`` (default: the credential's static token, unchanged),
+    #: ``oidc`` (a client-credentials service token of the realm) or ``both`` (the service token, the static
+    #: token when the IdP cannot be reached). Mirrors NOVA's ``NOVA_FORGE_INBOUND_AUTH``.
+    nova_service_auth: Literal["token", "oidc", "both"] = "token"
+    service_client_id: str = "forge-service"
+    service_client_secret: str = ""
+    #: Token endpoint of the service account (defaults to the realm's one, ``FORGE_OIDC_ISSUER``).
+    service_token_endpoint: str = ""
+    #: Scopes asked for NOVA: its audience (``nova-web``) and the right to execute a run (ADR §7).
+    nova_service_scope: str = "orion-audience-nova orion:run.execute"
+
     # --- Observability (FORGE's own telemetry) ---------------------------------------------------
     otlp_endpoint: str = ""
     otlp_headers: str = ""
@@ -225,6 +241,21 @@ class Settings(BaseSettings):
             self.oidc_redirect_uri = (
                 self.oidc_redirect_uri.strip() or f"{self.public_base_url}/api/v1/auth/oidc/callback"
             )
+        return self
+
+    @model_validator(mode="after")
+    def _check_service_auth(self) -> Settings:
+        if self.nova_service_auth != "token":
+            if not self.service_client_secret:
+                raise ValueError(
+                    "FORGE_SERVICE_CLIENT_SECRET est requis lorsque FORGE_NOVA_SERVICE_AUTH != token."
+                )
+            if not self.service_token_endpoint.strip():
+                if not self.oidc_issuer.strip():
+                    raise ValueError("FORGE_SERVICE_TOKEN_ENDPOINT (ou FORGE_OIDC_ISSUER) est requis.")
+                self.service_token_endpoint = (
+                    f"{self.oidc_issuer.strip().rstrip('/')}/protocol/openid-connect/token"
+                )
         return self
 
     @model_validator(mode="after")
