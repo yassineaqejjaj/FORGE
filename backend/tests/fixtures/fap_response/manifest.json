@@ -12,16 +12,16 @@
  },
  "files": {
   "response_classification_refused.json": {
-   "sha256": "ecca4d96fdcf1e83e5d188a3227079b1d027e705d09e232523e24f415ecd2d5f"
+   "sha256": "e65532604dee615bbd822d0272a87c5ac9c9bfa0913c4f40d1cf5ab0be63bc58"
   },
   "response_ok.json": {
-   "sha256": "608dcca47ddcbd41526528f85ee74edfd60754a7da41a5590da6f3fb346e77d8"
+   "sha256": "4e00e8d1adb040e8a4bc500ace1eea14b74808b2bbfa285f81176190c113b9b3"
   },
   "response_unauthorized.json": {
-   "sha256": "05d34a8db562b84bf20fa72d6a1bbf67285e0dbfd7a39abb4216ec43e8b298a8"
+   "sha256": "3a0f4a37fcf49d238a623323c9d5c78bced58edd3e69d783b65b570364287ccd"
   },
   "response_unsupported_override.json": {
-   "sha256": "9241d4edd504392526cd3ce2b2c7673ef2baa3b64327fdb75cd82b495fe9679b"
+   "sha256": "867730362d1657554a97dc09eb56f8de82390f0ffba375970dfd67b9170ef934"
   }
  }
 }
