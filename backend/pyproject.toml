@@ -57,7 +57,7 @@ packages = ["forge"]
 [tool.ruff]
 line-length = 110
 target-version = "py312"
-extend-exclude = ["alembic/versions"]
+extend-exclude = ["alembic/versions", "forge/domain/orion_claims.py"]  # the claims module is a verified copy (NOVA)
 
 [tool.ruff.lint]
 select = ["E", "F", "W", "I", "B", "UP", "ASYNC", "SIM", "RUF"]

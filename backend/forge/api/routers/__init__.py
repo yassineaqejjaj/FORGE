@@ -39,9 +39,16 @@ ROUTER_MODULES: tuple[str, ...] = (
 )
 
 
+#: Mounted only when the feature is enabled (``FORGE_OIDC_ENABLED``): disabled, the routes do not exist.
+OPTIONAL_ROUTER_MODULES: tuple[str, ...] = ("oidc",)
+
+
 def build_api_router() -> APIRouter:
+    from forge.config import settings
+
     api_router = APIRouter(prefix=API_PREFIX)
-    for name in ROUTER_MODULES:
+    modules = ROUTER_MODULES + (OPTIONAL_ROUTER_MODULES if settings.oidc_enabled else ())
+    for name in modules:
         module = importlib.import_module(f"forge.api.routers.{name}")
         api_router.include_router(module.router)
     return api_router

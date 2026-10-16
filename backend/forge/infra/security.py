@@ -83,6 +83,8 @@ class TokenClaims:
     issued_at: datetime
     expires_at: datetime
     token_id: str
+    #: Caps of the IdP token that opened an SSO session (``OidcContext.to_claim()``); ``None`` otherwise.
+    oidc: dict[str, Any] | None = None
 
 
 def create_access_token(
@@ -134,6 +136,7 @@ def decode_access_token(token: str) -> TokenClaims:
         issued_at=datetime.fromtimestamp(int(payload["iat"]), UTC),
         expires_at=datetime.fromtimestamp(int(payload["exp"]), UTC),
         token_id=str(payload.get("jti", "")),
+        oidc=payload["oidc"] if isinstance(payload.get("oidc"), dict) else None,
     )
 
 

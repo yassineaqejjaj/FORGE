@@ -10,7 +10,7 @@ from forge.infra.models.evaluation import (
     RunError,
     Score,
 )
-from forge.infra.models.identity import ApiKey, AuditEvent, ProviderCredential, User
+from forge.infra.models.identity import ApiKey, AuditEvent, ExternalIdentity, ProviderCredential, User
 from forge.infra.models.job import Job
 from forge.infra.models.programs import (
     Benchmark,
@@ -67,6 +67,7 @@ __all__ = [
     "ExecutionTrace",
     "Experiment",
     "ExperimentScenario",
+    "ExternalIdentity",
     "FeedbackReport",
     "Job",
     "Judge",

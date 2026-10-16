@@ -11,7 +11,7 @@ from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
 from forge.domain.enums import ActorType, ProviderKind, Role
-from forge.infra.db import Base, CreatedAtMixin, TimestampMixin, UUIDPkMixin
+from forge.infra.db import Base, CreatedAtMixin, TimestampMixin, UUIDPkMixin, utcnow
 from forge.infra.models._types import StrEnumType, enum_check, range_check
 from forge.infra.models.workspace import ProjectScopedMixin, WorkspaceScopedMixin
 
@@ -41,6 +41,26 @@ class User(UUIDPkMixin, CreatedAtMixin, Base):
     last_login_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     #: Set when the user finishes (or skips) the first-login welcome tour; ``NULL`` = not onboarded yet.
     onboarded_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+
+class ExternalIdentity(Base):
+    """Link between a local user and an IdP identity (OIDC ``iss`` + ``sub``), created only on the user's
+    explicit confirmation (ADR 001 §8, NOV-108). Additive: no existing table changes."""
+
+    __tablename__ = "external_identities"
+    __table_args__ = (
+        Index("uq_external_identities_issuer_user_id", "issuer", "user_id", unique=True),
+        Index("ix_external_identities_user_id", "user_id"),
+    )
+
+    issuer: Mapped[str] = mapped_column(Text, primary_key=True)
+    sub: Mapped[str] = mapped_column(Text, primary_key=True)
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False
+    )
+    linked_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, default=utcnow, server_default=text("now()")
+    )
 
 
 class ApiKey(UUIDPkMixin, CreatedAtMixin, ProjectScopedMixin, Base):
