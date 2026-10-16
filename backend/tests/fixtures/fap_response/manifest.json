@@ -8,7 +8,7 @@
   "usage fixed (100 in / 20 out); task id, trace id, runtime commit, skill catalog digest, release labels and Skill versions replaced"
  ],
  "derived_from": {
-  "fap_request_manifest_sha256": "67f84255051c793d7bf0a68c101175858543aa58788e1fdac18c5e9aebdb6a35"
+  "fap_request_manifest_sha256": "5ed0036e81a70f228ef18b29fb2912fba178d01fe1e43ea15c5f28018482b7f5"
  },
  "files": {
   "response_classification_refused.json": {
