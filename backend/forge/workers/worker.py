@@ -35,6 +35,7 @@ from forge.infra.queue import (
     mark_succeeded,
     requeue_stale_jobs,
 )
+from forge.infra.workspace_scope import bind_session
 from forge.workers.handlers import resolve_handler
 
 logger = logging.getLogger("forge.worker")
@@ -141,6 +142,9 @@ class Worker:
                 job = await session.get(Job, job_id)
                 if job is None:
                     return
+                # Background work runs inside the workspace of its job: stamped rows inherit it and,
+                # with FORGE_WORKSPACE_ENFORCEMENT=enforce, nothing of another workspace is visible.
+                bind_session(session, job.workspace_id)
                 label = f"{job.kind} job={job.id} run={job.run_id} attempt={job.attempts}/{job.max_attempts}"
                 logger.info("Running %s", label)
                 with self._tracer.start_as_current_span(f"job.{job.kind}") as span:

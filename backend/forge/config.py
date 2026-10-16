@@ -54,6 +54,13 @@ class Settings(BaseSettings):
     secrets_key: str = DEV_SECRETS_KEY
     login_rate_limit_per_minute: int = 10
 
+    #: ORION workspace isolation (NOV-105, docs/WORKSPACES.md). ``off`` (default): the workspace columns
+    #: exist and are stamped, nothing is filtered or counted — behaviour identical to before. ``shadow``:
+    #: every read of a row outside the caller's workspace is logged and counted
+    #: (``forge_workspace_violations_total``) but still served. ``enforce``: such rows are invisible (404,
+    #: indistinguishable from an unknown id).
+    workspace_enforcement: Literal["off", "shadow", "enforce"] = "off"
+
     # --- Observability (FORGE's own telemetry) ---------------------------------------------------
     otlp_endpoint: str = ""
     otlp_headers: str = ""

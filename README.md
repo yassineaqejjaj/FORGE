@@ -133,6 +133,7 @@ flowchart LR
 * [docs/DEMO.md](docs/DEMO.md) : scénario de démonstration guidée.
 * [docs/DEMO_AGENTS.md](docs/DEMO_AGENTS.md) : agents de démonstration simulés (comportements, paramètres).
 * [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) : déploiement (Vercel, Railway).
+* [docs/WORKSPACES.md](docs/WORKSPACES.md) : espaces et projets ORION, isolation (`FORGE_WORKSPACE_ENFORCEMENT`), migration, exceptions.
 * [docs/OPERATIONS.md](docs/OPERATIONS.md) : production — secrets, TLS, sauvegardes, supervision, mises à jour.
 
 ## Stack

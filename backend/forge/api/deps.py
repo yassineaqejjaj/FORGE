@@ -9,6 +9,11 @@ Two kinds of callers:
 
 Routers declare the minimum role with ``RequireViewer`` … ``RequireAdmin``. Private scenario
 content is filtered with :meth:`Principal.can_see_private` (maintainer and above).
+
+Every authenticated dependency also **binds the database session to the caller's workspace**
+(``forge.infra.workspace_scope``): the workspace comes from the validated identity — the user's
+membership or the API key's workspace — never from a parameter or a header. Whether the session is
+then filtered depends on ``FORGE_WORKSPACE_ENFORCEMENT`` (docs/WORKSPACES.md).
 """
 
 from __future__ import annotations
@@ -26,7 +31,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from forge.api.errors import forbidden, unauthorized
 from forge.domain.enums import ActorType, Role, role_at_least
 from forge.infra.db import get_session, utcnow
-from forge.infra.models import ApiKey, User
+from forge.infra.models import ORION_DEFAULT_WORKSPACE_ID, ApiKey, User
 from forge.infra.security import (
     API_KEY_HEADER,
     SESSION_COOKIE_NAME,
@@ -38,7 +43,26 @@ from forge.infra.security import (
     password_fingerprint,
     verify_api_key,
 )
+from forge.infra.workspace_scope import bind_session
 from forge.services.audit import Actor
+from forge.services.workspaces import workspace_id_of_user
+
+#: Routes whose session is **not** bound to a workspace (no authenticated identity yet, or a platform
+#: caller), each with the reason. The inventory test fails for any other route without a binding
+#: authentication dependency (``get_principal`` / ``get_trace_writer`` / ``get_current_user``).
+UNBOUND_ROUTES: dict[tuple[str, str], str] = {
+    (
+        "POST",
+        "/api/v1/auth/login",
+    ): "no identity yet: binds the user's workspace once the password is verified",
+    ("POST", "/api/v1/auth/logout"): "binds the workspace of the session token it revokes",
+    (
+        "POST",
+        "/api/v1/webhooks/orbit",
+    ): "HMAC-signed ORBIT webhook, no user: forgets copies of a document in every workspace",
+}
+#: Non-API routes (liveness, readiness and Prometheus scrape: aggregated platform counters, no tenant data).
+UNBOUND_PLATFORM_PATHS: frozenset[str] = frozenset({"/health", "/ready", "/metrics"})
 
 SessionDep = Annotated[AsyncSession, Depends(get_session)]
 
@@ -58,9 +82,12 @@ class Principal:
     user: User | None = None
     api_key: ApiKey | None = None
     scopes: list[str] = field(default_factory=list)
+    #: ``orion_workspace_id`` of the caller (isolation boundary) and the project of a project key.
+    workspace_id: uuid.UUID = ORION_DEFAULT_WORKSPACE_ID
+    project_id: uuid.UUID | None = None
 
     @classmethod
-    def for_user(cls, user: User) -> Principal:
+    def for_user(cls, user: User, workspace_id: uuid.UUID = ORION_DEFAULT_WORKSPACE_ID) -> Principal:
         return cls(
             kind="user",
             id=user.id,
@@ -68,6 +95,7 @@ class Principal:
             role=user.role,
             clearance=int(user.clearance),
             user=user,
+            workspace_id=workspace_id,
         )
 
     @classmethod
@@ -80,6 +108,8 @@ class Principal:
             clearance=int(key.clearance),
             api_key=key,
             scopes=list(key.scopes or []),
+            workspace_id=key.workspace_id,
+            project_id=key.project_id,
         )
 
     @property
@@ -117,6 +147,16 @@ _ROLE_MESSAGES: dict[Role, str] = {
     Role.maintainer: "Action réservée aux mainteneurs de benchmarks (rôle maintainer ou supérieur)",
     Role.admin: "Action réservée aux administrateurs de la plateforme",
 }
+
+
+async def _user_principal(session: AsyncSession, user: User) -> Principal:
+    return bind(session, Principal.for_user(user, await workspace_id_of_user(session, user.id)))
+
+
+def bind(session: AsyncSession, principal: Principal) -> Principal:
+    """Scope the request's session to the caller's workspace (see ``forge.infra.workspace_scope``)."""
+    bind_session(session, principal.workspace_id, principal.project_id)
+    return principal
 
 
 # --- Credential extraction ------------------------------------------------------------------------
@@ -198,11 +238,11 @@ async def get_principal(request: Request, session: SessionDep) -> Principal:
         api_key = await authenticate_api_key(session, key)
         if api_key.scopes:
             raise forbidden("Cette clé d'API est limitée à l'envoi de traces")
-        return Principal.for_api_key(api_key)
+        return bind(session, Principal.for_api_key(api_key))
     token = session_token(request)
     if token is None:
         raise unauthorized("Authentification requise")
-    return Principal.for_user(await _user_from_token(session, token))
+    return await _user_principal(session, await _user_from_token(session, token))
 
 
 async def get_trace_writer(request: Request, session: SessionDep) -> Principal:
@@ -210,7 +250,7 @@ async def get_trace_writer(request: Request, session: SessionDep) -> Principal:
     key = extract_api_key(request)
     if key:
         api_key = await authenticate_api_key(session, key)
-        principal = Principal.for_api_key(api_key)
+        principal = bind(session, Principal.for_api_key(api_key))
         if api_key.scopes and TRACES_WRITE_SCOPE not in api_key.scopes:
             raise forbidden("Cette clé d'API ne permet pas l'envoi de traces")
         if not api_key.scopes:
@@ -219,7 +259,7 @@ async def get_trace_writer(request: Request, session: SessionDep) -> Principal:
     token = session_token(request)
     if token is None:
         raise unauthorized("Authentification requise (clé d'API fgk_… attendue)")
-    principal = Principal.for_user(await _user_from_token(session, token))
+    principal = await _user_principal(session, await _user_from_token(session, token))
     principal.require(Role.editor)
     return principal
 
@@ -231,7 +271,9 @@ async def get_current_user(request: Request, session: SessionDep) -> User:
         if extract_api_key(request):
             raise forbidden("Cette opération n'est pas accessible avec une clé d'API")
         raise unauthorized("Authentification requise")
-    return await _user_from_token(session, token)
+    user = await _user_from_token(session, token)
+    bind_session(session, await workspace_id_of_user(session, user.id))
+    return user
 
 
 def require_role(minimum: Role) -> Callable[..., Awaitable[Principal]]:

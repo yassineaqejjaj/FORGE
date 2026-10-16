@@ -26,7 +26,9 @@ LAST_ADMIN_MESSAGE = "Impossible de retirer le dernier administrateur actif de l
 
 async def _active_admins(session: AsyncSession) -> int:
     count = await session.scalar(
-        select(func.count()).select_from(User).where(User.role == Role.admin, User.active.is_(True))
+        select(func.count())
+        .select_from(User)
+        .where(User.role == Role.admin, User.active.is_(True), *user_service.scope_conditions(session))
     )
     return int(count or 0)
 
@@ -40,7 +42,7 @@ async def list_users(
     role: Role | None = None,
     active: bool | None = None,
 ) -> Page[UserOut]:
-    conditions = []
+    conditions = user_service.scope_conditions(session)
     if q and q.strip():
         pattern = f"%{q.strip()}%"
         conditions.append(or_(User.email.ilike(pattern), User.full_name.ilike(pattern)))
@@ -56,8 +58,10 @@ async def list_users(
         .offset(paging.offset)
         .limit(paging.page_size)
     )
+    users = list(rows)
+    await user_service.report_foreign_users(session, [u.id for u in users])
     return Page[UserOut](
-        items=[UserOut.model_validate(u) for u in rows],
+        items=[UserOut.model_validate(u) for u in users],
         total=int(total or 0),
         page=paging.page,
         page_size=paging.page_size,
@@ -93,9 +97,12 @@ async def create_user(body: UserCreateIn, admin: RequireAdmin, session: SessionD
 async def update_user(
     user_id: uuid.UUID, body: UserUpdateIn, admin: RequireAdmin, session: SessionDep
 ) -> UserOut:
-    user = await session.get(User, user_id)
+    user = await session.scalar(
+        select(User).where(User.id == user_id, *user_service.scope_conditions(session))
+    )
     if user is None:
         raise not_found("Utilisateur introuvable")
+    await user_service.report_foreign_users(session, [user.id])
     changes: dict[str, object] = {}
     if body.full_name is not None and body.full_name.strip() != user.full_name:
         changes["full_name"] = body.full_name.strip()

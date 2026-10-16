@@ -17,6 +17,7 @@ from sqlalchemy.exc import IntegrityError
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from forge.infra.observability.context import get_request_id
+from forge.infra.workspace_scope import WorkspaceViolation
 
 logger = logging.getLogger("forge.errors")
 
@@ -227,6 +228,12 @@ async def _integrity_error_handler(request: Request, exc: IntegrityError) -> JSO
     return _response(409, error_body("Conflit avec une ressource existante", "conflict"))
 
 
+async def _workspace_violation_handler(request: Request, exc: WorkspaceViolation) -> JSONResponse:
+    """A row of another workspace reached memory (a filter hole): answer like an unknown resource."""
+    logger.error("Workspace violation refused on %s %s (table %s)", request.method, request.url.path, exc)
+    return _response(404, error_body(DEFAULT_MESSAGES[404], "not_found"))
+
+
 async def _unhandled_exception_handler(request: Request, exc: Exception) -> JSONResponse:
     logger.exception("Unhandled error on %s %s", request.method, request.url.path)
     return _response(500, error_body(DEFAULT_MESSAGES[500], "internal_error"))
@@ -237,4 +244,5 @@ def install_exception_handlers(app: FastAPI) -> None:
     app.add_exception_handler(RequestValidationError, _validation_exception_handler)  # type: ignore[arg-type]
     app.add_exception_handler(NotImplementedError, _not_implemented_handler)  # type: ignore[arg-type]
     app.add_exception_handler(IntegrityError, _integrity_error_handler)  # type: ignore[arg-type]
+    app.add_exception_handler(WorkspaceViolation, _workspace_violation_handler)  # type: ignore[arg-type]
     app.add_exception_handler(Exception, _unhandled_exception_handler)
