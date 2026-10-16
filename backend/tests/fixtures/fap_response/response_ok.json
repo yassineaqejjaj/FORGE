@@ -1,0 +1,116 @@
+{
+ "status_code": 200,
+ "body": {
+  "protocol": "forge-agent-protocol/v1",
+  "output": "# Product Requirements Document\n\n## Summary\n\nGenerated text [source: 3bc8be0b-0000-4000-8000-000000000001]\nGenerated text [source: 3bc8be0b-0000-4000-8000-00000",
+  "output_json": {
+   "prd": {}
+  },
+  "events": [
+   {
+    "id": "evt-decision",
+    "parent_id": null,
+    "type": "decision",
+    "name": "Understanding your request",
+    "started_at": null,
+    "ended_at": "2026-10-01T12:00:00+00:00",
+    "status": "ok",
+    "input": null,
+    "output": "<detail>",
+    "attributes": {
+     "nova.step": "intent"
+    }
+   },
+   {
+    "id": "evt-retrieval",
+    "parent_id": null,
+    "type": "retrieval",
+    "name": "Using the provided context",
+    "started_at": null,
+    "ended_at": "2026-10-01T12:00:00+00:00",
+    "status": "ok",
+    "input": null,
+    "output": "<detail>",
+    "attributes": {
+     "nova.step": "context"
+    }
+   },
+   {
+    "id": "evt-custom",
+    "parent_id": null,
+    "type": "custom",
+    "name": "Framing the problem and the users",
+    "started_at": null,
+    "ended_at": "2026-10-01T12:00:00+00:00",
+    "status": "ok",
+    "input": null,
+    "output": "<detail>",
+    "attributes": {
+     "nova.step": "1-write-the-prd:framing"
+    }
+   },
+   {
+    "id": "evt-llm_call",
+    "parent_id": null,
+    "type": "llm_call",
+    "name": "Skill prd@<version>",
+    "started_at": null,
+    "ended_at": "2026-10-01T12:00:00+00:00",
+    "status": "ok",
+    "input": null,
+    "output": null,
+    "attributes": {
+     "model": "test-model",
+     "input_tokens": 100,
+     "output_tokens": 20,
+     "nova.skill": "prd",
+     "nova.skill_version": "<version>"
+    }
+   }
+  ],
+  "usage": {
+   "input_tokens": 100,
+   "output_tokens": 20,
+   "model_calls": 1,
+   "tool_calls": 0
+  },
+  "model": "test-model",
+  "metadata": {
+   "nova_version": "0.1.0",
+   "nova_task_id": "00000000-0000-4000-8000-000000000000",
+   "trace_id": null,
+   "skills": [
+    {
+     "id": "prd",
+     "version": "<version>"
+    }
+   ],
+   "skill_catalog": "<digest>",
+   "artifact_types": [
+    "prd"
+   ],
+   "nova_agent_id": "nova-orchestrator",
+   "requested_version": "<current release label>",
+   "executed_version": "0.1.0+<digest>",
+   "executed": {
+    "nova_version": "0.1.0",
+    "runtime_commit": "",
+    "skill_catalog": "<digest>",
+    "provider": "vllm",
+    "model": "test-model",
+    "policy_id": null,
+    "parameters": {
+     "max_tokens": 0,
+     "max_cost": 0,
+     "max_steps": 8
+    },
+    "version": "0.1.0+<digest>"
+   },
+   "accepted_overrides": [
+    "budget.max_steps"
+   ],
+   "policies": {}
+  },
+  "error": null
+ }
+}

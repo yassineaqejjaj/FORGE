@@ -1,7 +1,8 @@
 {
+ "schema_version": 2,
  "request_id": "9a9a9a9a-0000-4000-8000-000000000001",
  "trace_id": "tttttttttttttttttttttttttttttttt",
- "task": "t",
+ "task": "Préparer l'atelier de cadrage",
  "intent": "general",
  "created_at": "2026-10-01T12:00:00Z",
  "context": "[S1] Le client veut un export CSV hebdomadaire.\n[S2] Décision : export CSV le lundi.\n[S3] Le prix plancher synthétique est de 120 EUR.",
@@ -9,14 +10,14 @@
   {
    "citation": "S1",
    "candidate_type": "chunk",
-   "id": "3bc8be0b-9044-4ee0-b690-dec6c9ad082c",
-   "document_id": "60b7e3f2-e7a0-4852-af65-e76f128d3c21",
+   "id": "3bc8be0b-0000-4000-8000-000000000001",
+   "document_id": "60b7e3f2-0000-4000-8000-000000000001",
    "memory_item_id": null,
    "title": "Note client",
    "source_kind": "document",
    "memory_kind": null,
    "memory_scope": null,
-   "uri": "x",
+   "uri": "orbit://synthetic/note-client",
    "version": 2,
    "excerpt": "Le client veut un export CSV hebdomadaire.",
    "tokens": 3,
@@ -29,6 +30,7 @@
     "final": 0.8
    },
    "classification": 1,
+   "access_scope": "public",
    "date": "2026-10-01T12:00:00Z",
    "pii_redacted": false,
    "reason_code": "INCLUDED_RELEVANT",
@@ -37,10 +39,10 @@
   {
    "citation": "S2",
    "candidate_type": "memory",
-   "id": "8bead5e8-cdd6-4bf7-92e7-1f1268551698",
+   "id": "8bead5e8-0000-4000-8000-000000000002",
    "document_id": null,
-   "memory_item_id": "fe3339a9-2fda-4698-9fbf-c42d415d96a6",
-   "title": "Dec",
+   "memory_item_id": "60b7e3f2-0000-4000-8000-000000000002",
+   "title": "Décision export",
    "source_kind": null,
    "memory_kind": "decision",
    "memory_scope": "project",
@@ -57,6 +59,7 @@
     "final": 0.5
    },
    "classification": 2,
+   "access_scope": "project",
    "date": null,
    "pii_redacted": false,
    "reason_code": "INCLUDED_RELEVANT",
@@ -72,7 +75,7 @@
    "source_kind": "document",
    "memory_kind": null,
    "memory_scope": null,
-   "uri": "x",
+   "uri": "orbit://synthetic/grille-tarifaire",
    "version": 4,
    "excerpt": "Le prix plancher synthétique est de 120 EUR.",
    "tokens": 3,
@@ -85,6 +88,7 @@
     "final": 0.8
    },
    "classification": 3,
+   "access_scope": "restricted",
    "date": "2026-10-01T12:00:00Z",
    "pii_redacted": false,
    "reason_code": "INCLUDED_RELEVANT",
@@ -117,9 +121,9 @@
  "exclusion_summary": {
   "EXCLUDED_ACL": 1
  },
- "tokens_used": 5,
+ "tokens_used": 8,
  "token_budget": 4000,
- "candidates_count": 3,
+ "candidates_count": 4,
  "timings": {
   "understand": 0.0,
   "rewrite": 0.0,
@@ -135,13 +139,13 @@
  },
  "snapshot": {
   "id": "d0d62e58-0010-4373-9403-7c6a253b3383",
-  "name": "n",
-  "version": 1
+  "name": "discovery",
+  "version": 7
  },
  "config": {
   "retrieval": "hybrid-bm25-knn-rrf-v1",
   "reranker": "heuristic",
-  "embedding_model": "m",
+  "embedding_model": "synthetic-hash",
   "llm": null,
   "compression": null
  },
@@ -153,5 +157,6 @@
  "mode": "full",
  "index": [],
  "profile": null,
- "sufficiency": null
+ "sufficiency": null,
+ "max_classification": 3
 }

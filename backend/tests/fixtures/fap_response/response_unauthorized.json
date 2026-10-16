@@ -1,0 +1,23 @@
+{
+ "status_code": 401,
+ "body": {
+  "protocol": "forge-agent-protocol/v1",
+  "output": "",
+  "output_json": null,
+  "events": [],
+  "usage": {
+   "input_tokens": 0,
+   "output_tokens": 0,
+   "model_calls": 0,
+   "tool_calls": 0
+  },
+  "model": null,
+  "metadata": {},
+  "error": {
+   "type": "UNAUTHORIZED",
+   "message": "Jeton NOVA invalide",
+   "retryable": false,
+   "fields": null
+  }
+ }
+}
