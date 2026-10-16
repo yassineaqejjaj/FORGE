@@ -1,0 +1,25 @@
+{
+ "contract": "fap-request",
+ "protocol": "forge-agent-protocol/v1",
+ "source": "FORGE backend/scripts/generate_fap_fixtures.py (real code, synthetic data)",
+ "derived_from": {
+  "orbit_manifest_sha256": "c7d757f3c32d8e0a4555ef1542b979005dfc3d2e854b3fcb642f1c89203b85a5",
+  "orbit_schema_version": 2,
+  "scenarios": {
+   "request_orbit_live.json": "context_package.json",
+   "request_orbit_live_limited_rights.json": "context_package_limited_rights.json",
+   "request_orbit_snapshot.json": "snapshot.json"
+  }
+ },
+ "files": {
+  "request_orbit_live.json": {
+   "sha256": "921d5064c5e8abad020d05d5a1b2bc760923bed3a23f25e11203708e593abe18"
+  },
+  "request_orbit_live_limited_rights.json": {
+   "sha256": "1d8d3c8d8dbcd8cd06df87290dc5d57de537859f289cdc373b4573240b2c7e0c"
+  },
+  "request_orbit_snapshot.json": {
+   "sha256": "0040bac7efe98bb96e7ee4bcc7353fef330361a6c20afe0bff3466bc9c9a1363"
+  }
+ }
+}

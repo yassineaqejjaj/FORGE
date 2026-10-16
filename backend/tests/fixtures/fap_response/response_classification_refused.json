@@ -1,0 +1,23 @@
+{
+ "body": {
+  "error": {
+   "fields": null,
+   "message": "Contexte au-dessus du plafond de classification NOVA (C2) : 3bc8be0b-0000-4000-8000-000000000001, 8bead5e8-0000-4000-8000-000000000002, 3bc8be0b-0000-4000-8000-000000000003, orbit-context",
+   "retryable": false,
+   "type": "CLASSIFICATION_REFUSED"
+  },
+  "events": [],
+  "metadata": {},
+  "model": null,
+  "output": "",
+  "output_json": null,
+  "protocol": "forge-agent-protocol/v1",
+  "usage": {
+   "input_tokens": 0,
+   "model_calls": 0,
+   "output_tokens": 0,
+   "tool_calls": 0
+  }
+ },
+ "status_code": 403
+}

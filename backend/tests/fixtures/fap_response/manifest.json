@@ -1,0 +1,27 @@
+{
+ "contract": "fap-response",
+ "protocol": "forge-agent-protocol/v1",
+ "source": "NOVA tests/contract/test_fap_response_fixtures.py (real route, scripted LLM, synthetic data)",
+ "normalization": [
+  "output cut to its first 160 characters; output_json artifacts reduced to their type with an empty object",
+  "events: first event of each type, ids and timestamps replaced, token counts fixed, free-text detail cut",
+  "usage fixed (100 in / 20 out); task id, trace id, runtime commit, skill catalog digest, release labels and Skill versions replaced"
+ ],
+ "derived_from": {
+  "fap_request_manifest_sha256": "67f84255051c793d7bf0a68c101175858543aa58788e1fdac18c5e9aebdb6a35"
+ },
+ "files": {
+  "response_classification_refused.json": {
+   "sha256": "e65532604dee615bbd822d0272a87c5ac9c9bfa0913c4f40d1cf5ab0be63bc58"
+  },
+  "response_ok.json": {
+   "sha256": "4e00e8d1adb040e8a4bc500ace1eea14b74808b2bbfa285f81176190c113b9b3"
+  },
+  "response_unauthorized.json": {
+   "sha256": "3a0f4a37fcf49d238a623323c9d5c78bced58edd3e69d783b65b570364287ccd"
+  },
+  "response_unsupported_override.json": {
+   "sha256": "867730362d1657554a97dc09eb56f8de82390f0ffba375970dfd67b9170ef934"
+  }
+ }
+}

@@ -129,6 +129,7 @@ flowchart LR
 * [docs/AGENT_PROTOCOL.md](docs/AGENT_PROTOCOL.md) : brancher un agent (FORGE Agent Protocol).
 * [docs/OBSERVED_RUNS.md](docs/OBSERVED_RUNS.md) : ingérer des runs déjà exécutés par un système externe.
 * [docs/CI.md](docs/CI.md) : bloquer un déploiement sur régression (CLI `forge`).
+* [docs/CONTRACTS.md](docs/CONTRACTS.md) : fixtures de contrat ORBIT → FORGE → NOVA (régénération, copies vérifiées).
 * [docs/DEMO.md](docs/DEMO.md) : scénario de démonstration guidée.
 * [docs/DEMO_AGENTS.md](docs/DEMO_AGENTS.md) : agents de démonstration simulés (comportements, paramètres).
 * [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) : déploiement (Vercel, Railway).
