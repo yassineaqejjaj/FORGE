@@ -36,8 +36,18 @@ from forge.infra.models.scenarios import (
     Scenario,
     ScenarioVersion,
 )
+from forge.infra.models.workspace import (
+    ORION_DEFAULT_WORKSPACE_ID,
+    Project,
+    ProjectMember,
+    ProjectScopedMixin,
+    Workspace,
+    WorkspaceMember,
+    WorkspaceScopedMixin,
+)
 
 __all__ = [
+    "ORION_DEFAULT_WORKSPACE_ID",
     "Agent",
     "AgentVersion",
     "ApiKey",
@@ -62,6 +72,9 @@ __all__ = [
     "Judge",
     "JudgeCacheEntry",
     "ModelConfiguration",
+    "Project",
+    "ProjectMember",
+    "ProjectScopedMixin",
     "PromptVersion",
     "ProviderCredential",
     "RunError",
@@ -71,4 +84,7 @@ __all__ = [
     "ToolConfiguration",
     "TraceEvent",
     "User",
+    "Workspace",
+    "WorkspaceMember",
+    "WorkspaceScopedMixin",
 ]

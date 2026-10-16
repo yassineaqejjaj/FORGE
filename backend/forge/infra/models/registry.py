@@ -12,6 +12,7 @@ from sqlalchemy.orm import Mapped, mapped_column
 from forge.domain.enums import AdapterKind
 from forge.infra.db import Base, CreatedAtMixin, TimestampMixin, UUIDPkMixin
 from forge.infra.models._types import StrEnumType, enum_check
+from forge.infra.models.workspace import ProjectScopedMixin, WorkspaceScopedMixin
 
 _JSON_OBJ = text("'{}'::jsonb")
 _JSON_LIST = text("'[]'::jsonb")
@@ -21,7 +22,7 @@ def _creator() -> Mapped[uuid.UUID | None]:
     return mapped_column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
 
 
-class ModelConfiguration(UUIDPkMixin, CreatedAtMixin, Base):
+class ModelConfiguration(UUIDPkMixin, CreatedAtMixin, WorkspaceScopedMixin, Base):
     """Immutable model settings (provider, model, version, sampling, pricing)."""
 
     __tablename__ = "model_configurations"
@@ -44,7 +45,7 @@ class ModelConfiguration(UUIDPkMixin, CreatedAtMixin, Base):
     created_by: Mapped[uuid.UUID | None] = _creator()
 
 
-class PromptVersion(UUIDPkMixin, CreatedAtMixin, Base):
+class PromptVersion(UUIDPkMixin, CreatedAtMixin, WorkspaceScopedMixin, Base):
     """Immutable prompt text, versioned by name (``product_manager`` v12)."""
 
     __tablename__ = "prompt_versions"
@@ -61,7 +62,7 @@ class PromptVersion(UUIDPkMixin, CreatedAtMixin, Base):
     created_by: Mapped[uuid.UUID | None] = _creator()
 
 
-class ToolConfiguration(UUIDPkMixin, CreatedAtMixin, Base):
+class ToolConfiguration(UUIDPkMixin, CreatedAtMixin, WorkspaceScopedMixin, Base):
     """Immutable tool set exposed to an agent (name, description, JSON schema of the arguments)."""
 
     __tablename__ = "tool_configurations"
@@ -77,9 +78,13 @@ class ToolConfiguration(UUIDPkMixin, CreatedAtMixin, Base):
     created_by: Mapped[uuid.UUID | None] = _creator()
 
 
-class Agent(UUIDPkMixin, TimestampMixin, Base):
+class Agent(UUIDPkMixin, TimestampMixin, ProjectScopedMixin, Base):
     __tablename__ = "agents"
-    __table_args__ = (Index("uq_agents_slug", "slug", unique=True),)
+    __table_args__ = (
+        Index("ix_agents_workspace_id_created_at", "workspace_id", "created_at"),
+        Index("ix_agents_project_id", "project_id", postgresql_where=text("project_id IS NOT NULL")),
+        Index("uq_agents_slug", "slug", unique=True),
+    )
 
     slug: Mapped[str] = mapped_column(Text, nullable=False)
     name: Mapped[str] = mapped_column(Text, nullable=False)
@@ -96,7 +101,7 @@ class Agent(UUIDPkMixin, TimestampMixin, Base):
     )
 
 
-class AgentVersion(UUIDPkMixin, CreatedAtMixin, Base):
+class AgentVersion(UUIDPkMixin, CreatedAtMixin, WorkspaceScopedMixin, Base):
     """Immutable, executable agent version. Any change creates a new version (docs §6.1)."""
 
     __tablename__ = "agent_versions"

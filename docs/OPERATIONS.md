@@ -142,6 +142,13 @@ invalidées (les clés d'API `fgk_…` ne sont pas affectées).
 * Les canaris `FORGE-CANARY-…` détectent la contamination des agents (règle `no_canary`,
   contrôle à la création des versions d'agents).
 
+### Isolation par espace (`FORGE_WORKSPACE_ENFORCEMENT`)
+
+`off` (**défaut**) : comportement historique, rien n'est filtré. `shadow` : toute lecture hors de l'espace de
+l'appelant est journalisée et comptée (`forge_workspace_violations_total`, alerte `ForgeWorkspaceViolations`)
+sans être refusée. `enforce` : ces lignes sont invisibles (404 indiscernable d'un identifiant inconnu).
+Procédure de bascule, commandes `python -m forge.ops workspace-*` et exceptions : [WORKSPACES.md](WORKSPACES.md).
+
 ### Politique de promotion (`FORGE_PROMOTION_POLICY`)
 
 Aucune amélioration n'est promue sur la foi d'une mesure non validée. `strict` (**défaut**) bloque,

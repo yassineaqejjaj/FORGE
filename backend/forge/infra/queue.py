@@ -26,8 +26,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from forge.domain.enums import JOB_QUEUES, TERMINAL_RUN_STATUSES, JobKind, JobQueue, JobStatus, RunOrigin
 from forge.infra.db import utcnow
-from forge.infra.models import EvaluationRun, Job
+from forge.infra.models import ORION_DEFAULT_WORKSPACE_ID, EvaluationRun, Job
 from forge.infra.observability.metrics import record_job, record_queue_snapshot
+from forge.infra.workspace_scope import scoped_key, session_workspace
 
 BACKOFF_BASE_SECONDS = 5.0
 BACKOFF_MAX_SECONDS = 600.0
@@ -74,13 +75,26 @@ async def enqueue_job(
     run_after: datetime | None = None,
     max_attempts: int = 3,
     dedupe_key: str | None = None,
+    workspace_id: uuid.UUID | None = None,
 ) -> Job | None:
     """Add a ``queued`` job (flushed; caller commits).
 
     With ``dedupe_key``, nothing is inserted when an active (queued/running) job with the same key
     exists; ``None`` is returned in that case.
+
+    The job belongs to a workspace: ``workspace_id``, else the one the session is bound to, else the
+    workspace of its run, else the default one. The dedupe key carries the workspace (unchanged for the
+    default workspace).
     """
     job_kind = JobKind(kind)
+    workspace_id = workspace_id or session_workspace(session)
+    if workspace_id is None and run_id is not None:
+        workspace_id = await session.scalar(
+            select(EvaluationRun.workspace_id).where(EvaluationRun.id == run_id)
+        )
+    workspace_id = workspace_id or ORION_DEFAULT_WORKSPACE_ID
+    if dedupe_key is not None:
+        dedupe_key = scoped_key(workspace_id, dedupe_key)
     values: dict[str, Any] = {
         "id": uuid.uuid4(),
         "kind": job_kind,
@@ -91,6 +105,7 @@ async def enqueue_job(
         "max_attempts": max(1, max_attempts),
         "payload": dict(payload or {}),
         "run_id": run_id,
+        "workspace_id": workspace_id,
         "dedupe_key": dedupe_key,
         "run_after": run_after or utcnow(),
         "created_at": utcnow(),

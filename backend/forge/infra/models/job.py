@@ -17,9 +17,10 @@ from sqlalchemy.orm import Mapped, mapped_column
 from forge.domain.enums import JobKind, JobQueue, JobStatus
 from forge.infra.db import Base, CreatedAtMixin, UUIDPkMixin, utcnow
 from forge.infra.models._types import StrEnumType, enum_check
+from forge.infra.models.workspace import WorkspaceScopedMixin
 
 
-class Job(UUIDPkMixin, CreatedAtMixin, Base):
+class Job(UUIDPkMixin, CreatedAtMixin, WorkspaceScopedMixin, Base):
     __tablename__ = "jobs"
     __table_args__ = (
         enum_check("kind", JobKind),

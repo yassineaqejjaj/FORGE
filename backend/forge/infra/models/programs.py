@@ -22,6 +22,7 @@ from sqlalchemy.orm import Mapped, mapped_column
 from forge.domain.enums import ExecutionStatus
 from forge.infra.db import Base, CreatedAtMixin, TimestampMixin, UUIDPkMixin
 from forge.infra.models._types import StrEnumType, enum_check, range_check
+from forge.infra.models.workspace import ProjectScopedMixin, WorkspaceScopedMixin
 
 _JSON_OBJ = text("'{}'::jsonb")
 _JSON_LIST = text("'[]'::jsonb")
@@ -31,9 +32,14 @@ def _creator() -> Mapped[uuid.UUID | None]:
     return mapped_column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
 
 
-class Benchmark(UUIDPkMixin, TimestampMixin, Base):
+class Benchmark(UUIDPkMixin, TimestampMixin, ProjectScopedMixin, Base):
     __tablename__ = "benchmarks"
-    __table_args__ = (Index("uq_benchmarks_slug", "slug", unique=True), range_check("repetitions", 1, 20))
+    __table_args__ = (
+        Index("ix_benchmarks_workspace_id_created_at", "workspace_id", "created_at"),
+        Index("ix_benchmarks_project_id", "project_id", postgresql_where=text("project_id IS NOT NULL")),
+        Index("uq_benchmarks_slug", "slug", unique=True),
+        range_check("repetitions", 1, 20),
+    )
 
     slug: Mapped[str] = mapped_column(Text, nullable=False)
     name: Mapped[str] = mapped_column(Text, nullable=False)
@@ -77,7 +83,7 @@ class BenchmarkAgent(Base):
     position: Mapped[int] = mapped_column(Integer, nullable=False, default=0, server_default=text("0"))
 
 
-class BenchmarkExecution(UUIDPkMixin, CreatedAtMixin, Base):
+class BenchmarkExecution(UUIDPkMixin, CreatedAtMixin, WorkspaceScopedMixin, Base):
     """One launch of a benchmark: the full matrix of runs plus its aggregated results."""
 
     __tablename__ = "benchmark_executions"
@@ -114,11 +120,13 @@ class BenchmarkExecution(UUIDPkMixin, CreatedAtMixin, Base):
     finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
 
-class Experiment(UUIDPkMixin, CreatedAtMixin, Base):
+class Experiment(UUIDPkMixin, CreatedAtMixin, ProjectScopedMixin, Base):
     """Baseline vs candidate comparison on the same scenarios (paired), with regression detection."""
 
     __tablename__ = "experiments"
     __table_args__ = (
+        Index("ix_experiments_workspace_id_created_at", "workspace_id", "created_at"),
+        Index("ix_experiments_project_id", "project_id", postgresql_where=text("project_id IS NOT NULL")),
         enum_check("status", ExecutionStatus),
         range_check("repetitions", 1, 20),
         Index("ix_experiments_created_at", "created_at"),

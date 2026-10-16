@@ -42,3 +42,9 @@ groups:
         labels: {severity: warning}
         annotations:
           summary: "More than 100 observed captures wait for evaluation"
+      - alert: ForgeWorkspaceViolations
+        expr: increase(forge_workspace_violations_total[15m]) > 0
+        for: 5m
+        labels: {severity: warning}
+        annotations:
+          summary: "Rows read outside the caller's workspace (shadow: would be refused; enforce: refused) — do not enable enforce while this fires in shadow"

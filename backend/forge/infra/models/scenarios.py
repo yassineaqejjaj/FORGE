@@ -24,6 +24,7 @@ from sqlalchemy.orm import Mapped, mapped_column
 from forge.domain.enums import DatasetKind, Difficulty, Dimension, ErrorSeverity, ScenarioVisibility
 from forge.infra.db import Base, CreatedAtMixin, TimestampMixin, UUIDPkMixin
 from forge.infra.models._types import StrEnumType, enum_check, range_check
+from forge.infra.models.workspace import ProjectScopedMixin, WorkspaceScopedMixin
 
 _JSON_OBJ = text("'{}'::jsonb")
 _JSON_LIST = text("'[]'::jsonb")
@@ -33,11 +34,16 @@ def _creator() -> Mapped[uuid.UUID | None]:
     return mapped_column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
 
 
-class Dataset(UUIDPkMixin, TimestampMixin, Base):
+class Dataset(UUIDPkMixin, TimestampMixin, ProjectScopedMixin, Base):
     """Context datasets (documents attached to scenarios) and gold datasets (human calibration)."""
 
     __tablename__ = "datasets"
-    __table_args__ = (enum_check("kind", DatasetKind), Index("uq_datasets_slug", "slug", unique=True))
+    __table_args__ = (
+        Index("ix_datasets_workspace_id_created_at", "workspace_id", "created_at"),
+        Index("ix_datasets_project_id", "project_id", postgresql_where=text("project_id IS NOT NULL")),
+        enum_check("kind", DatasetKind),
+        Index("uq_datasets_slug", "slug", unique=True),
+    )
 
     slug: Mapped[str] = mapped_column(Text, nullable=False)
     name: Mapped[str] = mapped_column(Text, nullable=False)
@@ -48,7 +54,7 @@ class Dataset(UUIDPkMixin, TimestampMixin, Base):
     created_by: Mapped[uuid.UUID | None] = _creator()
 
 
-class DatasetItem(UUIDPkMixin, CreatedAtMixin, Base):
+class DatasetItem(UUIDPkMixin, CreatedAtMixin, WorkspaceScopedMixin, Base):
     __tablename__ = "dataset_items"
     __table_args__ = (
         UniqueConstraint("dataset_id", "key"),
@@ -69,11 +75,13 @@ class DatasetItem(UUIDPkMixin, CreatedAtMixin, Base):
     )
 
 
-class Scenario(UUIDPkMixin, TimestampMixin, Base):
+class Scenario(UUIDPkMixin, TimestampMixin, ProjectScopedMixin, Base):
     """Stable identity of a scenario (``scenario_prd_001``); content lives in :class:`ScenarioVersion`."""
 
     __tablename__ = "scenarios"
     __table_args__ = (
+        Index("ix_scenarios_workspace_id_created_at", "workspace_id", "created_at"),
+        Index("ix_scenarios_project_id", "project_id", postgresql_where=text("project_id IS NOT NULL")),
         enum_check("visibility", ScenarioVisibility),
         range_check("classification", 0, 3),
         Index("uq_scenarios_slug", "slug", unique=True),
@@ -109,7 +117,7 @@ class Scenario(UUIDPkMixin, TimestampMixin, Base):
     )
 
 
-class ScenarioVersion(UUIDPkMixin, CreatedAtMixin, Base):
+class ScenarioVersion(UUIDPkMixin, CreatedAtMixin, WorkspaceScopedMixin, Base):
     """Immutable content of a scenario (docs §6.1). Runs always reference a scenario version."""
 
     __tablename__ = "scenario_versions"
