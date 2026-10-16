@@ -251,12 +251,16 @@ def evaluate_gate(
     summary: str | None = None,
     confidence: str | None = None,
     strict: bool = False,
+    blocking: Sequence[str] = (),
+    notices: Sequence[str] = (),
     max_listed: int = 10,
 ) -> GateDecision:
     """CI gate: passes unless the experiment is unfinished or the recommendation is negative.
 
     Default mode fails on ``do_not_ship`` only (evidence of a regression); ``strict`` mode passes
-    on ``ship`` only (evidence of an improvement without trade-off).
+    on ``ship`` only (evidence of an improvement without trade-off). ``blocking`` findings (promotion
+    policy: uncalibrated judges, contamination, regression cases not replayed) fail the gate whatever
+    the recommendation; ``notices`` are listed without changing the decision.
     """
     if status != "completed":
         return GateDecision(
@@ -273,16 +277,22 @@ def evaluate_gate(
             False, None, status, strict, confidence, summary, ["Aucune recommandation n'a été calculée."]
         )
     passed = recommendation == Recommendation.ship if strict else recommendation != Recommendation.do_not_ship
+    accepted = passed
+    passed = accepted and not blocking
     reasons: list[str] = []
     label = RECOMMENDATION_LABELS.get(recommendation, recommendation)
     if passed:
         reasons.append(f"Garde-fou CI franchi : recommandation « {label} ».")
+    elif accepted:
+        reasons.append(f"Recommandation « {label} » acceptée, mais la promotion est bloquée.")
     elif strict and recommendation != Recommendation.do_not_ship:
         reasons.append(
             f"Mode strict : seule la recommandation « Déployer » est acceptée (obtenu : « {label} »)."
         )
     else:
         reasons.append(f"Garde-fou CI bloquant : recommandation « {label} ».")
+    reasons += [f"Promotion bloquée : {item}." for item in blocking]
+    reasons += [f"Avertissement : {item}." for item in notices]
     if summary:
         reasons.append(summary)
     ranked = sorted(

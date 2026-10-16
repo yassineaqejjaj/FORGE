@@ -44,6 +44,9 @@ os.environ.update(
         "FORGE_WORKER_METRICS_PORT": "0",
         "FORGE_TRACE_GRACE_SECONDS": "0",
         "FORGE_LOG_LEVEL": "WARNING",
+        # Existing suites exercise experiments with uncalibrated heuristic judges: they run under the
+        # ``warn`` policy; tests of the strict policy (default in production) set it explicitly.
+        "FORGE_PROMOTION_POLICY": "warn",
         "FORGE_DEMO_AGENTS_URL": "http://demo-agents.invalid",
     }
 )

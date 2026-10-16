@@ -34,13 +34,16 @@ Kubernetes, chaque service compose correspond à un `Deployment` (mêmes images,
 ## 3. Observabilité
 
 * Santé : `GET /health` (vivant), `GET /ready` (Postgres requis, Valkey informatif, profondeur des
-  files). Le web expose `GET /healthz`.
-* Métriques Prometheus : `api:8000/metrics`, workers `:9464/metrics`.
-  Alertes suggérées :
-  * `rate(forge_runs_total{status="failed"}[15m]) / rate(forge_runs_total[15m]) > 0.2` ;
-  * file `execution` ou `evaluation` > 500 jobs pendant 30 min ;
-  * `rate(forge_judge_calls_total{outcome!="ok"}[15m]) > 0.1` (fournisseur LLM dégradé) ;
-  * `forge_otlp_spans_total{outcome="orphan"}` en hausse (agents mal corrélés).
+  files). Les deux exposent `version` et `git_sha` (commit déployé : `FORGE_GIT_SHA`, sinon l'argument
+  de build `GIT_SHA`, sinon `RAILWAY_GIT_COMMIT_SHA` ; vide hors build). Le web expose `GET /healthz`.
+* Métriques Prometheus : `api:8000/metrics`, workers `:9464/metrics`. L'API ajoute, lus en base à chaque
+  scrape, `forge_queue_depth{queue}`, `forge_oldest_job_age_seconds{queue}` (plus ancien job exécutable en
+  attente) et `forge_observed_pending_evaluations` (captures observées non encore évaluées) ; les workers
+  exposent `forge_worker_inflight_jobs`. Ne scrapez ces trois jauges que sur l'API.
+* Règles d'alerte : `deploy/alerts.yml` (échecs de runs, files, âge du plus ancien job, échecs de juges,
+  spans orphelins, captures en attente). Un test vérifie que chaque métrique citée existe dans le code.
+  Attention : `forge_judge_calls_total{outcome}` vaut `success`, `failure` ou `cached` (jamais `ok`) ;
+  l'alerte juge est un **ratio d'échecs** `outcome="failure"` / `outcome=~"success|failure"`.
 * Traces de FORGE lui-même : `FORGE_OTLP_ENDPOINT` (collecteur OTel, Tempo, Jaeger…).
 * Journaux : une ligne par événement avec `rid=<request id>` (en-tête `X-Request-ID`).
 * Audit fonctionnel : *Paramètres → Audit* ou `GET /api/v1/audit`.
@@ -88,12 +91,36 @@ Rotation de la clé de chiffrement des secrets :
 docker compose exec -T -e FORGE_SECRETS_KEY_OLD="$OLD_KEY" api python -m forge.ops rotate-secrets
 ```
 
-Rétention : supprimer les payloads de trace (entrées/sorties des étapes) des runs terminés depuis
-plus de N jours, en conservant timeline, scores, justifications et erreurs :
+### Rétention et oubli
 
-```bash
-docker compose exec -T api python -m forge.ops purge-payloads --older-than-days 180
-```
+FORGE copie du contenu (contexte ORBIT reçu par l'agent, sorties, prompts et réponses de juge, cache de
+juges, preuves des rapports de feedback, manifestes de run, contexte copié des scénarios promus). Deux
+mécanismes **vident ces textes sans toucher aux mesures** (scores, erreurs, tokens, coûts, latences,
+structure de la timeline). Cadrage technique, pas une conclusion juridique.
+
+* **Purge planifiée** : chaque worker lance, toutes les `FORGE_RETENTION_INTERVAL_HOURS` heures (24 ; 0
+  désactive), une passe protégée par un verrou Postgres (une seule à la fois). Règles par type, en jours
+  après la fin du run ou la création (0 = conserver) : `FORGE_RETENTION_TRACE_DAYS` (180 : entrées,
+  sorties, messages de `ExecutionTrace` et payloads des événements), `FORGE_RETENTION_EVALUATION_DAYS` (180 :
+  `Evaluation.raw_response`, prompts et réponses des juges), `FORGE_RETENTION_JUDGE_CACHE_DAYS` (90 : lignes
+  supprimées), `FORGE_RETENTION_FEEDBACK_DAYS` (365 : exemples et extraits des rapports).
+  `FORGE_RETENTION_DRY_RUN=true` ne fait que compter. Métrique `forge_retention_purged_total{kind,trigger}` ;
+  chaque passe est journalisée (audit `retention.purge`). À la demande :
+  `python -m forge.ops retention [--dry-run]` (l'ancienne commande `purge-payloads` reste disponible).
+* **Oubli ciblé** : `POST /api/v1/forget` (rôle admin : donnez à NOVA / ORBIT une clé d'API admin dédiée)
+  avec `document_ids`, `memory_item_ids`, `lineage_ids` et/ou `task_ids` (observés : `external_id` en
+  « …:<task_id> »). Tout run ayant reçu un document concerné perd **tous** ses payloads (sa sortie peut le
+  citer), ainsi que les prompts et réponses de juge, les preuves des rapports, le contexte copié des
+  scénarios promus et des manifestes ; le cache de juges, sans lien avec les runs, est vidé en entier.
+  Idempotent ; l'accusé décrit ce qui a été touché ; audit `forget.apply`.
+* **Webhook ORBIT** : `POST /api/v1/webhooks/orbit`, signé comme les webhooks ORBIT
+  (`X-Orbit-Signature: sha256=<HMAC-SHA256(secret, corps)>`). Définir `FORGE_ORBIT_WEBHOOK_SECRET` (vide :
+  503) puis créer côté ORBIT un webhook vers cette URL pour `memory.forgotten` et `document.forgotten` avec
+  le même secret ; les autres événements sont acquittés et ignorés.
+* **Limites connues** : les éléments d'un snapshot ORBIT n'exposent pas leur `document_id` (ils ne sont
+  retrouvés que par `id`/`key`) ; les événements ORBIT restreints (C2+ ou ACL) n'exposent pas
+  `lineage_id`, les anciennes versions d'une mémoire oubliée peuvent donc subsister ; les explications de
+  score et la table `run_errors` ne sont pas purgées.
 
 Rotation du secret JWT (`FORGE_JWT_SECRET`) : redémarrer l'API ; toutes les sessions sont
 invalidées (les clés d'API `fgk_…` ne sont pas affectées).
@@ -114,3 +141,22 @@ invalidées (les clés d'API `fgk_…` ne sont pas affectées).
   scénarios ; les scénarios privés ne sont visibles en clair que des mainteneurs.
 * Les canaris `FORGE-CANARY-…` détectent la contamination des agents (règle `no_canary`,
   contrôle à la création des versions d'agents).
+
+### Politique de promotion (`FORGE_PROMOTION_POLICY`)
+
+Aucune amélioration n'est promue sur la foi d'une mesure non validée. `strict` (**défaut**) bloque,
+`warn` signale les mêmes constats sans rien bloquer (audit, avertissements de la comparaison, raisons
+de la garde CI). Trois contrôles (`services/promotion.py`) :
+
+* **Juges calibrés** : chaque juge de la configuration d'évaluation doit être calibré contre les scores
+  humains des jeux `gold` (n ≥ 10, κ pondéré ≥ `FORGE_CALIBRATION_MIN_KAPPA`, défaut 0,6, accord ≥ 0,7).
+* **Pas de contamination** : aucune version d'agent comparée ne porte d'alerte de contamination
+  (canaris, sorties attendues privées). La création d'une version l'enregistre toujours ; c'est la
+  création d'expérience, la garde CI et la publication qui la refusent.
+* **Cas de régression rejoués** : les scénarios promus depuis des runs en échec de l'agent
+  (`promote-to-scenario`) doivent faire partie de l'expérience.
+
+Effets en `strict` : `POST /experiments` est refusé (422) ; `GET /experiments/{id}/gate` ne passe que sur
+`ship` (le paramètre `strict` ne peut pas l'assouplir) et échoue sur ces constats ; la publication d'un
+apprentissage vers ORBIT exige que la garde passe. En `warn`, le comportement historique est conservé
+(`inconclusive` passe la garde par défaut). Les jeux de démonstration (`forge.seed`) s'exécutent en `warn`.

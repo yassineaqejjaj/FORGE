@@ -548,8 +548,12 @@ async def create_variant(
     visibility: ScenarioVisibility | None = None,
     changelog: str = "",
     owner_id: uuid.UUID | None = None,
+    classification: int | None = None,
 ) -> tuple[Scenario, ScenarioVersion]:
-    """Variant of ``parent`` (same family): content = parent's latest version + ``overrides``."""
+    """Variant of ``parent`` (same family): content = parent's latest version + ``overrides``.
+
+    A variant is never less classified than its parent: ``classification`` can only raise it.
+    """
     _require_private_rights(viewer, parent.visibility)
     normalized_label = _slug_part(label)
     if not normalized_label:
@@ -567,7 +571,7 @@ async def create_variant(
         content=content,
         slug=f"{parent.slug}_variant_{normalized_label}",
         visibility=visibility or parent.visibility,
-        classification=parent.classification,
+        classification=max(int(parent.classification), int(classification or 0)),
         tags=tags if tags is not None else list(parent.tags or []),
         fresh_until=parent.fresh_until
         if (visibility or parent.visibility) == ScenarioVisibility.fresh

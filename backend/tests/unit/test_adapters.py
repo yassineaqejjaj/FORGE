@@ -151,6 +151,21 @@ def test_protocol_body_never_leaks_expected_output_or_mocks() -> None:
     assert body["input"]["prompt"].startswith("Rédige") and body["constraints"] == ["Maximum 300 mots"]
 
 
+def test_protocol_body_carries_the_classification_of_every_document() -> None:
+    request = make_request(AdapterKind.nova)
+    request.scenario.classification = 2
+    request.context.update(
+        {"documents": [{"id": "d1", "content": "a"}, {"id": "d2", "content": "b", "classification": 3}]}
+    )
+    context = build_protocol_body(request)["context"]
+    assert [d["classification"] for d in context["documents"]] == [2, 3] and context[
+        "max_classification"
+    ] == 3
+    request.context["documents"] = [{"id": "d1", "content": "a", "classification": "inconnu"}]
+    assert build_protocol_body(request)["context"]["documents"][0]["classification"] == 3  # fail-closed
+    assert request.context["documents"][0]["classification"] == "inconnu"  # the request is not rewritten
+
+
 def test_tool_names_and_mock_matching() -> None:
     names = ToolNames([ToolSpec(name="jira.search"), ToolSpec(name="jira_search")])
     assert names.wire("jira.search") == "jira_search" and names.wire("jira_search") == "jira_search_2"
@@ -278,6 +293,24 @@ async def test_nova_handoffs_become_agent_handoff_events() -> None:
 async def test_nova_requires_agent_id() -> None:
     with pytest.raises(AgentExecutionError, match="nova_agent_id"):
         await get_adapter("nova").invoke(make_request(AdapterKind.nova), InMemoryTraceRecorder())
+
+
+@respx.mock
+@pytest.mark.parametrize("kind", [AdapterKind.openai, AdapterKind.anthropic])
+async def test_llm_adapters_refuse_classified_content_above_the_ceiling(kind, monkeypatch) -> None:
+    from forge.config import settings
+
+    monkeypatch.setattr(settings, "llm_max_classification", 1)
+    monkeypatch.setattr(settings, "llm_local", False)
+    route = respx.post(url__regex=r"https://llm\.example/.*").mock(return_value=httpx.Response(500))
+    config = {"base_url": "https://llm.example"}
+    for scenario_level, documents in ((2, []), (1, [{"id": "d", "content": "x", "classification": 3}])):
+        request = make_request(kind, adapter_config=config, model=MODEL, credentials={"api_key": SECRET})
+        request.scenario.classification = scenario_level
+        request.context = {"documents": documents}
+        with pytest.raises(AgentExecutionError, match="plafond LLM"):
+            await get_adapter(kind.value).invoke(request, InMemoryTraceRecorder())
+    assert route.call_count == 0
 
 
 # --- OpenAI / Anthropic loops -------------------------------------------------------------------------

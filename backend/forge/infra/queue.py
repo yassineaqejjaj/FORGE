@@ -24,10 +24,10 @@ from sqlalchemy import select, text, update
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from forge.domain.enums import JOB_QUEUES, JobKind, JobQueue, JobStatus
+from forge.domain.enums import JOB_QUEUES, TERMINAL_RUN_STATUSES, JobKind, JobQueue, JobStatus, RunOrigin
 from forge.infra.db import utcnow
-from forge.infra.models import Job
-from forge.infra.observability.metrics import record_job
+from forge.infra.models import EvaluationRun, Job
+from forge.infra.observability.metrics import record_job, record_queue_snapshot
 
 BACKOFF_BASE_SECONDS = 5.0
 BACKOFF_MAX_SECONDS = 600.0
@@ -236,6 +236,29 @@ async def queue_depth(session: AsyncSession) -> dict[str, int]:
     for queue, count in rows.all():
         depth[JobQueue(queue).value] = int(count)
     return depth
+
+
+async def refresh_queue_metrics(session: AsyncSession) -> None:
+    """Set the queue gauges from the database (called at each ``/metrics`` scrape of the API)."""
+    from sqlalchemy import func
+
+    now = utcnow()
+    depth = await queue_depth(session)
+    rows = await session.execute(
+        select(Job.queue, func.min(Job.created_at))
+        .where(Job.status == JobStatus.queued, Job.run_after <= now)
+        .group_by(Job.queue)
+    )
+    oldest = {JobQueue(q).value: max(0.0, (now - created).total_seconds()) for q, created in rows.all()}
+    pending = await session.scalar(
+        select(func.count())
+        .select_from(EvaluationRun)
+        .where(
+            EvaluationRun.origin == RunOrigin.observed,
+            EvaluationRun.status.not_in(list(TERMINAL_RUN_STATUSES)),
+        )
+    )
+    record_queue_snapshot(depth, oldest, int(pending or 0))
 
 
 async def queue_activity(session: AsyncSession) -> dict[str, dict[str, int]]:

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import base64
 import hashlib
+import os
 from functools import lru_cache
 from pathlib import Path
 from typing import Literal
@@ -33,6 +34,9 @@ class Settings(BaseSettings):
     env: Literal["development", "production", "test"] = "development"
     log_level: str = "INFO"
     app_version: str = __version__
+    #: Commit deployed (``/health``, ``/ready``): ``FORGE_GIT_SHA``, else the ``GIT_SHA`` build argument,
+    #: else Railway's ``RAILWAY_GIT_COMMIT_SHA`` (first non-empty).
+    git_sha: str = ""
     #: Public URL of the API (shown in the UI for OTLP / CI snippets).
     public_base_url: str = "http://localhost:8100"
 
@@ -77,6 +81,35 @@ class Settings(BaseSettings):
     feedback_llm_base_url: str = ""
     feedback_llm_model: str = ""
     feedback_llm_api_key: str = ""
+
+    #: LLM guardrail: highest classification (0-3) that may leave FORGE for an LLM (judges, feedback
+    #: synthesis, OpenAI/Anthropic agent adapters). Same policy and default (C1) as ORBIT.
+    llm_max_classification: int = Field(default=1, ge=0, le=3)
+    #: True when every LLM is self-hosted: lifts the ceiling (same as ORBIT's ``ORBIT_LLM_LOCAL``).
+    llm_local: bool = False
+
+    # --- Retention (docs/OPERATIONS.md) -------------------------------------------------------------
+    #: Days after which the *text* FORGE copied is emptied (0 keeps it forever). Scores, errors, costs,
+    #: latencies and the timeline structure are never purged: they are the measurement.
+    retention_trace_days: int = Field(default=180, ge=0)  # execution traces + trace event payloads
+    retention_evaluation_days: int = Field(default=180, ge=0)  # judge prompts / answers (raw_response)
+    retention_judge_cache_days: int = Field(default=90, ge=0)  # judge cache rows (deleted)
+    retention_feedback_days: int = Field(default=365, ge=0)  # evidence / examples of feedback reports
+    #: Hours between two scheduled purges run by the workers (0 disables the schedule).
+    retention_interval_hours: float = Field(default=24.0, ge=0.0)
+    #: Scheduled purge only counts what it would purge (the CLI ``--dry-run`` does the same on demand).
+    retention_dry_run: bool = False
+    #: Shared secret of the signed ORBIT webhook (``POST /api/v1/webhooks/orbit``); empty = refused.
+    orbit_webhook_secret: str = ""
+
+    # --- Promotion policy ------------------------------------------------------------------------
+    #: ``strict`` (default): an experiment cannot start, pass the CI gate or be published as a learning
+    #: unless its judges are calibrated on a gold set, its agent versions are free of contamination and
+    #: the regression cases of the agent are replayed (the gate then passes on ``ship`` only).
+    #: ``warn``: the same findings are reported as warnings and block nothing.
+    promotion_policy: Literal["strict", "warn"] = "strict"
+    #: Minimum weighted kappa of a judge against human scores on gold datasets (strict policy).
+    calibration_min_kappa: float = Field(default=0.6, ge=0.0, le=1.0)
 
     # --- Analytics (benchmarks, experiments) -----------------------------------------------------
     #: Bootstrap resamples of the confidence intervals (seeded, docs §9.3).
@@ -136,6 +169,15 @@ class Settings(BaseSettings):
     @classmethod
     def _strip_trailing_slash(cls, value: str) -> str:
         return value.strip().rstrip("/")
+
+    @model_validator(mode="after")
+    def _resolve_git_sha(self) -> Settings:
+        self.git_sha = (
+            self.git_sha.strip()
+            or os.environ.get("GIT_SHA", "").strip()
+            or os.environ.get("RAILWAY_GIT_COMMIT_SHA", "").strip()
+        )
+        return self
 
     @model_validator(mode="after")
     def _check_production_secrets(self) -> Settings:

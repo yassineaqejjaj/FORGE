@@ -16,6 +16,7 @@ from typing import Any
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from forge.domain.classification import context_level
 from forge.domain.enums import RunStatus
 from forge.infra.models import ExecutionTrace, RunError, ScenarioVersion
 from forge.services import audit
@@ -77,6 +78,11 @@ async def promote_run(
             scenario,
             label=slug_label,
             overrides=overrides,
+            # The copied documents may be more classified than the scenario (ORBIT serves C2/C3): the
+            # regression case takes the highest level, it never lowers it.
+            classification=context_level(
+                context if isinstance(context, dict) else None, scenario.classification
+            ),
             name=f"{scenario.name} — régression {run.id.hex[:8]}",
             tags=tags,
             changelog=f"Cas de régression issu du run {run.id}",

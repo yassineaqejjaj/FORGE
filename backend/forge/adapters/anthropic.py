@@ -11,7 +11,14 @@ from typing import Any
 
 import httpx
 
-from forge.adapters.base import as_dict, conversation, credential_headers, extract_json, http_timeout
+from forge.adapters.base import (
+    as_dict,
+    conversation,
+    credential_headers,
+    ensure_llm_allowed,
+    extract_json,
+    http_timeout,
+)
 from forge.adapters.http import create_client, request_json
 from forge.adapters.tool_loop import ToolNames, parse_arguments, run_tool, steps_exhausted
 from forge.domain.enums import AdapterKind, BuiltinErrorType, TraceEventType
@@ -31,6 +38,7 @@ class AnthropicAdapter:
         agent = request.agent
         if agent.model is None:
             raise AgentExecutionError("Aucune configuration de modèle pour cet agent (adapter anthropic)")
+        ensure_llm_allowed(request)
         names = ToolNames(agent.tools)
         messages: list[dict[str, Any]] = conversation(request)
         usage = TokenUsage()

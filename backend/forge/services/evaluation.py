@@ -32,6 +32,7 @@ from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from forge.config import settings
+from forge.domain.classification import context_level
 from forge.domain.enums import (
     SEVERITY_RANK,
     BuiltinErrorType,
@@ -82,6 +83,7 @@ from forge.domain.types import (
 from forge.infra import cache
 from forge.infra.db import utcnow
 from forge.infra.llm import client_from_credentials, estimate_cost
+from forge.infra.llm_guardrail import judge_or_heuristic
 from forge.infra.models import (
     CompositeScore,
     ErrorType,
@@ -185,7 +187,14 @@ def build_context(
         estimated_cost=trace.estimated_cost if trace else None,
         latency_ms=trace.total_latency_ms if trace else None,
         run_error=run.error,
+        context_classification=_received_level(trace, specs.scenario.classification),
     )
+
+
+def _received_level(trace: ExecutionTrace | None, scenario_level: int) -> int:
+    """Highest level of the documents the agent received (recorded on the trace), fail-closed."""
+    received = trace.input.get("context") if trace is not None and isinstance(trace.input, dict) else None
+    return context_level(received if isinstance(received, dict) else None, scenario_level)
 
 
 def criteria_map(
@@ -512,6 +521,9 @@ async def _run_judges(
         warning = self_preference_warning(judge, ctx.agent)
         if warning:
             warnings.append(warning)
+        judge, skipped = judge_or_heuristic(judge, ctx.classification)
+        if skipped:
+            warnings.append(skipped)
         prompt = render_prompt(judge, ctx, selected, labels)
         judge_run = JudgeRun(judge=judge, criteria=selected, prompt=prompt, model=judge.model)
         is_heuristic = JudgeProvider(judge.provider) == JudgeProvider.heuristic

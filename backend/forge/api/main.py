@@ -26,6 +26,7 @@ from forge.infra.observability.logging_setup import setup_logging
 from forge.infra.observability.metrics import metrics_asgi_app
 from forge.infra.observability.middleware import RequestContextMiddleware
 from forge.infra.observability.tracing import instrument_fastapi, setup_tracing, shutdown_tracing
+from forge.infra.queue import refresh_queue_metrics
 
 logger = logging.getLogger("forge.main")
 
@@ -53,6 +54,7 @@ OPENAPI_TAGS = [
     {"name": "calibration", "description": "Calibration humaine des juges"},
     {"name": "analytics", "description": "Tableau de bord, explorateur d'erreurs"},
     {"name": "audit", "description": "Journal d'audit"},
+    {"name": "forget", "description": "Oubli de contenu copié (rétention, webhook ORBIT)"},
     {"name": "system", "description": "Santé et disponibilité"},
 ]
 
@@ -60,6 +62,9 @@ OPENAPI_TAGS = [
 class Health(BaseModel):
     status: str = "ok"
     version: str = settings.app_version
+    git_sha: str | None = Field(
+        default=None, description="Commit déployé (FORGE_GIT_SHA / GIT_SHA / Railway)"
+    )
 
 
 class DependencyCheck(BaseModel):
@@ -72,6 +77,7 @@ class DependencyCheck(BaseModel):
 class Ready(BaseModel):
     status: str
     version: str
+    git_sha: str | None = None
     checks: dict[str, DependencyCheck] = Field(default_factory=dict)
 
 
@@ -123,7 +129,7 @@ async def _check_valkey() -> dict[str, Any]:
 
 
 async def health() -> Health:
-    return Health()
+    return Health(version=settings.app_version, git_sha=settings.git_sha or None)
 
 
 async def ready() -> JSONResponse:
@@ -132,6 +138,7 @@ async def ready() -> JSONResponse:
     body = Ready(
         status="ok" if postgres.status == "ok" else "degraded",
         version=settings.app_version,
+        git_sha=settings.git_sha or None,
         checks={"postgres": postgres, "valkey": valkey},
     )
     return JSONResponse(
@@ -146,6 +153,18 @@ class _Asgi:
         self.app = app
 
     async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
+        await self.app(scope, receive, send)
+
+
+class _MetricsApp(_Asgi):
+    """``/metrics`` that first refreshes the queue gauges (a database read, never fatal to the scrape)."""
+
+    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
+        try:
+            async with get_sessionmaker()() as session:
+                await asyncio.wait_for(refresh_queue_metrics(session), timeout=READY_TIMEOUT_SECONDS)
+        except Exception:
+            logger.warning("Queue gauges not refreshed for this scrape", exc_info=True)
         await self.app(scope, receive, send)
 
 
@@ -190,7 +209,9 @@ def create_app() -> FastAPI:
         tags=["system"],
         responses={503: {"model": Ready, "description": "Dépendance indisponible"}},
     )
-    app.router.routes.append(Route("/metrics", endpoint=_Asgi(metrics_asgi_app()), include_in_schema=False))
+    app.router.routes.append(
+        Route("/metrics", endpoint=_MetricsApp(metrics_asgi_app()), include_in_schema=False)
+    )
     # CORS is intentionally not enabled: the UI calls the API same-origin through the Next.js proxy.
     app.add_middleware(RequestContextMiddleware)
     instrument_fastapi(app)

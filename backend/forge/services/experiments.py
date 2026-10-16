@@ -51,7 +51,7 @@ from forge.infra.models import (
     ScenarioVersion,
 )
 from forge.infra.queue import PRIORITY_EXPERIMENT, PermanentJobError
-from forge.services import audit, runs
+from forge.services import audit, promotion, runs
 from forge.services.access import Viewer
 from forge.services.audit import Actor, ActorLike
 from forge.services.benchmarks import (
@@ -270,8 +270,12 @@ async def create_experiment(
     source_feedback_report_id: uuid.UUID | None = None,
     trigger: str = "ui",
     enqueue: bool = True,
+    policy: str | None = None,
 ) -> Experiment:
-    """Create and launch an experiment (status ``running`` once its runs are created)."""
+    """Create and launch an experiment (status ``running`` once its runs are created).
+
+    ``policy`` overrides ``FORGE_PROMOTION_POLICY`` (the demo seed, which calibrates after its experiment).
+    """
     if baseline_version_id == candidate_version_id:
         raise AnalyticsInvalid("La baseline et la candidate doivent être deux versions différentes")
     labels = await require_agent_versions(session, [baseline_version_id, candidate_version_id])
@@ -308,6 +312,11 @@ async def create_experiment(
     resolved = await resolve_scenarios(session, selections, viewer=viewer)
     config = await resolve_config(
         session, evaluation_config_id or (benchmark.evaluation_config_id if benchmark is not None else None)
+    )
+    policy_warnings = promotion.enforce(
+        await promotion.creation_problems(session, config, [baseline_version_id, candidate_version_id]),
+        policy=policy,
+        what="Expérience refusée par la politique de promotion",
     )
     reps = repetitions if repetitions is not None else (benchmark.repetitions if benchmark is not None else 1)
     if not 1 <= reps <= 20:
@@ -402,7 +411,7 @@ async def create_experiment(
             "repetitions": reps,
             "evaluation_config_id": str(config.id),
             "trigger": experiment.trigger,
-            "warnings": warnings,
+            "warnings": [*warnings, *policy_warnings],
         },
     )
     return experiment
@@ -459,9 +468,13 @@ async def _warnings_for(session: AsyncSession, experiment: Experiment) -> list[s
     labels = await agent_version_labels(
         session, [experiment.baseline_version_id, experiment.candidate_version_id]
     )
-    return experiment_warnings(
-        labels.get(experiment.baseline_version_id), labels.get(experiment.candidate_version_id)
-    )
+    notices = await promotion.experiment_problems(session, experiment)
+    return [
+        *experiment_warnings(
+            labels.get(experiment.baseline_version_id), labels.get(experiment.candidate_version_id)
+        ),
+        *(f"Politique de promotion : {item}" for item in notices),
+    ]
 
 
 async def finalize_experiment(session: AsyncSession, experiment: Experiment) -> dict[str, Any]:
@@ -571,11 +584,19 @@ async def experiment_comparison(
 async def experiment_gate(
     session: AsyncSession, viewer: Viewer, experiment: Experiment, *, strict: bool = False
 ) -> dict[str, Any]:
-    """CI decision ``{passed, recommendation, status, reasons[]}``."""
+    """CI decision ``{passed, recommendation, status, reasons[]}``.
+
+    Under the strict promotion policy the gate passes on ``ship`` only (``strict`` cannot relax it) and
+    fails when a judge is uncalibrated, a version is contaminated or regression cases are not replayed;
+    under ``warn`` those findings are listed as warnings.
+    """
     status = experiment.status.value
+    strict_policy = promotion.policy_of() == "strict"
+    strict = strict or strict_policy
     if status != ExecutionStatus.completed:
         decision = evaluate_gate(status=status, recommendation=experiment.recommendation, strict=strict)
         return {**to_dict(decision), "experiment_id": experiment.id}
+    findings = await promotion.experiment_problems(session, experiment)
     comparison = await experiment_comparison(session, viewer, experiment)
     recommendation = comparison.get("recommendation") or {}
     decision = evaluate_gate(
@@ -585,6 +606,8 @@ async def experiment_gate(
         summary=recommendation.get("summary"),
         confidence=recommendation.get("confidence"),
         strict=strict,
+        blocking=findings if strict_policy else (),
+        notices=() if strict_policy else findings,
     )
     result = to_dict(decision)
     if comparison.get("restricted"):

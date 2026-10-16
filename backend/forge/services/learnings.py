@@ -14,12 +14,13 @@ from dataclasses import dataclass, field
 from typing import Any
 from urllib.parse import quote
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from forge.domain.classification import MAX_LEVEL
 from forge.domain.enums import ExecutionStatus, ExperimentArm, Recommendation
-from forge.infra.models import AgentVersion, EvaluationRun, Experiment
-from forge.services import audit, multi_experiments
+from forge.infra.models import AgentVersion, EvaluationRun, Experiment, Scenario, ScenarioVersion
+from forge.services import audit, multi_experiments, promotion
 from forge.services import experiments as experiment_service
 from forge.services.access import Viewer
 from forge.services.audit import ActorLike
@@ -70,6 +71,18 @@ async def _require_winner(session: AsyncSession, viewer: Viewer, experiment: Exp
                 )
 
 
+async def _scenarios_level(session: AsyncSession, experiment: Experiment) -> int:
+    """Highest classification among the scenarios the experiment ran (C3 when none is found)."""
+    level = await session.scalar(
+        select(func.max(Scenario.classification))
+        .select_from(EvaluationRun)
+        .join(ScenarioVersion, ScenarioVersion.id == EvaluationRun.scenario_version_id)
+        .join(Scenario, Scenario.id == ScenarioVersion.scenario_id)
+        .where(EvaluationRun.experiment_id == experiment.id)
+    )
+    return int(level) if level is not None else MAX_LEVEL
+
+
 def _default_content(experiment: Experiment, candidate: AgentVersion | None, summary: str | None) -> str:
     parts = [
         experiment.hypothesis.strip(),
@@ -101,6 +114,17 @@ async def publish_learning(
     if any(r.get("severity") == "critical" for r in comparison.get("regressions") or []):
         raise AnalyticsInvalid("Une régression critique empêche de publier cet apprentissage")
     await _require_winner(session, viewer, experiment)
+    # Strict policy: the CI gate must pass (ship only, judges calibrated, no contamination, regression
+    # cases replayed). Under ``warn`` the findings are only recorded in the audit trail.
+    promotion_findings: list[str] = []
+    if promotion.policy_of() == "strict":
+        gate = await experiment_service.experiment_gate(session, viewer, experiment)
+        if not gate["passed"]:
+            raise AnalyticsInvalid(
+                "Publication refusée par la politique de promotion : " + " ".join(gate["reasons"])
+            )
+    else:
+        promotion_findings = await promotion.experiment_problems(session, experiment)
 
     baseline_mean = (comparison.get("baseline") or {}).get("composite_mean")
     candidate_mean = (comparison.get("candidate") or {}).get("composite_mean")
@@ -139,8 +163,14 @@ async def publish_learning(
         "applies_to": request.applies_to,
         "evidence": {k: v for k, v in evidence.items() if v is not None},
     }
-    if request.classification is not None:
-        payload["classification"] = request.classification
+    # The text comes from hypotheses, changelogs and summaries of scenarios that may be C2/C3: ORBIT must
+    # never apply its own default, and the level can only be raised by the caller.
+    floor = await _scenarios_level(session, experiment)
+    if request.classification is not None and request.classification < floor:
+        raise AnalyticsInvalid(
+            f"Classification inférieure à celle des scénarios (C{floor}) : publication refusée"
+        )
+    payload["classification"] = request.classification if request.classification is not None else floor
 
     agent_context = {}
     if candidate is not None:
@@ -170,7 +200,12 @@ async def publish_learning(
         "experiment",
         experiment.id,
         summary=f"Apprentissage publié dans ORBIT ({orbit.project}) : {payload['title']}",
-        details={"orbit_item_id": item_id, "orbit_project": orbit.project, "evidence": payload["evidence"]},
+        details={
+            "orbit_item_id": item_id,
+            "orbit_project": orbit.project,
+            "evidence": payload["evidence"],
+            "promotion_warnings": promotion_findings,
+        },
     )
     return PublishResult(experiment.id, item_id, orbit.project, created=True, learning=item)
 

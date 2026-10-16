@@ -23,6 +23,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from forge.config import settings
+from forge.domain.classification import MAX_LEVEL, context_level
 from forge.domain.enums import FeedbackScope, ScenarioVisibility
 from forge.domain.feedback import (
     FeedbackCriterion,
@@ -36,6 +37,7 @@ from forge.domain.rules.extraction import extract_json_object
 from forge.domain.serialization import list_from_dicts
 from forge.domain.taxonomy import BUILTIN_ERROR_TYPES
 from forge.domain.types import EvidenceRef, FeedbackReportData, to_dict
+from forge.infra import llm_guardrail
 from forge.infra.llm import LLMError, get_client
 from forge.infra.models import CompositeScore, ErrorType, EvaluationRun, FeedbackReport, RunError, Score
 from forge.services import audit
@@ -54,8 +56,20 @@ LLM_SYSTEM_PROMPT = (
 # --- LLM synthesis ---------------------------------------------------------------------------------
 
 
-async def _llm_enrich(report: FeedbackReportData) -> FeedbackReportData:
+def run_level(run: EvaluationRun) -> int:
+    """Classification of what a report on ``run`` may quote: its scenario and context, C3 when unknown."""
+    scenario = (run.manifest or {}).get("scenario") or {}
+    level = scenario.get("classification")
+    return context_level(scenario.get("context"), MAX_LEVEL if level is None else level)
+
+
+async def _llm_enrich(report: FeedbackReportData, level: int) -> FeedbackReportData:
+    """Optional LLM rewrite; ``level`` = highest classification of the runs the report is about."""
     if not settings.feedback_llm_enabled or not report.recommendations:
+        return report
+    if not llm_guardrail.allows(level):
+        llm_guardrail.record_skip()
+        logger.warning("Feedback LLM synthesis skipped: content above the LLM ceiling (C%s)", level)
         return report
     payload = {
         "summary": report.summary,
@@ -169,7 +183,7 @@ async def create_run_feedback(
     """Build (deterministic + optional LLM) and store the run report of ``round_no``."""
     agent = run.manifest.get("agent") or {}
     data.label = data.label or f"{agent.get('agent_name', 'Agent')} v{agent.get('version', '?')}"
-    report = await _llm_enrich(build_feedback(data))
+    report = await _llm_enrich(build_feedback(data), run_level(run))
     row = _row(
         report, scope=FeedbackScope.run, run_id=run.id, agent_version_id=run.agent_version_id, round=round_no
     )
@@ -306,7 +320,9 @@ async def create_aggregate_feedback(
         if len(agents) == 1:
             agent = evaluated[0].manifest.get("agent") or {}
             label = f"{agent.get('agent_name', 'Agent')} v{agent.get('version', '?')}"
-    report = await _llm_enrich(build_group_feedback(inputs, label=label))
+    report = await _llm_enrich(
+        build_group_feedback(inputs, label=label), max(map(run_level, evaluated), default=MAX_LEVEL)
+    )
     if len(runs) != len(evaluated):
         report.summary += f" ({len(runs) - len(evaluated)} run(s) non évalué(s) exclus.)"
     row = _row(

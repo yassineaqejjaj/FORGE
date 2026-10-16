@@ -11,7 +11,7 @@ from forge.infra.models import ExecutionTrace, RunError, Scenario, ScenarioVersi
 from tests.factories import attach_trace, create_agent_version, create_run, create_scenario_version
 
 
-async def _failed_run(db_session, *, with_input: bool = True, failed: bool = True):
+async def _failed_run(db_session, *, with_input: bool = True, failed: bool = True, documents=None):
     av = await create_agent_version(db_session)
     sv = await create_scenario_version(db_session)
     run = await create_run(db_session, sv, av)
@@ -19,7 +19,7 @@ async def _failed_run(db_session, *, with_input: bool = True, failed: bool = Tru
     if with_input:
         trace.input = {
             "prompt": "Rembourse mon billet de train",
-            "context": {"documents": [{"id": "d1", "content": "x"}]},
+            "context": {"documents": documents or [{"id": "d1", "content": "x"}]},
         }
     else:
         trace.input = {}
@@ -82,3 +82,40 @@ async def test_only_failed_runs_with_a_recorded_input_can_be_promoted(client_as,
     assert (await editor.post(f"/api/v1/runs/{uuid.uuid4()}/promote-to-scenario")).status_code == 404
     trace = await db_session.scalar(select(ExecutionTrace).where(ExecutionTrace.run_id == run.id))
     assert trace is not None
+
+
+async def test_promotion_never_launders_a_classified_document_into_a_lower_scenario(
+    client_as, db_session
+) -> None:
+    """A C3 ORBIT document copied into the regression scenario makes that scenario C3 (never the parent's C1)."""
+    documents = [
+        {"id": "d1", "content": "public interne", "classification": 1},
+        {"id": "d2", "content": "remise synthétique 35 %", "classification": 3},
+    ]
+    run, sv = await _failed_run(db_session, documents=documents)
+    parent = await db_session.get(Scenario, sv.scenario_id)
+    assert parent.classification == 1
+
+    low = await client_as(Role.editor, clearance=1)
+    assert (await low.post(f"/api/v1/runs/{run.id}/promote-to-scenario", json={})).status_code == 403
+
+    high = await client_as(Role.editor, clearance=3)
+    created = await high.post(f"/api/v1/runs/{run.id}/promote-to-scenario", json={})
+    assert created.status_code == 201, created.text
+    scenario = await db_session.get(Scenario, uuid.UUID(created.json()["scenario_id"]))
+    assert scenario.classification == 3
+    assert (await low.get(f"/api/v1/scenarios/{scenario.id}")).status_code == 404  # not visible at C1
+
+
+async def test_promotion_keeps_the_parents_classification_when_documents_are_lower(
+    client_as, db_session
+) -> None:
+    run, sv = await _failed_run(db_session)
+    parent = await db_session.get(Scenario, sv.scenario_id)
+    parent.classification = 2
+    await db_session.commit()
+    editor = await client_as(Role.editor, clearance=2)
+    created = await editor.post(f"/api/v1/runs/{run.id}/promote-to-scenario", json={})
+    assert created.status_code == 201, created.text
+    scenario = await db_session.get(Scenario, uuid.UUID(created.json()["scenario_id"]))
+    assert scenario.classification == 2
