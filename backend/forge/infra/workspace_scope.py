@@ -54,6 +54,8 @@ EXEMPT_TABLES: dict[str, str] = {
     "projects": "project registry: owned by a workspace through its own workspace_id, managed by operators",
     "workspace_members": "membership of a user in a workspace; the user's workspace is read from it",
     "project_members": "per-project role of a user, reached through the (workspace-bound) project",
+    "external_identities": "OIDC (issuer, sub) -> user link, read before any workspace is known (login); "
+    "scoped through its user",
     "users": "identity: scoped through workspace_members (services.users.scope_conditions)",
     "criteria": "global criteria catalog (builtin + custom), shared by every workspace",
     "error_types": "global error taxonomy (builtin + custom codes), shared by every workspace",

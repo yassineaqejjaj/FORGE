@@ -10,6 +10,7 @@ chaîne optionnel.
 |---|---|---|
 | `backend/tests/fixtures/orbit/` | réponses réelles d'ORBIT (contexte réel, droits limités, C3, élément oublié) | **copie** d'ORBIT `contracts/orbit/` |
 | `contracts/fap_request/` | corps FAP que FORGE envoie à NOVA, par scénario ORBIT | **source** : généré par le vrai code FORGE |
+| `backend/tests/fixtures/claims/` + `backend/forge/domain/orion_claims.py` | contrat de claims ORION (NOV-104) : jetons signés, JWKS public, module de validation | **copie** de NOVA `contracts/claims/` et `nova/domain/orion_claims.py` (`sync_contract_fixtures.py --claims <NOVA>`) |
 | `backend/tests/fixtures/fap_response/` | réponses de NOVA (200, 401, 403, 422 `unsupported_override`) | **copie** de NOVA `contracts/fap_response/` |
 
 Chaque répertoire contient un `manifest.json` (sha256 de chaque fichier). Les copies sont octet pour octet celles de la
@@ -27,6 +28,14 @@ source, manifeste compris : ne jamais les éditer à la main.
   `forgotten` jamais envoyé, mauvais credential ORBIT (401, non réessayable, repli si `optional`).
 * **Réponses de NOVA** lues par l'adaptateur `nova` : succès (événements, usage, versions déclarée/exécutée), version
   refusée (`unsupported_override`, permanent), mauvais credential, contexte au-dessus du plafond.
+
+## Contrat de claims (NOV-104, utilisé par l'OIDC de NOV-108)
+
+Le module de validation (un fichier, bibliothèque standard) et les fixtures signées viennent de NOVA, octet pour octet ;
+`manifest.json` porte le hash de chaque fixture **et du module** (`module.sha256`). Rafraîchir :
+`uv run python scripts/sync_contract_fixtures.py --claims <NOVA>` (`--check` pour comparer seulement). Le module est exclu de
+`ruff` (copie vérifiée). `tests/contract/test_claims_contract.py` (copie adaptée : `SERVICES = ("forge",)`, chemins) exécute la
+table de l'ADR §4 ; avec `CONTRACT_SOURCE_NOVA_ROOT=<NOVA>` la copie doit être identique à la source.
 
 ## Régénérer et rafraîchir
 

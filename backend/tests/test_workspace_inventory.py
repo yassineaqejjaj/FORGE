@@ -16,7 +16,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 import forge.infra.models  # noqa: F401  (registers every table)
 from forge.api import deps
-from forge.api.routers import API_PREFIX, ROUTER_MODULES
+from forge.api.routers import API_PREFIX, OPTIONAL_ROUTER_MODULES, ROUTER_MODULES
 from forge.infra.db import Base
 from forge.infra.models import ORION_DEFAULT_WORKSPACE_ID, WorkspaceScopedMixin
 from forge.infra.models.workspace import ProjectScopedMixin
@@ -115,7 +115,7 @@ def _dependencies(route: APIRoute) -> set[object]:
 
 def _api_routes() -> list[APIRoute]:
     routes: list[APIRoute] = []
-    for name in (*ROUTER_MODULES,):
+    for name in (*ROUTER_MODULES, *OPTIONAL_ROUTER_MODULES):  # optional ones are mounted by a flag
         module = importlib.import_module(f"forge.api.routers.{name}")
         routes += [r for r in module.router.routes if isinstance(r, APIRoute)]
     traces = importlib.import_module("forge.api.routers.traces")

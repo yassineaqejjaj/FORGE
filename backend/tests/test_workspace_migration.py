@@ -503,3 +503,38 @@ def test_migration_on_a_populated_database(scratch_url: str, capsys: pytest.Capt
             f"{before['evaluations'][0]} evaluations); after upgrade / downgrade / upgrade: identical "
             "counts and content hashes of every existing column; 0 row outside the default workspace."
         )
+
+
+def test_migration_0006_external_identities_on_a_populated_database(scratch_url: str) -> None:
+    """NOV-108: one new table; nothing existing moves. Up, down, up again, and resumed after a lost stamp."""
+    alembic(scratch_url, "upgrade", "0005")
+    schema = asyncio.run(read(scratch_url, tables_and_columns))
+    asyncio.run(read(scratch_url, populate))
+    before = asyncio.run(read(scratch_url, lambda c: snapshot(c, schema)))
+
+    async def table_exists(conn: asyncpg.Connection) -> bool:
+        return bool(await conn.fetchval("SELECT to_regclass('public.external_identities') IS NOT NULL"))
+
+    async def link_one(conn: asyncpg.Connection) -> None:
+        user_id = await conn.fetchval("SELECT id FROM users LIMIT 1")
+        await conn.execute(
+            "INSERT INTO external_identities (issuer, sub, user_id) VALUES ('https://idp.test/realms/orion', 's1', $1)",
+            user_id,
+        )
+        with pytest.raises(asyncpg.UniqueViolationError):  # one identity per (issuer, user)
+            await conn.execute(
+                "INSERT INTO external_identities (issuer, sub, user_id) VALUES ('https://idp.test/realms/orion', 's2', $1)",
+                user_id,
+            )
+
+    alembic(scratch_url, "upgrade", "head")
+    assert asyncio.run(read(scratch_url, table_exists))
+    assert asyncio.run(read(scratch_url, lambda c: snapshot(c, schema))) == before
+    asyncio.run(read(scratch_url, link_one))
+    alembic(scratch_url, "downgrade", "0005")
+    assert not asyncio.run(read(scratch_url, table_exists))
+    assert asyncio.run(read(scratch_url, lambda c: snapshot(c, schema))) == before
+    alembic(scratch_url, "upgrade", "head")
+    alembic(scratch_url, "stamp", "0005")
+    alembic(scratch_url, "upgrade", "head")  # idempotent
+    assert asyncio.run(read(scratch_url, lambda c: snapshot(c, schema))) == before

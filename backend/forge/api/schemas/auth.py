@@ -30,3 +30,24 @@ class PasswordChangeIn(ApiModel):
     current_password: str = Field(min_length=1, max_length=256)
     new_password: str = Field(min_length=PASSWORD_MIN_LENGTH, max_length=256)
     return_token: bool = False
+
+
+class OidcLinkIn(ApiModel):
+    confirm: bool = Field(
+        description="Confirmation explicite : lier mon compte FORGE à cette identité SSO",
+    )
+    password: str = Field(
+        min_length=1,
+        max_length=256,
+        description="Mot de passe actuel du compte FORGE (preuve que les deux comptes sont les miens)",
+    )
+
+
+class OidcLinkPendingOut(ApiModel):
+    """What the « Lier ce compte » screen shows before the user confirms."""
+
+    account_email: str = Field(description="Compte FORGE qui serait lié")
+    account_name: str
+    idp_email: str | None = Field(description="Adresse e-mail vérifiée par le fournisseur d'identité")
+    idp_name: str | None
+    issuer: str
