@@ -32,7 +32,7 @@ from forge.api.errors import ApiError, forbidden, unauthorized
 from forge.config import settings
 from forge.domain.enums import ActorType, Role, role_at_least
 from forge.infra.db import get_session, utcnow
-from forge.infra.models import ORION_DEFAULT_WORKSPACE_ID, ApiKey, User
+from forge.infra.models import ORION_DEFAULT_WORKSPACE_ID, ApiKey, Project, User
 from forge.infra.security import (
     API_KEY_HEADER,
     SESSION_COOKIE_NAME,
@@ -261,6 +261,12 @@ async def authenticate_api_key(session: AsyncSession, key: str, *, touch: bool =
         raise unauthorized("Clé d'API invalide")
     if not verify_api_key(key, api_key.key_hash):
         raise unauthorized("Clé d'API invalide")
+    if api_key.project_id is not None:  # a project key follows its project: out of the workspace = unusable
+        project_workspace = await session.scalar(
+            select(Project.workspace_id).where(Project.id == api_key.project_id)
+        )
+        if project_workspace != api_key.workspace_id:
+            raise unauthorized("Clé d'API invalide (projet hors de son espace)")
     now = utcnow()
     if api_key.revoked_at is not None:
         raise unauthorized("Clé d'API révoquée")

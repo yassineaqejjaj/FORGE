@@ -7,6 +7,9 @@
   keeping the timeline structure, scores and explanations (storage retention);
 * ``retention [--dry-run]`` — apply every ``FORGE_RETENTION_*_DAYS`` rule now (traces, judge prompts and
   answers, judge cache, feedback evidence), or only count what would be purged;
+* ``api-keys [--workspace W] [--project P] [--json]`` — list the service keys by workspace / project (age,
+  last use, expiry, status), **never** a secret or a hash; ``api-key-create`` attaches a key to a workspace /
+  project (the full key is shown once); ``project-move`` moves a project and revokes its keys (NOV-112);
 * ``workspace-list``, ``workspace-create``, ``project-create``, ``workspace-add-user`` — ORION workspaces
   and projects (docs/WORKSPACES.md). Platform commands: they act across every workspace.
 """
@@ -25,8 +28,9 @@ from datetime import timedelta
 from cryptography.fernet import Fernet, InvalidToken
 from sqlalchemy import select, update
 
+from forge.domain.enums import Role
 from forge.infra.db import dispose_engine, session_scope, utcnow
-from forge.infra.models import EvaluationRun, ProviderCredential, TraceEvent
+from forge.infra.models import ApiKey, EvaluationRun, ProviderCredential, TraceEvent
 from forge.infra.security import SecretDecryptionError, decrypt_secret, encrypt_secret
 from forge.infra.workspace_scope import bind_session, enforcement_mode
 
@@ -189,6 +193,128 @@ async def workspace_add_user(workspace_ref: str, email: str) -> int:
     return 0
 
 
+def _key_row(key: ApiKey, workspace_slug: str, project_slug: str | None) -> dict[str, object]:
+    from forge.infra.security import mask_api_key
+    from forge.services.api_keys import is_active
+
+    now = utcnow()
+    return {
+        "id": str(key.id),
+        "key": mask_api_key(key.prefix),
+        "name": key.name,
+        "workspace": workspace_slug,
+        "project": project_slug,
+        "role": key.role.value,
+        "clearance": key.clearance,
+        "scopes": list(key.scopes or []),
+        "age_days": (now - key.created_at).days,
+        "last_used_at": key.last_used_at.isoformat() if key.last_used_at else None,
+        "expires_at": key.expires_at.isoformat() if key.expires_at else None,
+        "status": "active" if is_active(key) else ("revoked" if key.revoked_at else "expired"),
+    }
+
+
+async def api_keys_list(workspace_ref: str | None, project_ref: str | None, as_json: bool) -> int:
+    import json
+
+    from forge.infra.models import Project, Workspace
+    from forge.services import workspaces
+
+    async with session_scope() as session:
+        query = select(ApiKey, Workspace.slug, Project.slug).join(
+            Workspace, Workspace.id == ApiKey.workspace_id
+        )
+        query = query.outerjoin(Project, Project.id == ApiKey.project_id)
+        if workspace_ref:
+            query = query.where(
+                ApiKey.workspace_id == (await workspaces.get_workspace(session, workspace_ref)).id
+            )
+        if project_ref:
+            query = query.where(Project.slug == project_ref)
+        rows = [
+            _key_row(key, ws, project)
+            for key, ws, project in (
+                await session.execute(query.order_by(Workspace.slug, ApiKey.created_at))
+            ).all()
+        ]
+    if as_json:
+        print(json.dumps(rows, ensure_ascii=False, indent=2))
+    else:
+        for row in rows:
+            print(
+                f"{row['key']}  {row['workspace']}/{row['project'] or '-'}  {row['role']} "
+                f"C{row['clearance']}  "
+                f"âge {row['age_days']} j  dernier usage {row['last_used_at'] or 'jamais'}  "
+                f"expire {row['expires_at'] or '—'}  {row['status']}  « {row['name']} »"
+            )
+        print(f"{len(rows)} clé(s) (aucun secret affiché).")
+    return 0
+
+
+async def api_key_create(
+    workspace_ref: str, project_ref: str | None, name: str, role: str, clearance: int, days: int | None
+) -> int:
+    from datetime import timedelta
+
+    from forge.domain.enums import Role
+    from forge.services import api_keys, workspaces
+    from forge.services.audit import Actor
+    from forge.services.taxonomy import PlatformError
+
+    try:
+        async with session_scope() as session:
+            workspace = await workspaces.get_workspace(session, workspace_ref)
+            bind_session(session, workspace.id)
+            project = None
+            if project_ref:
+                project = next(
+                    (p for p in await workspaces.list_projects(session, workspace) if p.slug == project_ref),
+                    None,
+                )
+                if project is None:
+                    print("Projet introuvable dans cet espace", file=sys.stderr)
+                    return 2
+            _key, full = await api_keys.create_api_key(
+                session,
+                Actor.system("forge.ops"),
+                name=name,
+                role=Role(role),
+                clearance=clearance,
+                expires_at=utcnow() + timedelta(days=days) if days else None,
+                project_id=project.id if project else None,
+                workspace_id=workspace.id,
+            )
+    except PlatformError as exc:
+        print(str(exc), file=sys.stderr)
+        return 2
+    print(f"Clé créée ({workspace.slug}/{project.slug if project else '-'}, {role}, C{clearance}) : {full}")
+    print("Elle ne sera plus jamais affichée : conservez-la dans votre gestionnaire de secrets.")
+    return 0
+
+
+async def project_move(project_ref: str, from_workspace: str, to_workspace: str) -> int:
+    from forge.services import workspaces
+    from forge.services.audit import Actor
+    from forge.services.taxonomy import PlatformError
+
+    try:
+        async with session_scope() as session:
+            source = await workspaces.get_workspace(session, from_workspace)
+            target = await workspaces.get_workspace(session, to_workspace)
+            project = next(
+                (p for p in await workspaces.list_projects(session, source) if p.slug == project_ref), None
+            )
+            if project is None:
+                print("Projet introuvable dans l'espace d'origine", file=sys.stderr)
+                return 2
+            revoked = await workspaces.move_project(session, Actor.system("forge.ops"), project, target)
+    except PlatformError as exc:
+        print(str(exc), file=sys.stderr)
+        return 2
+    print(f"Projet déplacé vers {target.slug} ; {revoked} clé(s) révoquée(s).")
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="python -m forge.ops", description="Commandes d'exploitation FORGE")
     sub = parser.add_subparsers(dest="command", required=True)
@@ -214,6 +340,23 @@ def main(argv: list[str] | None = None) -> int:
     ws_user = sub.add_parser("workspace-add-user", help="Placer un utilisateur dans un espace")
     ws_user.add_argument("--workspace", required=True, help="orion_workspace_id ou alias")
     ws_user.add_argument("--email", required=True)
+    keys_cmd = sub.add_parser("api-keys", help="Lister les clés de service par espace / projet (sans secret)")
+    keys_cmd.add_argument("--workspace")
+    keys_cmd.add_argument("--project")
+    keys_cmd.add_argument("--json", dest="as_json", action="store_true")
+    key_create = sub.add_parser("api-key-create", help="Créer une clé rattachée à un espace (et un projet)")
+    key_create.add_argument("--workspace", required=True)
+    key_create.add_argument("--project")
+    key_create.add_argument("--name", required=True)
+    key_create.add_argument("--role", required=True, choices=[r.value for r in Role])
+    key_create.add_argument("--clearance", required=True, type=int, choices=range(4))
+    key_create.add_argument("--days", type=int, help="durée de vie (jours)")
+    move = sub.add_parser(
+        "project-move", help="Déplacer un projet vers un autre espace (ses clés sont révoquées)"
+    )
+    move.add_argument("--project", required=True)
+    move.add_argument("--from", dest="from_workspace", required=True)
+    move.add_argument("--to", dest="to_workspace", required=True)
     args = parser.parse_args(argv)
 
     async def run() -> int:
@@ -224,6 +367,14 @@ def main(argv: list[str] | None = None) -> int:
                 return await check_secrets()
             if args.command == "retention":
                 return await retention_pass(args.dry_run)
+            if args.command == "api-keys":
+                return await api_keys_list(args.workspace, args.project, args.as_json)
+            if args.command == "api-key-create":
+                return await api_key_create(
+                    args.workspace, args.project, args.name, args.role, args.clearance, args.days
+                )
+            if args.command == "project-move":
+                return await project_move(args.project, args.from_workspace, args.to_workspace)
             if args.command == "workspace-list":
                 return await workspace_list()
             if args.command == "workspace-create":

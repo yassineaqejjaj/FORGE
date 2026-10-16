@@ -26,6 +26,7 @@ from forge.adapters.http import create_client, request_json
 from forge.domain.enums import AdapterKind, TraceEventSource, TraceEventType
 from forge.domain.traces.protocol import parse_protocol_events
 from forge.domain.types import AgentExecutionError, AgentRequest, AgentResult, TraceEventData
+from forge.infra.service_token import ServiceTokenError, nova_bearer
 
 DEFAULT_PATH = "/v1/agents/{nova_agent_id}/runs"
 TARGET = "NOVA"
@@ -44,8 +45,14 @@ class NovaAdapter:
         if config.get("nova_options"):
             body["options"] = dict(config["nova_options"])
         headers = {**credential_headers(request.agent.credentials), **propagation_headers(request)}
-        if request.agent.credentials.get("api_key"):
-            headers["Authorization"] = f"Bearer {request.agent.credentials['api_key']}"
+        try:
+            bearer = await nova_bearer(request.agent.credentials.get("api_key"))
+        except ServiceTokenError as exc:
+            raise AgentExecutionError(
+                f"Jeton de service pour NOVA indisponible : {exc}", retryable=True
+            ) from exc
+        if bearer:
+            headers["Authorization"] = f"Bearer {bearer}"
         started_at = datetime.now(UTC)
         async with create_client(timeout=http_timeout(request)) as client:
             data, _ = await request_json(
