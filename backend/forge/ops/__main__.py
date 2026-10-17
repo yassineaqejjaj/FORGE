@@ -10,6 +10,9 @@
 * ``api-keys [--workspace W] [--project P] [--json]`` — list the service keys by workspace / project (age,
   last use, expiry, status), **never** a secret or a hash; ``api-key-create`` attaches a key to a workspace /
   project (the full key is shown once); ``project-move`` moves a project and revokes its keys (NOV-112);
+* ``accounts inventory|reconcile|approve|flags|enable-password|break-glass|unlink`` — account migration
+  tool (NOV-113, docs/ACCOUNTS_MIGRATION.md): read-only inventory and dry-run reconciliation, writes only with
+  ``--apply`` + ``--confirm-backup`` (+ a signed approval to link accounts);
 * ``workspace-list``, ``workspace-create``, ``project-create``, ``workspace-add-user`` — ORION workspaces
   and projects (docs/WORKSPACES.md). Platform commands: they act across every workspace.
 """
@@ -340,6 +343,9 @@ def main(argv: list[str] | None = None) -> int:
     ws_user = sub.add_parser("workspace-add-user", help="Placer un utilisateur dans un espace")
     ws_user.add_argument("--workspace", required=True, help="orion_workspace_id ou alias")
     ws_user.add_argument("--email", required=True)
+    from forge.ops import accounts as accounts_tool
+
+    accounts_tool.add_parsers(sub)
     keys_cmd = sub.add_parser("api-keys", help="Lister les clés de service par espace / projet (sans secret)")
     keys_cmd.add_argument("--workspace")
     keys_cmd.add_argument("--project")
@@ -367,6 +373,8 @@ def main(argv: list[str] | None = None) -> int:
                 return await check_secrets()
             if args.command == "retention":
                 return await retention_pass(args.dry_run)
+            if args.command == "accounts":
+                return await accounts_tool.run(args)
             if args.command == "api-keys":
                 return await api_keys_list(args.workspace, args.project, args.as_json)
             if args.command == "api-key-create":

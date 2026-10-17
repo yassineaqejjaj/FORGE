@@ -10,7 +10,14 @@ from forge.infra.models.evaluation import (
     RunError,
     Score,
 )
-from forge.infra.models.identity import ApiKey, AuditEvent, ExternalIdentity, ProviderCredential, User
+from forge.infra.models.identity import (
+    AccountFlag,
+    ApiKey,
+    AuditEvent,
+    ExternalIdentity,
+    ProviderCredential,
+    User,
+)
 from forge.infra.models.job import Job
 from forge.infra.models.programs import (
     Benchmark,
@@ -48,6 +55,7 @@ from forge.infra.models.workspace import (
 
 __all__ = [
     "ORION_DEFAULT_WORKSPACE_ID",
+    "AccountFlag",
     "Agent",
     "AgentVersion",
     "ApiKey",

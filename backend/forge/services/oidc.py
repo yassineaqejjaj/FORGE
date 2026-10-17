@@ -195,11 +195,6 @@ def apply(user: User, ctx: OidcContext) -> tuple[Role, int]:
     return Role(role), orion_claims.effective_clearance(int(user.clearance), ctx.clearance)
 
 
-def is_break_glass(user: User) -> bool:
-    """Administrators that keep the password login whatever the SSO policy (ADR §8, phase 3)."""
-    return Role(user.role) == Role.admin and user.email.lower() in settings.break_glass_set
-
-
 async def find_link(session: AsyncSession, issuer: str, subject: str) -> ExternalIdentity | None:
     return await session.get(ExternalIdentity, (issuer, subject))
 
