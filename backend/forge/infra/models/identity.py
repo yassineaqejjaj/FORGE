@@ -11,8 +11,9 @@ from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
 from forge.domain.enums import ActorType, ProviderKind, Role
-from forge.infra.db import Base, CreatedAtMixin, TimestampMixin, UUIDPkMixin
+from forge.infra.db import Base, CreatedAtMixin, TimestampMixin, UUIDPkMixin, utcnow
 from forge.infra.models._types import StrEnumType, enum_check, range_check
+from forge.infra.models.workspace import ProjectScopedMixin, WorkspaceScopedMixin
 
 DEFAULT_AVATAR_COLOR = "#ea580c"
 
@@ -42,11 +43,59 @@ class User(UUIDPkMixin, CreatedAtMixin, Base):
     onboarded_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
 
-class ApiKey(UUIDPkMixin, CreatedAtMixin, Base):
+class ExternalIdentity(Base):
+    """Link between a local user and an IdP identity (OIDC ``iss`` + ``sub``), created only on the user's
+    explicit confirmation (ADR 001 §8, NOV-108). Additive: no existing table changes."""
+
+    __tablename__ = "external_identities"
+    __table_args__ = (
+        Index("uq_external_identities_issuer_user_id", "issuer", "user_id", unique=True),
+        Index("ix_external_identities_user_id", "user_id"),
+    )
+
+    issuer: Mapped[str] = mapped_column(Text, primary_key=True)
+    sub: Mapped[str] = mapped_column(Text, primary_key=True)
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False
+    )
+    linked_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, default=utcnow, server_default=text("now()")
+    )
+
+
+class AccountFlag(Base):
+    """Per-account migration flags (ADR 001 §8, NOV-113): set by an operator, one row per flagged user.
+
+    ``password_login_disabled`` / ``sso_required`` refuse the password login (and, for ``sso_required``, any
+    session not opened by SSO); ``break_glass`` marks the administrator that always keeps the password.
+    """
+
+    __tablename__ = "account_flags"
+
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), primary_key=True
+    )
+    password_login_disabled: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=False, server_default=text("false")
+    )
+    sso_required: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=False, server_default=text("false")
+    )
+    break_glass: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=False, server_default=text("false")
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, default=utcnow, onupdate=utcnow, server_default=text("now()")
+    )
+    updated_by: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+
+class ApiKey(UUIDPkMixin, CreatedAtMixin, ProjectScopedMixin, Base):
     """Service keys (CI pipelines, NOVA, agents pushing traces). Format ``fgk_<prefix8>_<secret32>``."""
 
     __tablename__ = "api_keys"
     __table_args__ = (
+        Index("ix_api_keys_workspace_id", "workspace_id"),
         enum_check("role", Role),
         range_check("clearance", 0, 3),
         Index("uq_api_keys_prefix", "prefix", unique=True),
@@ -69,7 +118,7 @@ class ApiKey(UUIDPkMixin, CreatedAtMixin, Base):
     revoked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
 
-class ProviderCredential(UUIDPkMixin, TimestampMixin, Base):
+class ProviderCredential(UUIDPkMixin, TimestampMixin, ProjectScopedMixin, Base):
     """Encrypted secret (API key, bearer token, extra headers) referenced by agents and judges.
 
     Secrets are encrypted with Fernet (``FORGE_SECRETS_KEY``) and never returned by the API: only
@@ -78,6 +127,7 @@ class ProviderCredential(UUIDPkMixin, TimestampMixin, Base):
 
     __tablename__ = "provider_credentials"
     __table_args__ = (
+        Index("ix_provider_credentials_workspace_id", "workspace_id"),
         enum_check("kind", ProviderKind),
         Index("uq_provider_credentials_name", "name", unique=True),
     )
@@ -96,11 +146,12 @@ class ProviderCredential(UUIDPkMixin, TimestampMixin, Base):
     rotated_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
 
-class AuditEvent(UUIDPkMixin, CreatedAtMixin, Base):
+class AuditEvent(UUIDPkMixin, CreatedAtMixin, WorkspaceScopedMixin, Base):
     """Append-only audit log of every mutation and every evaluation decision."""
 
     __tablename__ = "audit_events"
     __table_args__ = (
+        Index("ix_audit_events_workspace_id_created_at", "workspace_id", "created_at"),
         enum_check("actor_type", ActorType),
         Index("ix_audit_events_created_at", "created_at"),
         Index("ix_audit_events_target", "target_type", "target_id"),

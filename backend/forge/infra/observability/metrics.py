@@ -45,6 +45,11 @@ ERRORS_DETECTED_TOTAL = Counter(
 OTLP_SPANS_TOTAL = Counter(
     "forge_otlp_spans_total", "OTLP spans received by outcome (attached, orphan, rejected).", ["outcome"]
 )
+WORKSPACE_VIOLATIONS_TOTAL = Counter(
+    "forge_workspace_violations_total",
+    "Rows read or written outside the caller's ORION workspace, by table and enforcement mode.",
+    ["table", "mode"],
+)
 JOBS_TOTAL = Counter("forge_jobs_total", "Jobs by kind and outcome.", ["kind", "outcome"])
 QUEUE_DEPTH = Gauge("forge_queue_depth", "Queued jobs per queue (refreshed at each scrape).", ["queue"])
 OLDEST_JOB_AGE = Gauge(
@@ -58,6 +63,11 @@ WORKER_INFLIGHT = Gauge("forge_worker_inflight_jobs", "Jobs currently processed 
 
 def record_run_terminal(status: str, origin: str) -> None:
     RUNS_TOTAL.labels(status=status, origin=origin).inc()
+
+
+def record_workspace_violation(table: str, mode: str) -> None:
+    """``mode`` ∈ {shadow, enforce} (``off`` never counts)."""
+    WORKSPACE_VIOLATIONS_TOTAL.labels(table=table, mode=mode).inc()
 
 
 def record_job(kind: str, outcome: str) -> None:

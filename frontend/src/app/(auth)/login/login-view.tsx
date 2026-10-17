@@ -17,6 +17,8 @@ import { cn, safeNextPath } from "@/lib/utils";
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const LANG_KEY = "forge-login-lang";
+/** SSO button: build-time flag, off by default (the OIDC routes exist only when FORGE_OIDC_ENABLED=true). */
+const SSO_ENABLED = process.env.NEXT_PUBLIC_FORGE_OIDC_ENABLED === "true";
 const ACCESS_CONTACT = "yassine.aqejjaj@devoteam.com";
 
 type Lang = "fr" | "en";
@@ -37,6 +39,7 @@ const T = {
     or: "ou continuer avec",
     soon: "Bientôt",
     googleSoon: "Connexion avec Google : bientôt disponible",
+    sso: "Se connecter par SSO",
     show: "Afficher le mot de passe",
     hide: "Masquer le mot de passe",
     needLogin: "Connectez-vous pour accéder à la page demandée.",
@@ -59,6 +62,7 @@ const T = {
           : "Trop de tentatives de connexion. Patientez quelques instants avant de réessayer.",
       unreachable: "Le service FORGE est injoignable pour le moment. Réessayez dans quelques instants.",
       generic: "Connexion impossible. Réessayez.",
+      ssoRefused: (code: string) => `Connexion SSO refusée (${code}). Contactez un administrateur si le problème persiste.`,
     },
   },
   en: {
@@ -75,6 +79,7 @@ const T = {
     or: "or continue with",
     soon: "Soon",
     googleSoon: "Sign in with Google: coming soon",
+    sso: "Sign in with SSO",
     show: "Show password",
     hide: "Hide password",
     needLogin: "Sign in to open the requested page.",
@@ -95,6 +100,7 @@ const T = {
         delay ? `Too many sign-in attempts. Try again in ${delay}.` : "Too many sign-in attempts. Wait a moment and try again.",
       unreachable: "FORGE cannot be reached right now. Try again in a moment.",
       generic: "Sign-in failed. Try again.",
+      ssoRefused: (code: string) => `SSO sign-in refused (${code}). Contact an administrator if this persists.`,
     },
   },
 } as const;
@@ -246,6 +252,7 @@ export function LoginView() {
     }
   };
 
+  const ssoError = searchParams.get("sso_error");
   const busy = login.isPending || redirecting;
   const tabClass = (active: boolean) =>
     cn(
@@ -319,6 +326,11 @@ export function LoginView() {
                 {formError ? (
                   <Alert id="login-error" tone="red" className="mt-6" title={t.refused}>
                     {formError}
+                  </Alert>
+                ) : null}
+                {ssoError && !formError ? (
+                  <Alert tone="red" className="mt-6" title={t.refused}>
+                    {t.errors.ssoRefused(ssoError)}
                   </Alert>
                 ) : null}
 
@@ -396,6 +408,12 @@ export function LoginView() {
                     {redirecting ? t.redirecting : t.submit}
                   </Button>
                 </form>
+
+                {SSO_ENABLED ? (
+                  <Button asChild size="lg" variant="secondary" className="mt-4 w-full">
+                    <a href={`/api/v1/auth/oidc/login?next=${encodeURIComponent(next)}`}>{t.sso}</a>
+                  </Button>
+                ) : null}
 
                 <div className="my-6 flex items-center gap-3 text-[13px] text-subtle-foreground" aria-hidden>
                   <span className="h-px flex-1 bg-border" />

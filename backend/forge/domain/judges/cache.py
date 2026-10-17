@@ -3,6 +3,9 @@
 ``key = sha256(judge.content_hash, scenario.content_hash, output, trace digest, criteria list)``: the
 same judge version on the same scenario version, output and trace, for the same criteria, reuses
 the stored answer (``cached=true``, cost 0).
+
+The cache never crosses workspaces: outside the default workspace the key also covers ``scope`` (the
+workspace id), so two workspaces never share an entry. The default workspace keeps its historical keys.
 """
 
 from __future__ import annotations
@@ -40,8 +43,9 @@ def judge_cache_key(
     output_json: Any,
     trace_digest: str,
     criteria_keys: Sequence[str],
+    scope: str = "",
 ) -> str:
-    payload = {
+    payload: dict[str, Any] = {
         "judge": judge_content_hash,
         "scenario": scenario_content_hash,
         "output_text": output_text or "",
@@ -49,4 +53,6 @@ def judge_cache_key(
         "trace": trace_digest,
         "criteria": list(criteria_keys),
     }
+    if scope:
+        payload["workspace"] = scope
     return "judge:" + hashlib.sha256(canonical_json(payload).encode("utf-8")).hexdigest()

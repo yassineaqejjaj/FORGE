@@ -8,10 +8,11 @@ from typing import Any
 from fastapi import APIRouter, Response, status
 
 from forge.api.deps import RequireAdmin, SessionDep
-from forge.api.errors import not_found
+from forge.api.errors import ApiError, not_found
 from forge.api.routers.meta import PageQuery, platform_errors
-from forge.api.schemas.api_keys import ApiKeyCreatedOut, ApiKeyCreateIn, ApiKeyOut
+from forge.api.schemas.api_keys import ApiKeyCreatedOut, ApiKeyCreateIn, ApiKeyOut, ApiKeyRotateIn
 from forge.api.schemas.common import Page
+from forge.config import settings
 from forge.infra.models import ApiKey
 from forge.infra.security import mask_api_key
 from forge.services import api_keys as service
@@ -56,6 +57,12 @@ async def list_api_keys(
     "", response_model=ApiKeyCreatedOut, status_code=status.HTTP_201_CREATED, summary="Créer une clé d'API"
 )
 async def create_api_key(body: ApiKeyCreateIn, admin: RequireAdmin, session: SessionDep) -> ApiKeyCreatedOut:
+    if settings.api_key_require_explicit:
+        missing = [f for f in ("role", "clearance") if f not in body.model_fields_set]
+        if missing:
+            raise ApiError(
+                422, f"Champ(s) explicite(s) requis : {', '.join(missing)}", code="explicit_fields_required"
+            )
     with platform_errors():
         key, full = await service.create_api_key(
             session,
@@ -66,9 +73,30 @@ async def create_api_key(body: ApiKeyCreateIn, admin: RequireAdmin, session: Ses
             scopes=body.scopes,
             expires_at=body.expires_at,
             created_by=admin.user_id,
+            project_id=body.project_id,
         )
     await session.commit()
     return ApiKeyCreatedOut(**_out(key), key=full)
+
+
+@router.post(
+    "/{key_id}/rotate",
+    response_model=ApiKeyCreatedOut,
+    status_code=status.HTTP_201_CREATED,
+    summary="Faire tourner une clé d'API (successeur identique, délai de grâce pour l'ancienne)",
+)
+async def rotate_api_key(
+    key_id: uuid.UUID, admin: RequireAdmin, session: SessionDep, body: ApiKeyRotateIn | None = None
+) -> ApiKeyCreatedOut:
+    key = await session.get(ApiKey, key_id)
+    if key is None:
+        raise not_found("Clé d'API introuvable")
+    with platform_errors():
+        successor, full = await service.rotate_api_key(
+            session, admin, key, grace_hours=(body or ApiKeyRotateIn()).grace_hours
+        )
+    await session.commit()
+    return ApiKeyCreatedOut(**_out(successor), key=full)
 
 
 @router.delete("/{key_id}", status_code=status.HTTP_204_NO_CONTENT, summary="Révoquer une clé d'API")

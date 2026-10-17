@@ -30,12 +30,13 @@ from forge.domain.enums import (
 )
 from forge.infra.db import Base, CreatedAtMixin, UUIDPkMixin
 from forge.infra.models._types import StrEnumType, enum_check
+from forge.infra.models.workspace import ProjectScopedMixin, WorkspaceScopedMixin
 
 _JSON_OBJ = text("'{}'::jsonb")
 _JSON_LIST = text("'[]'::jsonb")
 
 
-class EvaluationRun(UUIDPkMixin, CreatedAtMixin, Base):
+class EvaluationRun(UUIDPkMixin, CreatedAtMixin, ProjectScopedMixin, Base):
     """Scenario version + agent version + configuration + trace + evaluations + scores.
 
     ``manifest`` freezes everything needed to reproduce and compare the run (docs §6.2). It is
@@ -44,6 +45,8 @@ class EvaluationRun(UUIDPkMixin, CreatedAtMixin, Base):
 
     __tablename__ = "evaluation_runs"
     __table_args__ = (
+        Index("ix_evaluation_runs_workspace_id_created_at", "workspace_id", "created_at"),
+        Index("ix_evaluation_runs_project_id", "project_id", postgresql_where=text("project_id IS NOT NULL")),
         enum_check("status", RunStatus),
         enum_check("origin", RunOrigin),
         enum_check("arm", ExperimentArm),
@@ -129,7 +132,7 @@ class EvaluationRun(UUIDPkMixin, CreatedAtMixin, Base):
     finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
 
-class ExecutionTrace(UUIDPkMixin, CreatedAtMixin, Base):
+class ExecutionTrace(UUIDPkMixin, CreatedAtMixin, WorkspaceScopedMixin, Base):
     """Summary of one execution. Messages, tool calls and model calls are ``trace_events`` rows."""
 
     __tablename__ = "execution_traces"
@@ -166,7 +169,7 @@ class ExecutionTrace(UUIDPkMixin, CreatedAtMixin, Base):
     event_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0, server_default=text("0"))
 
 
-class TraceEvent(UUIDPkMixin, CreatedAtMixin, Base):
+class TraceEvent(UUIDPkMixin, CreatedAtMixin, WorkspaceScopedMixin, Base):
     """One step of the timeline. ``seq`` is stable and used as the reference in judge prompts."""
 
     __tablename__ = "trace_events"

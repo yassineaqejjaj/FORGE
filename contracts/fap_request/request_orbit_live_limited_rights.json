@@ -1,0 +1,50 @@
+{
+ "protocol": "forge-agent-protocol/v1",
+ "run_id": "run-contract-1",
+ "trace_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+ "repetition": 0,
+ "attempt": 1,
+ "scenario_version_id": "scv-1",
+ "input": {
+  "prompt": "Rédige un PRD pour l'export CSV."
+ },
+ "context": {
+  "documents": [
+   {
+    "id": "3bc8be0b-0000-4000-8000-000000000001",
+    "title": "Note client",
+    "content": "Le client veut un export CSV hebdomadaire.",
+    "source": "document",
+    "classification": 1,
+    "citation": "S1",
+    "version": 2,
+    "uri": "orbit://synthetic/note-client",
+    "document_id": "60b7e3f2-0000-4000-8000-000000000001",
+    "pii_redacted": false
+   }
+  ],
+  "orbit_context": "[S1] Le client veut un export CSV hebdomadaire.",
+  "max_classification": 1
+ },
+ "constraints": [
+  "Maximum 300 mots"
+ ],
+ "agent": {
+  "name": "NOVA",
+  "slug": "nova",
+  "version": "0.1.0+contract.000000",
+  "system_prompt": "",
+  "model": null,
+  "tools": [],
+  "parameters": {},
+  "memory": {},
+  "orchestration": {}
+ },
+ "budget": {
+  "max_tokens": null,
+  "max_cost": null,
+  "max_steps": 8,
+  "timeout_seconds": null
+ },
+ "nova_agent_id": "nova-orchestrator"
+}

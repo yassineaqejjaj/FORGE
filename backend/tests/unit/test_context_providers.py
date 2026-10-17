@@ -1,4 +1,7 @@
-"""ORBIT wire formats read by the context providers (fixtures serialized from the real ORBIT schemas)."""
+"""ORBIT wire formats read by the context providers (fixtures serialized from the real ORBIT schemas).
+
+``tests/fixtures/orbit`` is a verified copy of ORBIT ``contracts/orbit`` (see ``tests/contract`` and docs/CONTRACTS.md).
+"""
 
 from __future__ import annotations
 
@@ -21,7 +24,10 @@ def test_context_package_items_keep_excerpt_and_provenance() -> None:
     assert [d["content"] for d in documents] == [i["excerpt"] for i in package["items"]]
     first, memory, restricted = documents
     assert first["classification"] == 1 and first["citation"] == "S1" and first["version"] == 2
-    assert first["document_id"] == package["items"][0]["document_id"] and first["uri"] == "x"
+    assert (
+        first["document_id"] == package["items"][0]["document_id"]
+        and first["uri"] == package["items"][0]["uri"]
+    )
     assert first["source"] == "document" and first["id"] == package["items"][0]["id"]
     assert memory["memory_item_id"] == package["items"][1]["memory_item_id"]
     assert memory["memory_kind"] == "decision" and memory["classification"] == 2
@@ -37,11 +43,19 @@ def test_excluded_items_are_never_injected() -> None:
 def test_snapshot_items_read_excerpt_and_skip_forgotten() -> None:
     snapshot = fixture("snapshot.json")
     documents = orbit_documents(snapshot)
-    assert [d["id"] for d in documents] == ["c1", "m1"]
+    assert [d["id"] for d in documents] == ["c1", "m1", "c3"]
     assert all(d["content"] for d in documents) and "oublié" not in json.dumps(documents, ensure_ascii=False)
-    # Snapshot items carry no classification: none is invented here (callers fall back, fail-closed).
-    assert all("classification" not in d for d in documents)
+    # Since schema_version 2 snapshot items carry their classification; it is passed on as ORBIT gave it.
+    assert [d["classification"] for d in documents] == [1, 2, 3]
     assert documents[0]["source"] == "document" and documents[1]["memory_kind"] == "decision"
+
+    legacy = {
+        **snapshot,
+        "items": [{k: v for k, v in i.items() if k != "classification"} for i in snapshot["items"]],
+    }
+    assert all(
+        "classification" not in d for d in orbit_documents(legacy)
+    )  # an older snapshot: none is invented here
 
 
 def test_legacy_shapes_still_read() -> None:
@@ -56,7 +70,7 @@ def test_snapshot_content_becomes_orbit_context() -> None:
     snapshot = fixture("snapshot.json")
     context = _merge({}, orbit_documents(snapshot), snapshot, merge=True)
     assert context["orbit_context"] == snapshot["content"]
-    assert [d["id"] for d in context["documents"]] == ["c1", "m1"]
+    assert [d["id"] for d in context["documents"]] == ["c1", "m1", "c3"]
 
 
 def test_context_package_context_text_is_kept() -> None:

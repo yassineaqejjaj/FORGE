@@ -70,6 +70,28 @@ async def ensure_reference_data(session: AsyncSession) -> None:
     await session.commit()
 
 
+async def ensure_workspace_defaults(session: AsyncSession, workspace_slug: str) -> EvaluationConfig:
+    """Give a non-default workspace its own offline judge and default configuration.
+
+    The reference rows created by :func:`ensure_reference_data` belong to the default workspace and are
+    invisible from another one (``FORGE_WORKSPACE_ENFORCEMENT=enforce``). Keys are unique across the
+    platform, so they carry the workspace alias. Idempotent. The session must be bound to the workspace
+    (``forge.infra.workspace_scope.bind_session``) so that the rows are stamped with it.
+    """
+    judge = await _ensure_judge(
+        session, **{**_heuristic_judge(), "key": f"{HEURISTIC_JUDGE_KEY}-{workspace_slug}"}
+    )
+    return await _ensure_config(
+        session,
+        key=f"{DEFAULT_CONFIG_KEY}-{workspace_slug}",
+        name="FORGE — configuration par défaut",
+        description="Pondération équilibrée des 8 dimensions, garde-fous sécurité, juge hors ligne.",
+        weights=DEFAULT_DIMENSION_WEIGHTS,
+        judges=[judge],
+        is_default=True,
+    )
+
+
 async def _ensure_criteria(session: AsyncSession) -> None:
     existing = set(await session.scalars(select(Criterion.key)))
     for c in DEFAULT_CRITERIA:

@@ -129,9 +129,14 @@ flowchart LR
 * [docs/AGENT_PROTOCOL.md](docs/AGENT_PROTOCOL.md) : brancher un agent (FORGE Agent Protocol).
 * [docs/OBSERVED_RUNS.md](docs/OBSERVED_RUNS.md) : ingérer des runs déjà exécutés par un système externe.
 * [docs/CI.md](docs/CI.md) : bloquer un déploiement sur régression (CLI `forge`).
+* [docs/CONTRACTS.md](docs/CONTRACTS.md) : fixtures de contrat ORBIT → FORGE → NOVA (régénération, copies vérifiées).
 * [docs/DEMO.md](docs/DEMO.md) : scénario de démonstration guidée.
 * [docs/DEMO_AGENTS.md](docs/DEMO_AGENTS.md) : agents de démonstration simulés (comportements, paramètres).
 * [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) : déploiement (Vercel, Railway).
+* [docs/ACCOUNTS_MIGRATION.md](docs/ACCOUNTS_MIGRATION.md) : outil de migration des comptes (inventaire, rapprochement dry-run, approbation signée, break-glass).
+* [docs/SERVICE_KEYS.md](docs/SERVICE_KEYS.md) : clés `fgk_…` rattachées à un espace / projet, rotation, outil d'administration, compte de service vers NOVA.
+* [docs/OIDC.md](docs/OIDC.md) : SSO OIDC (désactivé par défaut), mapping rôles / habilitation, liaison de compte confirmée.
+* [docs/WORKSPACES.md](docs/WORKSPACES.md) : espaces et projets ORION, isolation (`FORGE_WORKSPACE_ENFORCEMENT`), migration, exceptions.
 * [docs/OPERATIONS.md](docs/OPERATIONS.md) : production — secrets, TLS, sauvegardes, supervision, mises à jour.
 
 ## Stack

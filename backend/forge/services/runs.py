@@ -280,6 +280,7 @@ async def _refresh_progress(
             payload={"id": str(parent_id)},
             priority=PRIORITY_FINALIZE,
             dedupe_key=f"{kind.value}:{parent_id}",
+            workspace_id=parent.workspace_id if parent is not None else None,
         )
     await session.flush()
 

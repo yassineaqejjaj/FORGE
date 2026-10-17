@@ -9,6 +9,11 @@ Two kinds of callers:
 
 Routers declare the minimum role with ``RequireViewer`` … ``RequireAdmin``. Private scenario
 content is filtered with :meth:`Principal.can_see_private` (maintainer and above).
+
+Every authenticated dependency also **binds the database session to the caller's workspace**
+(``forge.infra.workspace_scope``): the workspace comes from the validated identity — the user's
+membership or the API key's workspace — never from a parameter or a header. Whether the session is
+then filtered depends on ``FORGE_WORKSPACE_ENFORCEMENT`` (docs/WORKSPACES.md).
 """
 
 from __future__ import annotations
@@ -23,13 +28,15 @@ from fastapi import Depends, Request
 from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from forge.api.errors import forbidden, unauthorized
+from forge.api.errors import ApiError, forbidden, unauthorized
+from forge.config import settings
 from forge.domain.enums import ActorType, Role, role_at_least
 from forge.infra.db import get_session, utcnow
-from forge.infra.models import ApiKey, User
+from forge.infra.models import ORION_DEFAULT_WORKSPACE_ID, ApiKey, Project, User
 from forge.infra.security import (
     API_KEY_HEADER,
     SESSION_COOKIE_NAME,
+    TokenClaims,
     TokenError,
     decode_access_token,
     hash_api_key,
@@ -38,7 +45,33 @@ from forge.infra.security import (
     password_fingerprint,
     verify_api_key,
 )
+from forge.infra.workspace_scope import bind_session
+from forge.services import accounts as accounts_service
+from forge.services import oidc as oidc_service
 from forge.services.audit import Actor
+from forge.services.oidc import OidcAuthError, OidcContext
+from forge.services.workspaces import workspace_id_of_user
+
+#: Routes whose session is **not** bound to a workspace (no authenticated identity yet, or a platform
+#: caller), each with the reason. The inventory test fails for any other route without a binding
+#: authentication dependency (``get_principal`` / ``get_trace_writer`` / ``get_current_user``).
+UNBOUND_ROUTES: dict[tuple[str, str], str] = {
+    (
+        "POST",
+        "/api/v1/auth/login",
+    ): "no identity yet: binds the user's workspace once the password is verified",
+    ("POST", "/api/v1/auth/logout"): "binds the workspace of the session token it revokes",
+    ("GET", "/api/v1/auth/oidc/login"): "OIDC: redirects an anonymous browser to the IdP",
+    ("GET", "/api/v1/auth/oidc/callback"): "OIDC: no identity until the IdP token is validated; binds then",
+    ("GET", "/api/v1/auth/oidc/link"): "OIDC: pending link (signed cookie), no session yet",
+    ("POST", "/api/v1/auth/oidc/link"): "OIDC: explicit confirmation by password; binds the user's workspace",
+    (
+        "POST",
+        "/api/v1/webhooks/orbit",
+    ): "HMAC-signed ORBIT webhook, no user: forgets copies of a document in every workspace",
+}
+#: Non-API routes (liveness, readiness and Prometheus scrape: aggregated platform counters, no tenant data).
+UNBOUND_PLATFORM_PATHS: frozenset[str] = frozenset({"/health", "/ready", "/metrics"})
 
 SessionDep = Annotated[AsyncSession, Depends(get_session)]
 
@@ -58,16 +91,36 @@ class Principal:
     user: User | None = None
     api_key: ApiKey | None = None
     scopes: list[str] = field(default_factory=list)
+    #: ``orion_workspace_id`` of the caller (isolation boundary) and the project of a project key.
+    workspace_id: uuid.UUID = ORION_DEFAULT_WORKSPACE_ID
+    project_id: uuid.UUID | None = None
+    #: SSO administrator without ``amr`` ∋ ``mfa`` while ``FORGE_REQUIRE_MFA_FOR_ADMIN`` is set.
+    needs_mfa: bool = False
 
     @classmethod
-    def for_user(cls, user: User) -> Principal:
+    def for_user(
+        cls,
+        user: User,
+        workspace_id: uuid.UUID = ORION_DEFAULT_WORKSPACE_ID,
+        oidc: OidcContext | None = None,
+    ) -> Principal:
+        role, clearance = user.role, int(user.clearance)
+        label = user.full_name or user.email
+        needs_mfa = False
+        if oidc is not None:  # SSO: the local state capped by the token (ADR §4), never raised
+            role, clearance = oidc_service.apply(user, oidc)
+            if oidc.delegated_by:
+                label = f"{label} (via {oidc.delegated_by})"
+            needs_mfa = settings.require_mfa_for_admin and role == Role.admin and not oidc.mfa
         return cls(
             kind="user",
             id=user.id,
-            label=user.full_name or user.email,
-            role=user.role,
-            clearance=int(user.clearance),
+            label=label,
+            role=role,
+            clearance=clearance,
             user=user,
+            workspace_id=workspace_id,
+            needs_mfa=needs_mfa,
         )
 
     @classmethod
@@ -80,6 +133,8 @@ class Principal:
             clearance=int(key.clearance),
             api_key=key,
             scopes=list(key.scopes or []),
+            workspace_id=key.workspace_id,
+            project_id=key.project_id,
         )
 
     @property
@@ -96,6 +151,8 @@ class Principal:
     def require(self, minimum: Role) -> None:
         if not self.has_role(minimum):
             raise forbidden(_ROLE_MESSAGES[minimum])
+        if minimum == Role.admin and self.needs_mfa:
+            raise forbidden("Authentification multifacteur requise pour l'administration (amr ∋ mfa)")
 
     @property
     def can_see_private(self) -> bool:
@@ -117,6 +174,22 @@ _ROLE_MESSAGES: dict[Role, str] = {
     Role.maintainer: "Action réservée aux mainteneurs de benchmarks (rôle maintainer ou supérieur)",
     Role.admin: "Action réservée aux administrateurs de la plateforme",
 }
+
+
+async def _user_principal(session: AsyncSession, user: User, oidc: OidcContext | None = None) -> Principal:
+    workspace_id = await workspace_id_of_user(session, user.id)
+    if oidc is not None:
+        try:
+            await oidc_service.check_workspace(session, user, oidc)
+        except OidcAuthError as exc:
+            raise ApiError(exc.status, exc.detail, code=exc.code) from exc
+    return bind(session, Principal.for_user(user, workspace_id, oidc))
+
+
+def bind(session: AsyncSession, principal: Principal) -> Principal:
+    """Scope the request's session to the caller's workspace (see ``forge.infra.workspace_scope``)."""
+    bind_session(session, principal.workspace_id, principal.project_id)
+    return principal
 
 
 # --- Credential extraction ------------------------------------------------------------------------
@@ -150,7 +223,23 @@ def session_token(request: Request) -> str | None:
     return request.cookies.get(SESSION_COOKIE_NAME) or None
 
 
-async def _user_from_token(session: AsyncSession, token: str) -> User:
+async def _identity_from_token(session: AsyncSession, token: str) -> tuple[User, OidcContext | None]:
+    """The user behind a session token or (OIDC enabled) a Bearer IdP token, and what that token caps."""
+    if settings.oidc_enabled and oidc_service.is_idp_token(token):
+        try:
+            return await oidc_service.authenticate_bearer(session, token)
+        except OidcAuthError as exc:
+            if exc.status == 401:
+                raise unauthorized(f"{exc.detail} ({exc.code})") from exc
+            raise ApiError(exc.status, exc.detail, code=exc.code) from exc
+    user, claims = await _local_user_from_token(session, token)
+    oidc = OidcContext.from_claim(claims.oidc) if settings.oidc_enabled and claims.oidc else None
+    if oidc is None and await accounts_service.sso_required_without_sso(session, user):
+        raise unauthorized("Ce compte exige le SSO : reconnectez-vous par le fournisseur d'identité")
+    return user, oidc
+
+
+async def _local_user_from_token(session: AsyncSession, token: str) -> tuple[User, TokenClaims]:
     try:
         claims = decode_access_token(token)
     except TokenError as exc:
@@ -162,7 +251,7 @@ async def _user_from_token(session: AsyncSession, token: str) -> User:
         user.password_hash
     ):
         raise unauthorized("Session révoquée (mot de passe modifié) — veuillez vous reconnecter")
-    return user
+    return user, claims
 
 
 async def authenticate_api_key(session: AsyncSession, key: str, *, touch: bool = True) -> ApiKey:
@@ -176,6 +265,12 @@ async def authenticate_api_key(session: AsyncSession, key: str, *, touch: bool =
         raise unauthorized("Clé d'API invalide")
     if not verify_api_key(key, api_key.key_hash):
         raise unauthorized("Clé d'API invalide")
+    if api_key.project_id is not None:  # a project key follows its project: out of the workspace = unusable
+        project_workspace = await session.scalar(
+            select(Project.workspace_id).where(Project.id == api_key.project_id)
+        )
+        if project_workspace != api_key.workspace_id:
+            raise unauthorized("Clé d'API invalide (projet hors de son espace)")
     now = utcnow()
     if api_key.revoked_at is not None:
         raise unauthorized("Clé d'API révoquée")
@@ -198,11 +293,12 @@ async def get_principal(request: Request, session: SessionDep) -> Principal:
         api_key = await authenticate_api_key(session, key)
         if api_key.scopes:
             raise forbidden("Cette clé d'API est limitée à l'envoi de traces")
-        return Principal.for_api_key(api_key)
+        return bind(session, Principal.for_api_key(api_key))
     token = session_token(request)
     if token is None:
         raise unauthorized("Authentification requise")
-    return Principal.for_user(await _user_from_token(session, token))
+    user, oidc = await _identity_from_token(session, token)
+    return await _user_principal(session, user, oidc)
 
 
 async def get_trace_writer(request: Request, session: SessionDep) -> Principal:
@@ -210,7 +306,7 @@ async def get_trace_writer(request: Request, session: SessionDep) -> Principal:
     key = extract_api_key(request)
     if key:
         api_key = await authenticate_api_key(session, key)
-        principal = Principal.for_api_key(api_key)
+        principal = bind(session, Principal.for_api_key(api_key))
         if api_key.scopes and TRACES_WRITE_SCOPE not in api_key.scopes:
             raise forbidden("Cette clé d'API ne permet pas l'envoi de traces")
         if not api_key.scopes:
@@ -219,7 +315,8 @@ async def get_trace_writer(request: Request, session: SessionDep) -> Principal:
     token = session_token(request)
     if token is None:
         raise unauthorized("Authentification requise (clé d'API fgk_… attendue)")
-    principal = Principal.for_user(await _user_from_token(session, token))
+    user, oidc = await _identity_from_token(session, token)
+    principal = await _user_principal(session, user, oidc)
     principal.require(Role.editor)
     return principal
 
@@ -231,7 +328,9 @@ async def get_current_user(request: Request, session: SessionDep) -> User:
         if extract_api_key(request):
             raise forbidden("Cette opération n'est pas accessible avec une clé d'API")
         raise unauthorized("Authentification requise")
-    return await _user_from_token(session, token)
+    user, oidc = await _identity_from_token(session, token)
+    await _user_principal(session, user, oidc)  # binds the workspace (and checks the token's one)
+    return user
 
 
 def require_role(minimum: Role) -> Callable[..., Awaitable[Principal]]:
