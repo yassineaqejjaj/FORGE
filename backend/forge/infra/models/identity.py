@@ -63,6 +63,33 @@ class ExternalIdentity(Base):
     )
 
 
+class AccountFlag(Base):
+    """Per-account migration flags (ADR 001 §8, NOV-113): set by an operator, one row per flagged user.
+
+    ``password_login_disabled`` / ``sso_required`` refuse the password login (and, for ``sso_required``, any
+    session not opened by SSO); ``break_glass`` marks the administrator that always keeps the password.
+    """
+
+    __tablename__ = "account_flags"
+
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), primary_key=True
+    )
+    password_login_disabled: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=False, server_default=text("false")
+    )
+    sso_required: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=False, server_default=text("false")
+    )
+    break_glass: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=False, server_default=text("false")
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, default=utcnow, onupdate=utcnow, server_default=text("now()")
+    )
+    updated_by: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+
 class ApiKey(UUIDPkMixin, CreatedAtMixin, ProjectScopedMixin, Base):
     """Service keys (CI pipelines, NOVA, agents pushing traces). Format ``fgk_<prefix8>_<secret32>``."""
 

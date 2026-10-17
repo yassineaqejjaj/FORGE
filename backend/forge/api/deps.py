@@ -46,6 +46,7 @@ from forge.infra.security import (
     verify_api_key,
 )
 from forge.infra.workspace_scope import bind_session
+from forge.services import accounts as accounts_service
 from forge.services import oidc as oidc_service
 from forge.services.audit import Actor
 from forge.services.oidc import OidcAuthError, OidcContext
@@ -232,7 +233,10 @@ async def _identity_from_token(session: AsyncSession, token: str) -> tuple[User,
                 raise unauthorized(f"{exc.detail} ({exc.code})") from exc
             raise ApiError(exc.status, exc.detail, code=exc.code) from exc
     user, claims = await _local_user_from_token(session, token)
-    return user, OidcContext.from_claim(claims.oidc) if settings.oidc_enabled and claims.oidc else None
+    oidc = OidcContext.from_claim(claims.oidc) if settings.oidc_enabled and claims.oidc else None
+    if oidc is None and await accounts_service.sso_required_without_sso(session, user):
+        raise unauthorized("Ce compte exige le SSO : reconnectez-vous par le fournisseur d'identité")
+    return user, oidc
 
 
 async def _local_user_from_token(session: AsyncSession, token: str) -> tuple[User, TokenClaims]:

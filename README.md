@@ -133,6 +133,7 @@ flowchart LR
 * [docs/DEMO.md](docs/DEMO.md) : scénario de démonstration guidée.
 * [docs/DEMO_AGENTS.md](docs/DEMO_AGENTS.md) : agents de démonstration simulés (comportements, paramètres).
 * [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) : déploiement (Vercel, Railway).
+* [docs/ACCOUNTS_MIGRATION.md](docs/ACCOUNTS_MIGRATION.md) : outil de migration des comptes (inventaire, rapprochement dry-run, approbation signée, break-glass).
 * [docs/SERVICE_KEYS.md](docs/SERVICE_KEYS.md) : clés `fgk_…` rattachées à un espace / projet, rotation, outil d'administration, compte de service vers NOVA.
 * [docs/OIDC.md](docs/OIDC.md) : SSO OIDC (désactivé par défaut), mapping rôles / habilitation, liaison de compte confirmée.
 * [docs/WORKSPACES.md](docs/WORKSPACES.md) : espaces et projets ORION, isolation (`FORGE_WORKSPACE_ENFORCEMENT`), migration, exceptions.

@@ -538,3 +538,32 @@ def test_migration_0006_external_identities_on_a_populated_database(scratch_url:
     alembic(scratch_url, "stamp", "0005")
     alembic(scratch_url, "upgrade", "head")  # idempotent
     assert asyncio.run(read(scratch_url, lambda c: snapshot(c, schema))) == before
+
+
+def test_migration_0007_account_flags_on_a_populated_database(scratch_url: str) -> None:
+    """NOV-113: one new table; nothing existing moves. Up, down, up again, and resumed after a lost stamp."""
+    alembic(scratch_url, "upgrade", "0006")
+    schema = asyncio.run(read(scratch_url, tables_and_columns))
+    asyncio.run(read(scratch_url, populate))
+    before = asyncio.run(read(scratch_url, lambda c: snapshot(c, schema)))
+
+    async def table_exists(conn: asyncpg.Connection) -> bool:
+        return bool(await conn.fetchval("SELECT to_regclass('public.account_flags') IS NOT NULL"))
+
+    async def flag_one(conn: asyncpg.Connection) -> None:
+        user_id = await conn.fetchval("SELECT id FROM users LIMIT 1")
+        await conn.execute("INSERT INTO account_flags (user_id, sso_required) VALUES ($1, true)", user_id)
+        row = await conn.fetchrow("SELECT password_login_disabled, break_glass FROM account_flags")
+        assert (row["password_login_disabled"], row["break_glass"]) == (False, False)  # safe defaults
+
+    alembic(scratch_url, "upgrade", "head")
+    assert asyncio.run(read(scratch_url, table_exists))
+    assert asyncio.run(read(scratch_url, lambda c: snapshot(c, schema))) == before
+    asyncio.run(read(scratch_url, flag_one))
+    alembic(scratch_url, "downgrade", "0006")
+    assert not asyncio.run(read(scratch_url, table_exists))
+    assert asyncio.run(read(scratch_url, lambda c: snapshot(c, schema))) == before
+    alembic(scratch_url, "upgrade", "head")
+    alembic(scratch_url, "stamp", "0006")
+    alembic(scratch_url, "upgrade", "head")  # idempotent
+    assert asyncio.run(read(scratch_url, lambda c: snapshot(c, schema))) == before

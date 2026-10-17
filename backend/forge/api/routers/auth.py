@@ -24,6 +24,7 @@ from forge.infra.security import (
     verify_password,
 )
 from forge.infra.workspace_scope import bind_session
+from forge.services import accounts as accounts_service
 from forge.services import audit
 from forge.services import oidc as oidc_service
 from forge.services.audit import Actor
@@ -87,15 +88,16 @@ async def login(body: LoginIn, request: Request, response: Response, session: Se
         if user is not None and password_ok and not user.active:
             raise forbidden("Compte désactivé : contactez un administrateur")
         raise unauthorized(INVALID_CREDENTIALS)
-    if (
-        settings.password_login_disabled_for_linked
-        and await oidc_service.is_linked(session, user.id)
-        and not oidc_service.is_break_glass(user)
-    ):
+    refusal = await accounts_service.password_login_refusal(session, user)
+    if refusal is None and settings.password_login_disabled_for_linked:
+        linked = await oidc_service.is_linked(session, user.id)
+        if linked and not await accounts_service.is_break_glass(session, user):
+            refusal = "linked_account"
+    if refusal is not None:
         await audit.record(
             session, user, "auth.login_refused_sso", "user", user.id,
-            summary=f"Connexion par mot de passe refusée (compte lié au SSO) pour {user.email}",
-            details={"ip": ip},
+            summary=f"Connexion par mot de passe refusée (compte migré vers le SSO) pour {user.email}",
+            details={"ip": ip, "reason": refusal},
         )  # fmt: skip
         await session.commit()
         raise forbidden("Ce compte est lié au SSO : connectez-vous par le fournisseur d'identité")
