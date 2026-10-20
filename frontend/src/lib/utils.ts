@@ -35,7 +35,6 @@ export function safeNextPath(next: string | null | undefined, fallback = "/dashb
   if (!next) return fallback;
   if (!next.startsWith("/") || next.startsWith("//") || next.startsWith("/\\")) return fallback;
   if (next.startsWith("/login")) return fallback;
-  // "/" is the public landing page: after signing in, land in the application.
   if (next === "/") return fallback;
   return next;
 }
