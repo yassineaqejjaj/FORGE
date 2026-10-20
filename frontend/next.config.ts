@@ -19,6 +19,10 @@ const nextConfig: NextConfig = {
     // Long-running proxied calls (scenario import / export, judge tests).
     proxyTimeout: 120_000,
   },
+  async redirects() {
+    // No public landing page: the root opens the application (the login screen when signed out).
+    return [{ source: "/", destination: "/dashboard", permanent: false }];
+  },
   async rewrites() {
     return [
       { source: "/api/:path*", destination: `${apiUrl}/api/:path*` },
