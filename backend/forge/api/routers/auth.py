@@ -23,9 +23,13 @@ from forge.infra.security import (
     password_needs_rehash,
     verify_password,
 )
+from forge.infra.workspace_scope import bind_session
+from forge.services import accounts as accounts_service
 from forge.services import audit
+from forge.services import oidc as oidc_service
 from forge.services.audit import Actor
 from forge.services.users import get_by_email, normalize_email
+from forge.services.workspaces import workspace_id_of_user
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
@@ -63,6 +67,8 @@ async def login(body: LoginIn, request: Request, response: Response, session: Se
     if not await cache.hit(f"login:{email}:{ip}", settings.login_rate_limit_per_minute, window_seconds=60):
         raise ApiError(429, RATE_LIMITED, code="rate_limited", headers={"Retry-After": "60"})
     user = await get_by_email(session, email)
+    if user is not None:  # the login audit entries belong to the user's workspace
+        bind_session(session, await workspace_id_of_user(session, user.id))
     password_ok = verify_password(body.password, user.password_hash if user else None)
     if user is None or not password_ok or not user.active:
         await audit.record(
@@ -82,6 +88,19 @@ async def login(body: LoginIn, request: Request, response: Response, session: Se
         if user is not None and password_ok and not user.active:
             raise forbidden("Compte désactivé : contactez un administrateur")
         raise unauthorized(INVALID_CREDENTIALS)
+    refusal = await accounts_service.password_login_refusal(session, user)
+    if refusal is None and settings.password_login_disabled_for_linked:
+        linked = await oidc_service.is_linked(session, user.id)
+        if linked and not await accounts_service.is_break_glass(session, user):
+            refusal = "linked_account"
+    if refusal is not None:
+        await audit.record(
+            session, user, "auth.login_refused_sso", "user", user.id,
+            summary=f"Connexion par mot de passe refusée (compte migré vers le SSO) pour {user.email}",
+            details={"ip": ip, "reason": refusal},
+        )  # fmt: skip
+        await session.commit()
+        raise forbidden("Ce compte est lié au SSO : connectez-vous par le fournisseur d'identité")
     if password_needs_rehash(user.password_hash):
         user.password_hash = hash_password(body.password)
     user.last_login_at = utcnow()
@@ -108,6 +127,7 @@ async def logout(request: Request, session: SessionDep) -> Response:
             claims = decode_access_token(token)
             user = await session.get(User, claims.user_id)
             if user is not None:
+                bind_session(session, await workspace_id_of_user(session, user.id))
                 await audit.record(
                     session, user, "auth.logout", "user", user.id, summary=f"Déconnexion de {user.full_name}"
                 )

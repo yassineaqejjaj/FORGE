@@ -1,0 +1,25 @@
+{
+ "body": {
+  "error": {
+   "fields": [
+    "agent.version"
+   ],
+   "message": "Surcharge non prise en charge, rien n'a été exécuté : agent.version demandé « 0.1.0+contract.000000 », NOVA exécute « <current release label> »",
+   "retryable": false,
+   "type": "unsupported_override"
+  },
+  "events": [],
+  "metadata": {},
+  "model": null,
+  "output": "",
+  "output_json": null,
+  "protocol": "forge-agent-protocol/v1",
+  "usage": {
+   "input_tokens": 0,
+   "model_calls": 0,
+   "output_tokens": 0,
+   "tool_calls": 0
+  }
+ },
+ "status_code": 422
+}

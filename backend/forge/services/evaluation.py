@@ -85,6 +85,7 @@ from forge.infra.db import utcnow
 from forge.infra.llm import client_from_credentials, estimate_cost
 from forge.infra.llm_guardrail import judge_or_heuristic
 from forge.infra.models import (
+    ORION_DEFAULT_WORKSPACE_ID,
     CompositeScore,
     ErrorType,
     Evaluation,
@@ -104,6 +105,7 @@ from forge.infra.observability.metrics import (
     record_judge_call,
 )
 from forge.infra.queue import PRIORITY_INTERACTIVE, PermanentJobError, enqueue_job
+from forge.infra.workspace_scope import scope_token, scoped_key, session_workspace
 from forge.services import audit
 from forge.services import feedback as feedback_service
 from forge.services import runs as run_service
@@ -511,6 +513,7 @@ async def _run_judges(
         return []
     criteria = judged_criteria(ctx.scenario, config, catalog)
     digest = trace_digest(ctx.events)
+    cache_scope = scope_token(session_workspace(session))
     known = list(labels)
     finished: list[JudgeRun] = []
     pending: list[_JudgePlan] = []
@@ -536,6 +539,7 @@ async def _run_judges(
                 output_json=ctx.output_json,
                 trace_digest=digest,
                 criteria_keys=[c.key for c in selected],
+                scope=cache_scope,
             )
             entry = await session.get(JudgeCacheEntry, cache_key)
             if entry is not None:
@@ -559,7 +563,7 @@ async def _run_judges(
         judge = plan.run.judge
         if JudgeProvider(judge.provider) == JudgeProvider.heuristic:
             return await run_judge(judge, ctx, plan.run.criteria, error_types=labels, prompt=plan.run.prompt)
-        throttle_key = f"judge:{judge.credential_id or judge.ref}"
+        throttle_key = scoped_key(session_workspace(session), f"judge:{judge.credential_id or judge.ref}")
 
         async def before_call() -> None:
             await cache.throttle(throttle_key, settings.provider_rate_limit_per_minute)
@@ -585,6 +589,7 @@ async def _run_judges(
                 pg_insert(JudgeCacheEntry)
                 .values(
                     key=plan.cache_key,
+                    workspace_id=session_workspace(session) or ORION_DEFAULT_WORKSPACE_ID,
                     judge_id=_uuid(outcome.judge.judge_id),
                     response=audit.jsonable(cache_payload(outcome)),
                     hits=0,

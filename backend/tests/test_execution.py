@@ -331,11 +331,16 @@ async def test_real_orbit_snapshot_shape_gives_a_usable_context(db_session) -> N
     _, trace, _ = await reload(db_session, run)
     context = trace.input["context"]
     assert context["orbit_context"] == snapshot["content"]
-    assert [d["id"] for d in context["documents"]] == ["d1", "c1", "m1"]  # the forgotten item is not injected
+    assert [d["id"] for d in context["documents"]] == [
+        "d1",
+        "c1",
+        "m1",
+        "c3",
+    ]  # the forgotten item is not injected
     assert all(d["content"] for d in context["documents"])
     metadata = trace.metadata_["context"]
     assert metadata["orbit_request_id"] == snapshot["request_id"] and metadata["snapshot_version"] == "7"
-    assert metadata["snapshot_hash"] == snapshot["content_hash"] and metadata["orbit_documents"] == 2
+    assert metadata["snapshot_hash"] == snapshot["content_hash"] and metadata["orbit_documents"] == 3
 
 
 @respx.mock

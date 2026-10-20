@@ -57,7 +57,7 @@ packages = ["forge"]
 [tool.ruff]
 line-length = 110
 target-version = "py312"
-extend-exclude = ["alembic/versions"]
+extend-exclude = ["alembic/versions", "forge/domain/orion_claims.py"]  # the claims module is a verified copy (NOVA)
 
 [tool.ruff.lint]
 select = ["E", "F", "W", "I", "B", "UP", "ASYNC", "SIM", "RUF"]
@@ -71,6 +71,9 @@ ignore = [
 
 [tool.ruff.lint.per-file-ignores]
 "tests/**" = ["B011", "E501", "ASYNC109", "ASYNC110", "ASYNC240"]
+# Operator CLI: French messages and one-shot file reads at start-up.
+"forge/ops/accounts.py" = ["E501", "ASYNC240"]
+"forge/services/accounts.py" = ["E501"]
 
 [tool.ruff.lint.isort]
 known-first-party = ["forge"]

@@ -70,6 +70,7 @@ from forge.infra.observability.metrics import RUN_EXECUTION_SECONDS
 from forge.infra.observability.tracing import get_tracer
 from forge.infra.queue import RetryableJobError
 from forge.infra.security import SecretDecryptionError
+from forge.infra.workspace_scope import scoped_key, session_workspace
 from forge.services import runs as run_service
 from forge.services.context_providers import ContextPreparationError, PreparedContext, prepare_context
 from forge.services.credentials import resolve_credentials
@@ -167,7 +168,7 @@ async def run_agent(
         agent.credentials = await resolve_credentials(session, agent.credential_id)
         await _prepare(session, scenario, agent, outcome, run_id=run_id, base_context=base_context)
         await _invoke(scenario, agent, outcome, run_id=run_id, trace_id=trace_id, repetition=repetition,
-                      attempt=attempt)  # fmt: skip
+                      attempt=attempt, workspace_id=session_workspace(session))  # fmt: skip
     except AgentExecutionError as exc:
         outcome.error = exc
     except SecretDecryptionError as exc:
@@ -223,6 +224,7 @@ async def _invoke(
     trace_id: str,
     repetition: int,
     attempt: int,
+    workspace_id: uuid.UUID | None = None,
 ) -> None:
     assert outcome.prepared is not None
     try:
@@ -247,7 +249,7 @@ async def _invoke(
     limit = agent.max_concurrency or settings.runner_default_concurrency
     waited = time.perf_counter()
     try:
-        async with cache.concurrency_slot(f"agent:{agent.agent_version_id}", limit):
+        async with cache.concurrency_slot(scoped_key(workspace_id, f"agent:{agent.agent_version_id}"), limit):
             outcome.queue_wait_ms = (time.perf_counter() - waited) * 1000
             await _call_adapter(adapter, request, agent, outcome)
     except cache.RateLimitExceeded as exc:

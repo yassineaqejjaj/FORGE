@@ -93,9 +93,17 @@ def get_engine() -> AsyncEngine:
     return _engine
 
 
+def _install_workspace_scope() -> None:
+    """Register the workspace-isolation listeners (lazy import: the models import this module)."""
+    from forge.infra import workspace_scope
+
+    workspace_scope.install()
+
+
 def get_sessionmaker() -> async_sessionmaker[AsyncSession]:
     global _sessionmaker
     if _sessionmaker is None:
+        _install_workspace_scope()
         _sessionmaker = async_sessionmaker(get_engine(), expire_on_commit=False, autoflush=True)
     return _sessionmaker
 
@@ -103,6 +111,7 @@ def get_sessionmaker() -> async_sessionmaker[AsyncSession]:
 def configure_engine(url: str) -> AsyncEngine:
     """Replace the global engine (tests, scripts). Existing engine must be disposed by the caller."""
     global _engine, _sessionmaker
+    _install_workspace_scope()
     _engine = create_async_engine(url, **_engine_kwargs(url))
     _sessionmaker = async_sessionmaker(_engine, expire_on_commit=False, autoflush=True)
     return _engine

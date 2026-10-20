@@ -34,6 +34,7 @@ from forge.domain.enums import (
 )
 from forge.infra.db import Base, CreatedAtMixin, UUIDPkMixin
 from forge.infra.models._types import StrEnumType, enum_check
+from forge.infra.models.workspace import ProjectScopedMixin, WorkspaceScopedMixin
 
 _JSON_OBJ = text("'{}'::jsonb")
 _JSON_LIST = text("'[]'::jsonb")
@@ -49,11 +50,12 @@ def _run_fk() -> Mapped[uuid.UUID]:
     )
 
 
-class Judge(UUIDPkMixin, CreatedAtMixin, Base):
+class Judge(UUIDPkMixin, CreatedAtMixin, ProjectScopedMixin, Base):
     """Immutable LLM judge version (``key`` + ``version``). Editing a judge creates a new version."""
 
     __tablename__ = "judges"
     __table_args__ = (
+        Index("ix_judges_workspace_id_key_is_latest", "workspace_id", "key", "is_latest"),
         enum_check("provider", JudgeProvider),
         UniqueConstraint("key", "version"),
         Index("ix_judges_key_is_latest", "key", "is_latest"),
@@ -88,11 +90,12 @@ class Judge(UUIDPkMixin, CreatedAtMixin, Base):
     created_by: Mapped[uuid.UUID | None] = _creator()
 
 
-class EvaluationConfig(UUIDPkMixin, CreatedAtMixin, Base):
+class EvaluationConfig(UUIDPkMixin, CreatedAtMixin, ProjectScopedMixin, Base):
     """ScoreConfiguration: weights, normalisation, gates, judges and aggregation (immutable versions)."""
 
     __tablename__ = "evaluation_configs"
     __table_args__ = (
+        Index("ix_evaluation_configs_workspace_id_key_is_latest", "workspace_id", "key", "is_latest"),
         UniqueConstraint("key", "version"),
         Index("ix_evaluation_configs_key_is_latest", "key", "is_latest"),
     )
@@ -142,7 +145,7 @@ class EvaluationConfig(UUIDPkMixin, CreatedAtMixin, Base):
     created_by: Mapped[uuid.UUID | None] = _creator()
 
 
-class Evaluation(UUIDPkMixin, CreatedAtMixin, Base):
+class Evaluation(UUIDPkMixin, CreatedAtMixin, WorkspaceScopedMixin, Base):
     """One verdict of one evaluator on one criterion of one run (never an aggregate)."""
 
     __tablename__ = "evaluations"
@@ -197,7 +200,7 @@ class Evaluation(UUIDPkMixin, CreatedAtMixin, Base):
     )
 
 
-class Score(UUIDPkMixin, CreatedAtMixin, Base):
+class Score(UUIDPkMixin, CreatedAtMixin, WorkspaceScopedMixin, Base):
     """Per-criterion score of a run for one configuration and one source (AI and human kept apart)."""
 
     __tablename__ = "scores"
@@ -234,7 +237,7 @@ class Score(UUIDPkMixin, CreatedAtMixin, Base):
     )
 
 
-class CompositeScore(UUIDPkMixin, CreatedAtMixin, Base):
+class CompositeScore(UUIDPkMixin, CreatedAtMixin, WorkspaceScopedMixin, Base):
     __tablename__ = "composite_scores"
     __table_args__ = (UniqueConstraint("run_id", "round", "evaluation_config_id"),)
 
@@ -257,7 +260,7 @@ class CompositeScore(UUIDPkMixin, CreatedAtMixin, Base):
     formula: Mapped[str] = mapped_column(Text, nullable=False)
 
 
-class RunError(UUIDPkMixin, CreatedAtMixin, Base):
+class RunError(UUIDPkMixin, CreatedAtMixin, WorkspaceScopedMixin, Base):
     """Classified error detected on a run (taxonomy code, severity, evidence, evaluator, trace ref)."""
 
     __tablename__ = "run_errors"
@@ -290,7 +293,7 @@ class RunError(UUIDPkMixin, CreatedAtMixin, Base):
     criterion_key: Mapped[str | None] = mapped_column(Text, nullable=True)
 
 
-class FeedbackReport(UUIDPkMixin, CreatedAtMixin, Base):
+class FeedbackReport(UUIDPkMixin, CreatedAtMixin, WorkspaceScopedMixin, Base):
     """Structured, machine-readable feedback (run, benchmark execution or experiment)."""
 
     __tablename__ = "feedback_reports"
@@ -336,7 +339,7 @@ class FeedbackReport(UUIDPkMixin, CreatedAtMixin, Base):
     generator: Mapped[str] = mapped_column(Text, nullable=False)
 
 
-class JudgeCacheEntry(CreatedAtMixin, Base):
+class JudgeCacheEntry(CreatedAtMixin, WorkspaceScopedMixin, Base):
     """Cache of judge answers keyed by (judge content, scenario content, output, trace digest)."""
 
     __tablename__ = "judge_cache"

@@ -10,7 +10,14 @@ from forge.infra.models.evaluation import (
     RunError,
     Score,
 )
-from forge.infra.models.identity import ApiKey, AuditEvent, ProviderCredential, User
+from forge.infra.models.identity import (
+    AccountFlag,
+    ApiKey,
+    AuditEvent,
+    ExternalIdentity,
+    ProviderCredential,
+    User,
+)
 from forge.infra.models.job import Job
 from forge.infra.models.programs import (
     Benchmark,
@@ -36,8 +43,19 @@ from forge.infra.models.scenarios import (
     Scenario,
     ScenarioVersion,
 )
+from forge.infra.models.workspace import (
+    ORION_DEFAULT_WORKSPACE_ID,
+    Project,
+    ProjectMember,
+    ProjectScopedMixin,
+    Workspace,
+    WorkspaceMember,
+    WorkspaceScopedMixin,
+)
 
 __all__ = [
+    "ORION_DEFAULT_WORKSPACE_ID",
+    "AccountFlag",
     "Agent",
     "AgentVersion",
     "ApiKey",
@@ -57,11 +75,15 @@ __all__ = [
     "ExecutionTrace",
     "Experiment",
     "ExperimentScenario",
+    "ExternalIdentity",
     "FeedbackReport",
     "Job",
     "Judge",
     "JudgeCacheEntry",
     "ModelConfiguration",
+    "Project",
+    "ProjectMember",
+    "ProjectScopedMixin",
     "PromptVersion",
     "ProviderCredential",
     "RunError",
@@ -71,4 +93,7 @@ __all__ = [
     "ToolConfiguration",
     "TraceEvent",
     "User",
+    "Workspace",
+    "WorkspaceMember",
+    "WorkspaceScopedMixin",
 ]

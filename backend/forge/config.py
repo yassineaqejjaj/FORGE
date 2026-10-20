@@ -54,6 +54,63 @@ class Settings(BaseSettings):
     secrets_key: str = DEV_SECRETS_KEY
     login_rate_limit_per_minute: int = 10
 
+    #: ORION workspace isolation (NOV-105, docs/WORKSPACES.md). ``off`` (default): the workspace columns
+    #: exist and are stamped, nothing is filtered or counted — behaviour identical to before. ``shadow``:
+    #: every read of a row outside the caller's workspace is logged and counted
+    #: (``forge_workspace_violations_total``) but still served. ``enforce``: such rows are invisible (404,
+    #: indistinguishable from an unknown id).
+    workspace_enforcement: Literal["off", "shadow", "enforce"] = "off"
+
+    # --- OIDC relying party (NOV-108, docs/OIDC.md) — everything off by default ---------------------
+    #: ``False`` (default): no OIDC route is mounted and no Bearer token is read as an IdP token; password,
+    #: local JWT and ``fgk_…`` keys behave exactly as before.
+    oidc_enabled: bool = False
+    #: Issuer (``iss``) of the ORION realm, e.g. ``https://idp.example/realms/orion``. Required when enabled.
+    oidc_issuer: str = ""
+    oidc_client_id: str = "forge"
+    #: Client secret of a confidential client (``client_secret_post``); empty for a public PKCE client.
+    oidc_client_secret: str = ""
+    #: ``aud`` FORGE accepts (ADR §3: one token per audience).
+    oidc_audience: str = "forge"
+    #: Endpoints; default to the Keycloak layout under the issuer.
+    oidc_authorization_endpoint: str = ""
+    oidc_token_endpoint: str = ""
+    oidc_jwks_url: str = ""
+    oidc_redirect_uri: str = ""
+    oidc_scopes: str = "openid email profile"
+    oidc_jwks_cache_seconds: float = Field(default=300.0, ge=0.0)
+    #: Minimum delay between two JWKS refreshes forced by an unknown ``kid`` (key rotation, flood guard).
+    oidc_jwks_min_refresh_seconds: float = Field(default=30.0, ge=0.0)
+    oidc_clock_leeway_seconds: float = Field(default=30.0, ge=0.0, le=300.0)
+    #: Longest life of a FORGE session opened by SSO (the IdP token is not stored or refreshed).
+    oidc_session_ttl_minutes: int = Field(default=60, ge=5, le=60 * 24)
+    #: ``False`` (default): an SSO identity with no local account is refused. ``True``: created (viewer-level
+    #: local rights, workspace of the token) when the e-mail is verified.
+    oidc_auto_provision: bool = False
+    #: ADR §8 phase 3: linked users can no longer log in with their password (break-glass admins always can).
+    password_login_disabled_for_linked: bool = False
+    #: Administrators (e-mail, comma separated) that always keep the password login. The bootstrap
+    #: administrator is always one.
+    break_glass_emails: str = ""
+    #: ``True``: an administrator authenticated by SSO needs ``amr`` ∋ ``mfa`` for admin operations.
+    require_mfa_for_admin: bool = False
+
+    # --- Service accounts and API keys (NOV-112, docs/SERVICE_KEYS.md) — all off by default ------------
+    #: ``True``: creating a key requires an explicit ``role`` and ``clearance`` (no silent defaults).
+    api_key_require_explicit: bool = False
+    #: Longest life of a new key in days (0 = no limit). When set, a key needs an ``expires_at`` within it.
+    api_key_max_days: int = Field(default=0, ge=0, le=3650)
+    #: How FORGE authenticates to NOVA: ``token`` (default: the credential's static token, unchanged),
+    #: ``oidc`` (a client-credentials service token of the realm) or ``both`` (the service token, the static
+    #: token when the IdP cannot be reached). Mirrors NOVA's ``NOVA_FORGE_INBOUND_AUTH``.
+    nova_service_auth: Literal["token", "oidc", "both"] = "token"
+    service_client_id: str = "forge-service"
+    service_client_secret: str = ""
+    #: Token endpoint of the service account (defaults to the realm's one, ``FORGE_OIDC_ISSUER``).
+    service_token_endpoint: str = ""
+    #: Scopes asked for NOVA: its audience (``nova-web``) and the right to execute a run (ADR §7).
+    nova_service_scope: str = "orion-audience-nova orion:run.execute"
+
     # --- Observability (FORGE's own telemetry) ---------------------------------------------------
     otlp_endpoint: str = ""
     otlp_headers: str = ""
@@ -171,6 +228,37 @@ class Settings(BaseSettings):
         return value.strip().rstrip("/")
 
     @model_validator(mode="after")
+    def _check_oidc(self) -> Settings:
+        if self.oidc_enabled:
+            if not self.oidc_issuer.strip():
+                raise ValueError("FORGE_OIDC_ISSUER est requis lorsque FORGE_OIDC_ENABLED=true.")
+            issuer = self.oidc_issuer.strip().rstrip("/")
+            self.oidc_issuer = issuer
+            base = f"{issuer}/protocol/openid-connect"
+            self.oidc_authorization_endpoint = self.oidc_authorization_endpoint.strip() or f"{base}/auth"
+            self.oidc_token_endpoint = self.oidc_token_endpoint.strip() or f"{base}/token"
+            self.oidc_jwks_url = self.oidc_jwks_url.strip() or f"{base}/certs"
+            self.oidc_redirect_uri = (
+                self.oidc_redirect_uri.strip() or f"{self.public_base_url}/api/v1/auth/oidc/callback"
+            )
+        return self
+
+    @model_validator(mode="after")
+    def _check_service_auth(self) -> Settings:
+        if self.nova_service_auth != "token":
+            if not self.service_client_secret:
+                raise ValueError(
+                    "FORGE_SERVICE_CLIENT_SECRET est requis lorsque FORGE_NOVA_SERVICE_AUTH != token."
+                )
+            if not self.service_token_endpoint.strip():
+                if not self.oidc_issuer.strip():
+                    raise ValueError("FORGE_SERVICE_TOKEN_ENDPOINT (ou FORGE_OIDC_ISSUER) est requis.")
+                self.service_token_endpoint = (
+                    f"{self.oidc_issuer.strip().rstrip('/')}/protocol/openid-connect/token"
+                )
+        return self
+
+    @model_validator(mode="after")
     def _resolve_git_sha(self) -> Settings:
         self.git_sha = (
             self.git_sha.strip()
@@ -200,6 +288,11 @@ class Settings(BaseSettings):
     @property
     def fernet_key(self) -> bytes:
         return base64.urlsafe_b64encode(hashlib.sha256(self.secrets_key.encode("utf-8")).digest())
+
+    @property
+    def break_glass_set(self) -> frozenset[str]:
+        emails = {e.strip().lower() for e in self.break_glass_emails.split(",") if e.strip()}
+        return frozenset(emails | {self.bootstrap_admin_email.strip().lower()})
 
     @property
     def queues(self) -> list[str]:

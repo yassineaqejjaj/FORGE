@@ -1,0 +1,116 @@
+{
+ "body": {
+  "error": null,
+  "events": [
+   {
+    "attributes": {
+     "nova.step": "intent"
+    },
+    "ended_at": "2026-10-01T12:00:00+00:00",
+    "id": "evt-decision",
+    "input": null,
+    "name": "Understanding your request",
+    "output": "<detail>",
+    "parent_id": null,
+    "started_at": null,
+    "status": "ok",
+    "type": "decision"
+   },
+   {
+    "attributes": {
+     "nova.step": "context"
+    },
+    "ended_at": "2026-10-01T12:00:00+00:00",
+    "id": "evt-retrieval",
+    "input": null,
+    "name": "Using the provided context",
+    "output": "<detail>",
+    "parent_id": null,
+    "started_at": null,
+    "status": "ok",
+    "type": "retrieval"
+   },
+   {
+    "attributes": {
+     "nova.step": "1-write-the-prd:framing"
+    },
+    "ended_at": "2026-10-01T12:00:00+00:00",
+    "id": "evt-custom",
+    "input": null,
+    "name": "Framing the problem and the users",
+    "output": "<detail>",
+    "parent_id": null,
+    "started_at": null,
+    "status": "ok",
+    "type": "custom"
+   },
+   {
+    "attributes": {
+     "input_tokens": 100,
+     "model": "test-model",
+     "nova.skill": "prd",
+     "nova.skill_version": "<version>",
+     "output_tokens": 20
+    },
+    "ended_at": "2026-10-01T12:00:00+00:00",
+    "id": "evt-llm_call",
+    "input": null,
+    "name": "Skill prd@<version>",
+    "output": null,
+    "parent_id": null,
+    "started_at": null,
+    "status": "ok",
+    "type": "llm_call"
+   }
+  ],
+  "metadata": {
+   "accepted_overrides": [
+    "budget.max_steps"
+   ],
+   "artifact_types": [
+    "prd"
+   ],
+   "executed": {
+    "model": "test-model",
+    "nova_version": "0.1.0",
+    "parameters": {
+     "max_cost": 0,
+     "max_steps": 8,
+     "max_tokens": 0
+    },
+    "policy_id": null,
+    "provider": "vllm",
+    "runtime_commit": "",
+    "skill_catalog": "<digest>",
+    "version": "0.1.0+<digest>"
+   },
+   "executed_version": "0.1.0+<digest>",
+   "nova_agent_id": "nova-orchestrator",
+   "nova_task_id": "00000000-0000-4000-8000-000000000000",
+   "nova_version": "0.1.0",
+   "policies": {},
+   "requested_version": "<current release label>",
+   "skill_catalog": "<digest>",
+   "skills": [
+    {
+     "id": "prd",
+     "version": "<version>"
+    }
+   ],
+   "trace_id": null
+  },
+  "model": "test-model",
+  "output": "# Product Requirements Document\n\n## Summary\n\nGenerated text [source: 3bc8be0b-0000-4000-8000-000000000001]\nGenerated text [source: 3bc8be0b-0000-4000-8000-00000",
+  "output_json": {
+   "prd": {}
+  },
+  "protocol": "forge-agent-protocol/v1",
+  "usage": {
+   "input_tokens": 100,
+   "model_calls": 1,
+   "output_tokens": 20,
+   "tool_calls": 0
+  }
+ },
+ "status_code": 200
+}
