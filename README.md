@@ -1,5 +1,16 @@
 # FORGE — Laboratoire d'évaluation des agents IA
 
+<!-- portfolio-summary:start -->
+
+> **Agent evaluation and benchmarking** | **Status:** Bêta publique ; résultats dépendants des scénarios configurés.
+>
+> [Live application](https://forge-pied-rho.vercel.app) · [Architecture](docs/ARCHITECTURE.md) · [Demo / verification](docs/DEMO.md) · [Source code](https://github.com/yassineaqejjaj/FORGE)
+
+[![GitHub Actions](https://github.com/yassineaqejjaj/FORGE/actions/workflows/ci.yml/badge.svg)](https://github.com/yassineaqejjaj/FORGE/actions/workflows/ci.yml)
+
+<!-- portfolio-summary:end -->
+
+
 > **« Est-ce que cette nouvelle version de mon agent est réellement meilleure ? »**
 > FORGE y répond de façon mesurable : sur quels scénarios, sur quels critères, à quel coût,
 > avec quelles erreurs, quelles régressions et quel niveau de confiance.
