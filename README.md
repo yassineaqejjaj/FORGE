@@ -2,6 +2,8 @@
 
 <!-- portfolio-summary:start -->
 
+![Project overview](docs/assets/github-cover.svg)
+
 > **Agent evaluation and benchmarking** | **Status:** Bêta publique ; résultats dépendants des scénarios configurés.
 >
 > [Live application](https://forge-pied-rho.vercel.app) · [Architecture](docs/ARCHITECTURE.md) · [Demo / verification](docs/DEMO.md) · [Source code](https://github.com/yassineaqejjaj/FORGE)
