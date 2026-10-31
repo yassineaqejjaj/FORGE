@@ -15,6 +15,15 @@
 <!-- portfolio-summary:end -->
 
 
+## En un coup d'œil
+
+* **Ce que c'est :** un laboratoire d'évaluation des agents IA : FORGE compare des versions d'agents sur des scénarios versionnés (règles déterministes, juges LLM, évaluation humaine) et produit des scores explicables, des régressions et une recommandation.
+* **Problème :** décider si une nouvelle version d'un agent est réellement meilleure ne se fait pas de façon fiable avec quelques démonstrations subjectives ou un score agrégé unique ([cas d'étude](docs/PORTFOLIO_CASE_STUDY.md#the-problem)).
+* **Statut :** Bêta publique ; résultats dépendants des scénarios configurés (voir [Statut actuel](#statut-actuel)).
+* **Liens :** [Application en ligne](https://forge-pied-rho.vercel.app) · [Architecture](docs/ARCHITECTURE.md) · [Démo](docs/DEMO.md) · [Cas d'étude](docs/PORTFOLIO_CASE_STUDY.md)
+
+**Guide de lecture :** [Solution et fonctionnalités](#ce-que-fait-forge) · [Architecture](#architecture) · [Stack](#stack) · [Captures d'écran](#captures-décran) · [Démarrage rapide](#démarrage-rapide) · [Tests et qualité](#tests-et-qualité) · [Statut actuel](#statut-actuel) · [Limites connues](#limites-connues) · [Feuille de route](#feuille-de-route) · [Licence](#licence)
+
 > **« Est-ce que cette nouvelle version de mon agent est réellement meilleure ? »**
 > FORGE y répond de façon mesurable : sur quels scénarios, sur quels critères, à quel coût,
 > avec quelles erreurs, quelles régressions et quel niveau de confiance.
@@ -182,6 +191,33 @@ make dev-demo-agents    # agents de démonstration sur :8190
 make dev-frontend       # UI sur :3000
 make check              # ruff, mypy, contrats d'architecture, tests, lint + typecheck frontend
 ```
+
+## Captures d'écran
+
+Pas encore documenté : le dépôt ne contient pas de captures d'écran. Le scénario de [démonstration guidée](docs/DEMO.md) et l'[interface en ligne](#en-ligne) permettent de voir la plateforme.
+
+## Tests et qualité
+
+`make check` lance ruff, mypy, les contrats d'architecture, les tests, puis le lint et le typecheck du frontend (voir [Développement](#développement)). Le workflow GitHub Actions est `.github/workflows/ci.yml` (badge en tête de page). FORGE peut aussi servir de garde-fou de CI pour d'autres agents : voir [docs/CI.md](docs/CI.md). Nombre de tests : pas encore documenté.
+
+## Statut actuel
+
+Bêta publique, comme indiqué dans l'encadré en tête de page ; les résultats dépendent des scénarios configurés. Une instance en ligne existe (voir [En ligne](#en-ligne)). Le SSO OIDC est désactivé par défaut ([docs/OIDC.md](docs/OIDC.md)).
+
+## Limites connues
+
+* Sans clé LLM, FORGE utilise un juge heuristique hors ligne, clairement signalé ; un juge LLM doit être configuré pour des évaluations de production.
+* Les résultats dépendent des scénarios configurés.
+* Des limites connues de l'intégration ORBIT sont listées dans [docs/OPERATIONS.md](docs/OPERATIONS.md).
+* Les indicateurs du [cas d'étude](docs/PORTFOLIO_CASE_STUDY.md#limitations-and-honest-disclosure) sont des mesures proposées, pas des résultats obtenus.
+
+## Feuille de route
+
+Pas encore documenté.
+
+## Licence
+
+Pas encore de fichier de licence.
 
 ---
 
