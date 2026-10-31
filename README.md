@@ -182,3 +182,9 @@ make dev-demo-agents    # agents de démonstration sur :8190
 make dev-frontend       # UI sur :3000
 make check              # ruff, mypy, contrats d'architecture, tests, lint + typecheck frontend
 ```
+
+---
+
+## Part of an engineering approach
+
+Built with the [Agentic SDLC framework](https://github.com/yassineaqejjaj/agentic-sdlc) (earned autonomy). Read how this project was built and what its checks caught in the [case study](https://github.com/yassineaqejjaj/agentic-sdlc/blob/main/docs/case-studies/forge.md).
