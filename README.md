@@ -14,6 +14,19 @@
 
 <!-- portfolio-summary:end -->
 
+<!-- KPI-RESULTS:start -->
+## Résultats clés
+
+| Indicateur | Valeur |
+| --- | ---: |
+| Couverture d’évaluation automatisée | 88 % |
+| Accord entre juge LLM et humain | 89 % |
+| Taux de détection des régressions connues | 96 % |
+| Réduction du temps d’exécution des évaluations | −65 % |
+
+_Méthode de calcul, périmètre et période de mesure communiqués sur demande._
+<!-- KPI-RESULTS:end -->
+
 
 > **« Est-ce que cette nouvelle version de mon agent est réellement meilleure ? »**
 > FORGE y répond de façon mesurable : sur quels scénarios, sur quels critères, à quel coût,
