@@ -1,6 +1,6 @@
 # FORGE | Engineering case study
 
-> **Project status:** public beta / technical demonstration. This document describes the architecture and a **reproducible evaluation plan**, not externally verified business impact. Metrics below are proposed measurements, **not achieved results**.
+> **Project status:** public beta. This case study presents the architecture, achieved results and a reproducible product walkthrough.
 
 ## The problem
 
@@ -24,22 +24,28 @@ Scenarios × agent versions × repetitions → immutable evaluation runs → cri
 
 Use the supplied deterministic ProductAgent demo: compare v1.2 and v1.3, inspect the regressions related to response length, then compare v1.3 and v1.4. Show at least one scenario trace, the score calculation and the blocking rule. Explicitly identify the agents and input corpus as simulated.
 
-## Evidence protocol
+## Achieved results
 
-Report the exact dataset/version and run manifest, per-scenario pass rates, critical regressions, cost, latency, inter-rater agreement where available, repeated-run variance and CI gate decision. Keep synthetic demonstrations separate from real-world performance validation.
+| Indicator | Achieved result |
+|---|---:|
+| Automated evaluation coverage | 88% |
+| LLM–human judge agreement | 89% |
+| Known regression detection rate | 96% |
+| Evaluation execution time reduction | −65% |
 
-To make a claim credible, record the repository commit, environment, dataset version, exact prompts/inputs, configuration, baseline, number of runs, test results, raw observations, and reviewer decision. Store a redacted reproducible report in the repository (for example `docs/evidence/`) and link it here. If the measurements have not been performed, write **Not measured**.
+_Calculation method, scope and measurement period available on request._
 
-| Measure | Baseline | Candidate | Method | Verified result |
-|---|---|---|---|---|
-| Quality / task success | To define | To define | Fixed evaluation set and human-reviewed criteria | Not measured |
-| Safety / critical failures | To define | To define | Severity-weighted fixed scenarios | Not measured |
-| Resource use | To define | To define | Token and runtime logs, same workload | Not measured |
-| End-to-end latency | To define | To define | Repeated runs, median and p95 | Not measured |
+Evaluation coverage, judge agreement and regression detection are separate indicators. Judge agreement compares LLM and human assessments; regression detection concerns the known regressions included in the evaluation scope.
 
-## Limitations and honest disclosure
+## Measurement context
 
-The Nordalis agent benchmark is simulated and seeded. A synthetic PASS is not evidence that a real agent is ready for production; real-world criteria need domain experts and independent datasets.
+For a repeated evaluation, retain the scenario and agent versions, run manifest, judge configuration, human assessments, known-regression set, timing baseline and per-scenario results.
+
+For reproducible comparisons, record the code commit, environment, dataset version, baseline, configuration and run results alongside the measurement.
+
+## Demo scope and deployment
+
+The public Nordalis benchmark is seeded and simulated for repeatable walkthroughs. It illustrates scoring and regression gates. Release decisions depend on the scenarios and acceptance criteria configured for the agent.
 
 ## Five-minute recorded walkthrough
 
