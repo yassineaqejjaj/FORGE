@@ -12,8 +12,12 @@ Versioned scenarios and agent configurations, deterministic/LLM/human evaluation
 
 ## System flow
 
-```text
-Scenarios × agent versions × repetitions → immutable evaluation runs → criteria and human review → baseline/candidate comparison → regression gate.
+```mermaid
+flowchart LR
+    scenarios["Scenarios × agent versions × repetitions"] --> runs["Immutable evaluation runs"]
+    runs --> review["Criteria and human review"]
+    review --> comparison["Baseline / candidate comparison"]
+    comparison --> gate["Regression gate"]
 ```
 
 ## What is available to inspect
@@ -60,3 +64,4 @@ The public Nordalis benchmark is seeded and simulated for repeatable walkthrough
 ---
 
 [Back to repository](../README.md)
+
